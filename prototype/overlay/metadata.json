@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Id": "kubikoverlayproto",
+        "Name": "Kubik Overlay Prototype",
+        "Description": "Protótipo descartável: borda ativa e barra de abas em overlay QML.",
+        "Version": "0.0.1",
+        "License": "GPL-3.0-or-later",
+        "EnabledByDefault": false
+    },
+    "X-Plasma-API": "declarativescript",
+    "X-Plasma-MainScript": "ui/main.qml",
+    "KPackageStructure": "KWin/Script"
+}
