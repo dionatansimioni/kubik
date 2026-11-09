@@ -21,6 +21,9 @@ export const DEFAULT_FLOATING_CLASSES = [
  */
 export function floatReason(w: KWinWindow, floatingClasses: readonly string[]): string | null {
   if (!w.normalWindow) return "não é janela normal";
+  // Overlays do próprio KWin/scripts (bordas, prévias): sem classe e fora do
+  // Alt+Tab. Sem esta regra, a borda do protótipo entrava no tiling.
+  if (!w.resourceClass && w.skipSwitcher) return "janela interna do KWin";
   if (w.dialog) return "diálogo";
   if (w.splash) return "splash";
   if (w.utility) return "utilitário";

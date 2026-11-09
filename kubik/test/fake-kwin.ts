@@ -33,6 +33,12 @@ export class FakeWindow implements KWinWindow {
   minSize = { width: 0, height: 0 };
   maxSize = { width: 0, height: 0 };
   onAllDesktops = false;
+  skipSwitcher = false;
+  move = false;
+  resize = false;
+  readonly interactiveMoveResizeStarted = new FakeSignal();
+  readonly interactiveMoveResizeStepped = new FakeSignal<[Rect]>();
+  readonly interactiveMoveResizeFinished = new FakeSignal();
   readonly minimizedChanged = new FakeSignal();
   readonly fullScreenChanged = new FakeSignal();
   readonly desktopsChanged = new FakeSignal();
@@ -63,6 +69,25 @@ export class FakeWindow implements KWinWindow {
     this.geo = r;
     this.applied.push(r);
   }
+  /**
+   * Simula o usuário arrastando a janela (mode "move") ou uma borda dela
+   * ("resize"), passando pelos retângulos `steps`. Como no KWin, o KWin
+   * aplica cada passo à própria janela arrastada.
+   */
+  dragThrough(mode: "move" | "resize", steps: Rect[], ws?: FakeWorkspace, cursor?: { x: number; y: number }, output?: Output): void {
+    this.move = mode === "move";
+    this.resize = mode === "resize";
+    this.interactiveMoveResizeStarted.emit();
+    for (const r of steps) {
+      this.geo = r;
+      if (ws && cursor) ws.cursorPos = cursor;
+      if (output && output !== this._output) this.output = output;
+      this.interactiveMoveResizeStepped.emit(r);
+    }
+    this.move = this.resize = false;
+    this.interactiveMoveResizeFinished.emit();
+  }
+
   get minimized(): boolean {
     return this._minimized;
   }
@@ -96,6 +121,7 @@ export class FakeWindow implements KWinWindow {
 export class FakeWorkspace implements Workspace {
   stackingOrder: FakeWindow[] = [];
   activeWindow: FakeWindow | null = null;
+  cursorPos = { x: 0, y: 0 };
   readonly windowAdded = new FakeSignal<[KWinWindow]>();
   readonly windowRemoved = new FakeSignal<[KWinWindow]>();
   readonly windowActivated = new FakeSignal<[KWinWindow | null]>();
@@ -127,6 +153,7 @@ export const DESK_2: VirtualDesktop = { id: "desk-2" };
 
 export function fakeHost(ws: FakeWorkspace) {
   const logs: string[] = [];
+  const previews: Array<Rect | null> = [];
   const areas: Record<string, Rect> = {
     "DP-1": { x: 0, y: 0, width: 1280, height: 800 },
     "HDMI-1": { x: 1280, y: 0, width: 1000, height: 1000 },
@@ -135,6 +162,7 @@ export function fakeHost(ws: FakeWorkspace) {
     workspace: ws,
     clientArea: (o) => areas[o.name],
     log: (m) => logs.push(m),
+    preview: (r) => previews.push(r),
   };
-  return { host, logs };
+  return { host, logs, previews };
 }

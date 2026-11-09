@@ -8,6 +8,7 @@ import {
 let ws: FakeWorkspace;
 let ctl: Controller;
 let logs: string[];
+let previews: Array<import("../src/core/rect").Rect | null>;
 
 function win(caption: string, output = SCREEN_A, desktop = DESK_1): FakeWindow {
   return new FakeWindow(caption, output, desktop);
@@ -17,6 +18,7 @@ beforeEach(() => {
   ws = new FakeWorkspace();
   const h = fakeHost(ws);
   logs = h.logs;
+  previews = h.previews;
   ctl = new Controller(h.host);
   ctl.start();
 });
@@ -132,6 +134,9 @@ describe("Controller", () => {
       ["tamanho fixo", (w) => { w.minSize = { width: 300, height: 200 }; w.maxSize = { width: 300, height: 200 }; }],
       ["em todos os desktops", (w) => (w.onAllDesktops = true)],
       ["classe da lista padrão", (w) => (w.resourceClass = "org.kde.krunner")],
+      // Regressão: a borda do protótipo (janela interna do KWin) entrou no
+      // tiling e empurrou as janelas do usuário para a metade direita.
+      ["janela interna do KWin (overlay)", (w) => { w.resourceClass = ""; w.skipSwitcher = true; }],
     ];
     for (const [name, setup] of cases) {
       it(name, () => {
@@ -193,5 +198,61 @@ describe("Controller", () => {
     expect(a.minimizedChanged.count).toBe(0);
     const b = ws.open(win("b"));
     expect(b.applied).toEqual([]);
+  });
+
+  describe("mouse", () => {
+    it("redimensionar pela borda move a divisão e a vizinha acompanha ao vivo", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      a.dragThrough("resize", [rect(4, 4, 700, 792), rect(4, 4, 834, 792)]);
+      expect(a.frameGeometry).toEqual(rect(4, 4, 834, 792));
+      expect(b.frameGeometry).toEqual(rect(842, 4, 434, 792));
+      // durante o arrasto o kubik não briga com o KWin pela janela arrastada
+      expect(a.applied.filter((r) => r.width === 700)).toEqual([]);
+    });
+
+    it("arrastar e soltar sobre outra janela troca as duas de lugar", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      a.dragThrough("move", [rect(300, 50, 634, 792), rect(700, 60, 634, 792)], ws, { x: 900, y: 300 });
+      expect(a.frameGeometry).toEqual(rect(642, 4, 634, 792));
+      expect(b.frameGeometry).toEqual(rect(4, 4, 634, 792));
+    });
+
+    it("mostra a prévia do destino durante o arrasto e esconde ao soltar", () => {
+      const a = ws.open(win("a"));
+      ws.open(win("b"));
+      a.dragThrough("move", [rect(700, 60, 634, 792)], ws, { x: 900, y: 300 });
+      expect(previews).toEqual([rect(642, 4, 634, 792), null]);
+    });
+
+    it("soltar num gap ou sobre ela mesma devolve a janela ao lugar", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      a.dragThrough("move", [rect(50, 80, 634, 792)], ws, { x: 640, y: 300 }); // gap
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      expect(b.frameGeometry).toEqual(rect(642, 4, 634, 792));
+    });
+
+    it("soltar em outra tela leva a janela para a árvore de lá", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      const c = ws.open(win("c", SCREEN_B));
+      a.dragThrough("move", [rect(1500, 100, 634, 792)], ws, { x: 1700, y: 300 }, SCREEN_B);
+      expect(b.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      // tela B é quadrada (992×992 úteis): empate divide lado a lado
+      expect(c.frameGeometry).toEqual(rect(1284, 4, 494, 992));
+      expect(a.frameGeometry).toEqual(rect(1782, 4, 494, 992));
+    });
+
+    it("arrastar uma janela flutuante não mexe no tiling", () => {
+      const a = ws.open(win("a"));
+      const f = win("f");
+      f.dialog = true;
+      ws.open(f);
+      f.dragThrough("move", [rect(10, 10, 300, 200)], ws, { x: 100, y: 100 });
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(previews).toEqual([]);
+    });
   });
 });

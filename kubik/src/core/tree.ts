@@ -6,6 +6,14 @@ import { type Rect, inset } from "./rect";
  */
 export type Orientation = "horizontal" | "vertical";
 
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/** Menor tamanho (px) que um lado de uma divisão pode ter ao redimensionar. */
+export const MIN_SIDE = 60;
+
 export interface Gaps {
   /** Espaço entre as janelas e a borda da área de trabalho. */
   outer: number;
@@ -119,12 +127,71 @@ export class Tree {
     return out;
   }
 
+  /** A janela cuja área contém `p` (os gaps não pertencem a ninguém). */
+  idAt(p: Point, area: Rect, gaps: Gaps): string | null {
+    for (const [id, r] of this.layout(area, gaps))
+      if (p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height) return id;
+    return null;
+  }
+
+  /** Troca duas janelas de lugar; a forma da árvore não muda. */
+  swap(a: string, b: string): void {
+    const la = this.leaves.get(a);
+    const lb = this.leaves.get(b);
+    if (!la || !lb || la === lb) return;
+    la.id = b;
+    lb.id = a;
+    this.leaves.set(a, lb);
+    this.leaves.set(b, la);
+  }
+
+  /**
+   * Ajusta as proporções das divisões para que a janela `id` fique o mais
+   * perto possível de `desired` (o retângulo que o usuário arrastou).
+   * Cada borda que mudou move a divisão ancestral que fica naquela borda;
+   * bordas sem vizinho (borda da tela) são ignoradas.
+   */
+  resizeTo(id: string, desired: Rect, area: Rect, gaps: Gaps): void {
+    const leaf = this.leaves.get(id);
+    if (!leaf) return;
+    const edges: Array<[Orientation, "first" | "second", (s: Rect) => number]> = [
+      // [orientação, lado em que a janela está, tamanho desejado do 1º filho]
+      ["horizontal", "first", (s) => desired.x + desired.width - s.x],
+      ["horizontal", "second", (s) => desired.x - gaps.inner - s.x],
+      ["vertical", "first", (s) => desired.y + desired.height - s.y],
+      ["vertical", "second", (s) => desired.y - gaps.inner - s.y],
+    ];
+    for (const [orientation, side, firstSize] of edges) {
+      const split = this.ancestorAt(leaf, orientation, side);
+      if (!split) continue;
+      const sr = this.nodeRects(area, gaps).get(split)!;
+      const usable = (orientation === "horizontal" ? sr.width : sr.height) - gaps.inner;
+      if (usable <= 2 * MIN_SIDE) continue;
+      const wanted = Math.min(usable - MIN_SIDE, Math.max(MIN_SIDE, firstSize(sr)));
+      split.ratio = wanted / usable;
+    }
+  }
+
   shape(): TreeShape | null {
     const s = (n: Node): TreeShape =>
       n.kind === "leaf"
         ? n.id
         : { split: n.orientation, ratio: n.ratio, first: s(n.first), second: s(n.second) };
     return this.root ? s(this.root) : null;
+  }
+
+  /** O ancestral mais próximo com essa orientação em que `leaf` está no lado `side`. */
+  private ancestorAt(leaf: Leaf, orientation: Orientation, side: "first" | "second"): Split | null {
+    let child: Node = leaf;
+    for (let p = leaf.parent; p; child = p, p = p.parent)
+      if (p.orientation === orientation && p[side] === child) return p;
+    return null;
+  }
+
+  private nodeRects(area: Rect, gaps: Gaps): Map<Node, Rect> {
+    const nodes = new Map<Node, Rect>();
+    if (this.root) this.place(this.root, inset(area, gaps.outer), gaps.inner, new Map(), nodes);
+    return nodes;
   }
 
   private pickTarget(target: string | null, rects: Map<string, Rect>): Leaf {
@@ -149,23 +216,32 @@ export class Tree {
     else p.second = next;
   }
 
-  private place(n: Node, r: Rect, inner: number, out: Map<string, Rect>): void {
+  private place(
+    n: Node,
+    r: Rect,
+    inner: number,
+    out: Map<string, Rect>,
+    nodes: Map<Node, Rect> = new Map(),
+  ): void {
+    nodes.set(n, r);
     if (n.kind === "leaf") {
       out.set(n.id, r);
       return;
     }
+    // Math.round (não floor): proporções vindas de um resize (ex.: 534/1268)
+    // multiplicadas de volta precisam dar exatamente o tamanho pedido.
     if (n.orientation === "horizontal") {
       const usable = Math.max(0, r.width - inner);
-      const a = Math.max(1, Math.floor(usable * n.ratio));
+      const a = Math.max(1, Math.round(usable * n.ratio));
       const b = Math.max(1, usable - a);
-      this.place(n.first, { x: r.x, y: r.y, width: a, height: r.height }, inner, out);
-      this.place(n.second, { x: r.x + a + inner, y: r.y, width: b, height: r.height }, inner, out);
+      this.place(n.first, { x: r.x, y: r.y, width: a, height: r.height }, inner, out, nodes);
+      this.place(n.second, { x: r.x + a + inner, y: r.y, width: b, height: r.height }, inner, out, nodes);
     } else {
       const usable = Math.max(0, r.height - inner);
-      const a = Math.max(1, Math.floor(usable * n.ratio));
+      const a = Math.max(1, Math.round(usable * n.ratio));
       const b = Math.max(1, usable - a);
-      this.place(n.first, { x: r.x, y: r.y, width: r.width, height: a }, inner, out);
-      this.place(n.second, { x: r.x, y: r.y + a + inner, width: r.width, height: b }, inner, out);
+      this.place(n.first, { x: r.x, y: r.y, width: r.width, height: a }, inner, out, nodes);
+      this.place(n.second, { x: r.x, y: r.y + a + inner, width: r.width, height: b }, inner, out, nodes);
     }
   }
 }

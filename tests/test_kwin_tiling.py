@@ -5,6 +5,7 @@ por um script de inspeção dentro do KWin), não a que o kubik pediu.
 Tela virtual: 1280×800 sem painéis; gaps padrão de 4 px.
 """
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -32,6 +33,8 @@ def parse_windows(log):
 
 @unittest.skipUnless(kwin_env_available(), "testenv indisponível (docker/vgem)")
 class TilingInKWinTest(unittest.TestCase):
+    EXTRA_PKGS = ""
+
     @classmethod
     def setUpClass(cls):
         cls.out = tempfile.mkdtemp(prefix="kubik-tiling-")
@@ -39,6 +42,7 @@ class TilingInKWinTest(unittest.TestCase):
             [str(ROOT / "testenv" / "run.sh"), "kubik/package",
              "tests/scenarios/tiling.sh", cls.out],
             cwd=ROOT, check=True, capture_output=True, timeout=300,
+            env=dict(os.environ, KUBIK_EXTRA_PKGS=cls.EXTRA_PKGS),
         )
         with open(f"{cls.out}/kwin.log", errors="replace") as f:
             cls.log = f.read()
@@ -84,6 +88,18 @@ class TilingInKWinTest(unittest.TestCase):
         geos = self.w["on_again"]
         self.assertEqual(set(geos), {"Alpha", "Beta", "Delta"})
         self.assertEqual(sorted(geos.values()), sorted([LEFT, RIGHT_TOP, RIGHT_BOTTOM]))
+
+
+class TilingWithOverlayPrototypeTest(TilingInKWinTest):
+    """Regressão (relato do usuário): com o protótipo de overlays ativo, a borda
+    dele (janela interna do KWin) entrava no tiling, ocupava a metade esquerda
+    e as janelas do usuário se dividiam só na metade direita."""
+
+    EXTRA_PKGS = "prototype/overlay"
+
+    def test_overlay_border_is_not_tiled(self):
+        self.assertIn("janela interna do KWin", self.log)
+        self.assertNotIn("tiling '' em", self.log)
 
 
 if __name__ == "__main__":

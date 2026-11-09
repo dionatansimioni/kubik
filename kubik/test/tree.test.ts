@@ -96,3 +96,70 @@ describe("Tree", () => {
     expect(t.layout(area, GAPS).get("a")).toEqual(rect(1924, 40, 1272, 756));
   });
 });
+
+describe("Tree: operações do mouse", () => {
+  it("idAt encontra a janela sob o cursor (gaps não contam)", () => {
+    const t = tree("a", "b", "c");
+    expect(t.idAt({ x: 100, y: 100 }, AREA, GAPS)).toBe("a");
+    expect(t.idAt({ x: 900, y: 100 }, AREA, GAPS)).toBe("b");
+    expect(t.idAt({ x: 900, y: 700 }, AREA, GAPS)).toBe("c");
+    expect(t.idAt({ x: 640, y: 100 }, AREA, GAPS)).toBeNull(); // no gap entre a e b
+    expect(t.idAt({ x: 2000, y: 100 }, AREA, GAPS)).toBeNull();
+  });
+
+  it("swap troca duas janelas de lugar e mantém a forma", () => {
+    const t = tree("a", "b", "c");
+    t.swap("a", "c");
+    expect(t.shape()).toEqual({
+      split: "horizontal",
+      ratio: 0.5,
+      first: "c",
+      second: { split: "vertical", ratio: 0.5, first: "b", second: "a" },
+    });
+    const l = t.layout(AREA, GAPS);
+    expect(l.get("c")).toEqual(rect(4, 4, 634, 792));
+    expect(l.get("a")).toEqual(rect(642, 402, 634, 394));
+  });
+
+  it("swap com id desconhecido não faz nada", () => {
+    const t = tree("a", "b");
+    t.swap("a", "zzz");
+    expect(t.ids()).toEqual(["a", "b"]);
+  });
+
+  it("resizeTo: puxar a borda direita da janela da esquerda move a divisão", () => {
+    const t = tree("a", "b");
+    t.resizeTo("a", rect(4, 4, 834, 792), AREA, GAPS);
+    const l = t.layout(AREA, GAPS);
+    expect(l.get("a")).toEqual(rect(4, 4, 834, 792));
+    expect(l.get("b")).toEqual(rect(842, 4, 434, 792));
+  });
+
+  it("resizeTo: puxar a borda esquerda da janela da direita move a mesma divisão", () => {
+    const t = tree("a", "b");
+    t.resizeTo("b", rect(442, 4, 834, 792), AREA, GAPS);
+    const l = t.layout(AREA, GAPS);
+    expect(l.get("a")).toEqual(rect(4, 4, 434, 792));
+    expect(l.get("b")).toEqual(rect(442, 4, 834, 792));
+  });
+
+  it("resizeTo ajusta a divisão certa em árvore aninhada (horizontal e vertical juntas)", () => {
+    const t = tree("a", "b", "c"); // a | (b / c)
+    // c cresce para a esquerda (divisão a|bc) e para cima (divisão b/c)
+    t.resizeTo("c", rect(542, 302, 734, 494), AREA, GAPS);
+    const l = t.layout(AREA, GAPS);
+    expect(l.get("a")).toEqual(rect(4, 4, 534, 792));
+    expect(l.get("b")).toEqual(rect(542, 4, 734, 294));
+    expect(l.get("c")).toEqual(rect(542, 302, 734, 494));
+  });
+
+  it("resizeTo ignora bordas sem vizinho (borda da tela) e limita a proporção", () => {
+    const t = tree("a", "b");
+    t.resizeTo("a", rect(-500, 4, 1276, 792), AREA, GAPS); // borda esquerda: sem vizinho
+    const l = t.layout(AREA, GAPS);
+    expect(l.get("a")!.x).toBe(4);
+    t.resizeTo("a", rect(4, 4, 5000, 792), AREA, GAPS); // não pode engolir b
+    const l2 = t.layout(AREA, GAPS);
+    expect(l2.get("b")!.width).toBeGreaterThanOrEqual(60);
+  });
+});

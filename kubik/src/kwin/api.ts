@@ -4,6 +4,7 @@
  * o que os testes simulam (test/fake-kwin.ts).
  */
 import type { Rect } from "../core/rect";
+import type { Point } from "../core/tree";
 
 export interface Signal<Args extends unknown[] = []> {
   connect(handler: (...args: Args) => void): void;
@@ -38,6 +39,11 @@ export interface KWinWindow {
   readonly minimized: boolean;
   readonly fullScreen: boolean;
   readonly onAllDesktops: boolean;
+  /** Fora do Alt+Tab. Junto com resourceClass vazio, indica janela interna do KWin. */
+  readonly skipSwitcher: boolean;
+  /** true enquanto o usuário move / redimensiona a janela com o mouse. */
+  readonly move: boolean;
+  readonly resize: boolean;
   readonly minSize: Size;
   readonly maxSize: Size;
   readonly desktops: VirtualDesktop[];
@@ -49,11 +55,16 @@ export interface KWinWindow {
   readonly fullScreenChanged: Signal;
   readonly desktopsChanged: Signal;
   readonly outputChanged: Signal;
+  readonly interactiveMoveResizeStarted: Signal;
+  /** Geometria que o usuário está arrastando (ainda não aplicada). */
+  readonly interactiveMoveResizeStepped: Signal<[Rect]>;
+  readonly interactiveMoveResizeFinished: Signal;
 }
 
 export interface Workspace {
   readonly stackingOrder: KWinWindow[];
   readonly activeWindow: KWinWindow | null;
+  readonly cursorPos: Point;
   readonly windowAdded: Signal<[KWinWindow]>;
   readonly windowRemoved: Signal<[KWinWindow]>;
   readonly windowActivated: Signal<[KWinWindow | null]>;
@@ -65,4 +76,6 @@ export interface Host {
   /** Área útil (sem painéis) da tela × desktop. */
   clientArea(output: Output, desktop: VirtualDesktop): Rect;
   log(message: string): void;
+  /** Mostra (ou esconde, com null) a prévia de onde a janela arrastada vai entrar. */
+  preview(rect: Rect | null): void;
 }

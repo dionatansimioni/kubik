@@ -65,7 +65,7 @@ Comunicação com o script: o plasmoid aciona os atalhos globais do script via k
 - **Distribuição:** KWin Script e plasmoid na KDE Store, mais um release no GitHub com `install.sh` (kpackagetool6) que instala os dois.
 - **Testes:**
   - Vitest sobre o núcleo puro.
-  - Checklist manual em sessão aninhada (`kwin_wayland --windowed`).
+  - Integração num KWin real e headless (`testenv/`, Arch e Fedora 44), com mouse simulado, conferindo a geometria aplicada e os pixels.
 - **Licença:** GPL-3.0-or-later.
 - **Idiomas:** inglês e pt-BR via i18n (`.po`).
 - **Repositório:** GitHub.
@@ -83,6 +83,9 @@ Validadas no `testenv/`:
 
 7. **JavaScript também é guardado em cache pela URL.** Por isso o bundle do TypeScript é embutido no `Kubik.qml`, carregado com URL única, em vez de importado de um `.js`.
 8. **Para uma janela nova, `windowActivated` chega ANTES de `windowAdded`.** O alvo da divisão vem de um histórico de foco, não de "a última ativa que eu conheço".
+
+9. **Overlays de scripts aparecem como janelas normais.** Eles chegam como `normalWindow: true`, com `resourceClass` vazio e `skipSwitcher: true`. Sem uma regra, entram no tiling: a borda do protótipo ocupou metade da tela do usuário.
+10. **Durante um arrasto, `outputChanged` dispara a cada passo.** O kubik ignora esses sinais da janela arrastada, e quem decide o destino é o drop.
 
 ## Riscos
 

@@ -11,18 +11,21 @@ Baixe a versão mais recente em **Releases** e escolha uma das formas:
 
 Para remover: `./kubik-<versão>/uninstall.sh`. Logs: `journalctl --user -b | grep '\[kubik\]'`.
 
-## O que já funciona (0.1.0)
+## O que já funciona (0.2.0)
 
 - Janelas novas são organizadas em árvore BSP. A janela focada é dividida ao meio pelo lado mais longo.
 - Fechar ou minimizar uma janela devolve o espaço às vizinhas.
 - Há uma árvore por tela × desktop virtual. Mover uma janela de tela ou de desktop a reorganiza no destino.
 - Gaps de 4 px.
-- Ficam flutuantes, fora do tiling: diálogos, transientes, splash, janelas de tamanho fixo ou não redimensionáveis, janelas em todos os desktops, tela cheia, e algumas classes do Plasma (krunner, plasmashell, yakuake…).
+- Ficam flutuantes, fora do tiling: janelas internas do KWin (bordas e prévias de scripts), diálogos, transientes, splash, janelas de tamanho fixo ou não redimensionáveis, janelas em todos os desktops, tela cheia, e algumas classes do Plasma (krunner, plasmashell, yakuake…).
+- **Mouse:**
+  - Arrastar uma janela pela barra de título mostra uma prévia translúcida do destino. Soltar sobre outra janela troca as duas de lugar; soltar em outra tela leva a janela para a árvore de lá; soltar num gap devolve a janela ao lugar.
+  - Puxar a borda entre duas janelas redimensiona as duas ao vivo, e a proporção fica gravada na árvore.
 - **Meta+Y** liga e desliga o tiling. Ao desligar, as janelas voltam à posição e ao tamanho de antes.
 
 ## Ainda não
 
-Navegação e movimento por teclado, redimensionar e arrastar com o mouse, stacking, borda ativa, ícone na bandeja, configurações. Ver `docs/DESIGN.md`.
+Animações, navegação e movimento por teclado, stacking, borda ativa, ícone na bandeja, configurações. Ver `docs/DESIGN.md`.
 
 ## Desenvolvimento
 
