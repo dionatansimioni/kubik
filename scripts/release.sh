@@ -12,6 +12,8 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 python3 -m unittest discover -s tests
+# Os testes de integração também rodam no Fedora 44 (distro do usuário).
+(cd tests && KUBIK_TESTENV=fedora python3 -m unittest discover -p 'test_kwin_*.py')
 
 ID=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["KPlugin"]["Id"])' "$PKG/metadata.json")
 VERSION=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["KPlugin"]["Version"])' "$PKG/metadata.json")

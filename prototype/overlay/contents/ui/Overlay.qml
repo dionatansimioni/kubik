@@ -251,4 +251,13 @@ Item {
         tabWin = tabComponent.createObject(null);
         log("carregado; activeWindow=" + (active ? active.caption : "nenhuma") + " overlays=" + !!borderWin + "/" + !!tabWin);
     }
+    // Os overlays não têm pai (createObject(null)): se não forem destruídos
+    // aqui, sobrevivem ao descarregamento do script como bordas "fantasma".
+    Component.onDestruction: {
+        if (borderWin)
+            borderWin.destroy();
+        if (tabWin)
+            tabWin.destroy();
+        log("descarregado");
+    }
 }

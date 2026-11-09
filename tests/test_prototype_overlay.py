@@ -39,7 +39,7 @@ class MetadataTest(unittest.TestCase):
 
 @unittest.skipUnless(Path(QMLLINT).exists(), "qmllint não encontrado")
 class QmlLintTest(unittest.TestCase):
-    QML = PKG / "contents" / "ui" / "main.qml"
+    QML = PKG / "contents" / "ui" / "Overlay.qml"
     WARNING = re.compile(r"^(Warning|Error): .*?:(\d+):(\d+): (.*) \[([\w-]+)\]$")
 
     def lint(self):
@@ -67,6 +67,17 @@ class QmlLintTest(unittest.TestCase):
                 continue  # tipos do org.kde.kwin, só existem dentro do KWin
             unexpected.append(line)
         self.assertEqual(unexpected, [], "avisos inesperados:\n" + "\n".join(unexpected))
+
+
+class LoaderStubTest(unittest.TestCase):
+    """Regressão da v0.0.3: o KWin guarda o QML compilado por URL até reiniciar.
+    main.qml deve ser só um carregador que usa uma URL única a cada carga."""
+
+    def test_main_qml_is_a_cache_busting_loader(self):
+        src = (PKG / "contents" / "ui" / "main.qml").read_text(encoding="utf-8")
+        self.assertIn("Loader", src)
+        self.assertRegex(src, r'Qt\.resolvedUrl\("\w+\.qml"\)\s*\+\s*"\?load="\s*\+\s*Date\.now\(\)')
+        self.assertNotIn("org.kde.kwin", src)
 
 
 class KWinImportTest(unittest.TestCase):
