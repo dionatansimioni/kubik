@@ -8,4 +8,5 @@ Auto-tiling no estilo Pop!_Shell para KDE Plasma 6. O design está em `docs/DESI
 - **Testes:** rode `python3 -m unittest discover -s tests -v` (e, quando existir, a suíte Vitest do núcleo TS) após **toda** modificação. Se algo falhar, analise o bug, corrija e rode de novo até tudo passar, antes de commitar.
 - **Novo recurso testável = novo teste**, no mesmo commit.
 - `qmllint` fica em `/usr/lib/qt6/bin/qmllint`. O KWin não está disponível neste ambiente, então os testes de integração são manuais (`prototype/README.md`).
+- **Versões de teste:** aumente `KPlugin.Version` no `metadata.json`, commite e rode `scripts/release.sh`. Ele roda os testes, gera o `.kwinscript` e o `.tar.gz` (`scripts/build.py`), cria a tag `<Id>-v<versão>` e publica uma pré-release no repositório privado `dionatansimioni/kubik`.
 - Idioma: interface em en/pt-BR. A documentação do projeto é em pt-BR.

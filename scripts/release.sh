@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Publica uma versão de teste como GitHub Release (pré-release) com os pacotes anexados.
+# Uso: scripts/release.sh [diretório-do-pacote]   (padrão: prototype/overlay)
+# A versão vem de KPlugin.Version no metadata.json; a tag é <Id>-v<Versão>.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+PKG=${1:-prototype/overlay}
+
+if [ -n "$(git status --porcelain)" ]; then
+    echo "erro: há mudanças não commitadas" >&2; exit 1
+fi
+
+python3 -m unittest discover -s tests
+
+ID=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["KPlugin"]["Id"])' "$PKG/metadata.json")
+VERSION=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["KPlugin"]["Version"])' "$PKG/metadata.json")
+TAG="$ID-v$VERSION"
+
+if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+    echo "erro: a tag $TAG já existe; aumente KPlugin.Version em $PKG/metadata.json" >&2; exit 1
+fi
+
+mapfile -t FILES < <(python3 scripts/build.py "$PKG")
+
+NOTES=$(cat <<EOF
+Versão de teste **$VERSION** de \`$ID\` (commit $(git rev-parse --short HEAD)).
+
+**Instalar (escolha um):**
+- Configurações do Sistema › Scripts do KWin › *Instalar de arquivo…* › \`$ID-$VERSION.kwinscript\`
+- \`tar xzf $ID-$VERSION.tar.gz && ./$ID-$VERSION/install.sh\`
+
+Para remover: \`./$ID-$VERSION/uninstall.sh\`
+EOF
+)
+
+git tag -a "$TAG" -m "$ID $VERSION"
+git push origin HEAD --follow-tags
+gh release create "$TAG" "${FILES[@]}" --prerelease --title "$ID $VERSION" --notes "$NOTES"

@@ -2,23 +2,18 @@
 
 Este protótipo é **descartável**. Ele existe para responder ao maior risco técnico do kubik (ver `docs/DESIGN.md`): um KWin Script consegue desenhar a borda ativa e a barra de abas do stacking de forma aceitável?
 
-## Instalar e ativar
+## Instalar
 
-```sh
-kpackagetool6 --type=KWin/Script -i prototype/overlay      # use -u para atualizar
-kwriteconfig6 --file kwinrc --group Plugins --key kubikoverlayprotoEnabled true
-qdbus6 org.kde.KWin /KWin reconfigure
-```
+Baixe a versão mais recente em **Releases** no GitHub (ou com `gh release download -R dionatansimioni/kubik`). Depois, escolha uma das formas:
+
+- **Pela interface:** Configurações do Sistema › Scripts do KWin › *Instalar de arquivo…* › selecione o `.kwinscript` e marque o script.
+- **Pelo terminal:** `tar xzf kubikoverlayproto-<versão>.tar.gz && ./kubikoverlayproto-<versão>/install.sh`. O script instala ou atualiza, ativa e recarrega o KWin.
+
+Para remover: `./kubikoverlayproto-<versão>/uninstall.sh`
 
 Para ver os logs: `journalctl --user -f | grep kubik-proto`
 
 Para testar com segurança, use uma sessão aninhada: `dbus-run-session kwin_wayland --windowed konsole`
-
-Para remover:
-
-```sh
-kpackagetool6 --type=KWin/Script -r kubikoverlayproto
-```
 
 ## Atalhos
 
