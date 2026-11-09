@@ -27,6 +27,7 @@ Os testes de integração (`tests/test_kwin_*.py`) usam esse fluxo e verificam o
 ## Distros
 
 - `KUBIK_TESTENV=arch` (padrão): `testenv/Dockerfile`.
+- Os dois têm XWayland (o KWin sobe com `--xwayland`), KCalc, Chromium e `xdotool`, para testar apps X11 e apps com barra de título própria.
 - `KUBIK_TESTENV=fedora`: Fedora 44, a distro do usuário, em `testenv/fedora/Dockerfile`. Também tem KWin 6.8.2, mas com Qt 6.11.
 
 `KUBIK_KWINRC="Grupo/Chave=Valor …"` aplica configuração no `kwinrc` antes de o KWin iniciar (ex.: duração do efeito).

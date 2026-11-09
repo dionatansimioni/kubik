@@ -13,5 +13,5 @@ for kv in ${KUBIK_KWINRC:-}; do
     group=${kv%%/*}; rest=${kv#*/}
     kwriteconfig6 --file kwinrc --group "$group" --key "${rest%%=*}" "${rest#*=}"
 done
-dbus-run-session -- kwin_wayland --virtual --width 1280 --height 800 \
+dbus-run-session -- kwin_wayland --virtual --xwayland --width 1280 --height 800 \
     --exit-with-session "bash $SCENARIO" > /out/kwin.log 2>&1 || true
