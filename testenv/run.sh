@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Roda um cenário num KWin real (Plasma do Arch, sem monitor) dentro de um container.
+#
+# Uso: testenv/run.sh <diretório-do-pacote> <cenário.sh> <diretório-de-saída>
+#
+# O pacote é instalado e ativado ANTES do KWin iniciar. O cenário roda como a
+# sessão do KWin (--exit-with-session) e pode usar as funções de testenv/lib.sh.
+# Saída: <saída>/kwin.log (log completo do KWin, incluindo console.* dos scripts)
+#        <saída>/*.png     (screenshots tirados pelo cenário)
+#
+# Requisitos no host: docker e o módulo vgem (GPU virtual para o OpenGL por
+# software). O script carrega o vgem com modprobe se ele não estiver carregado.
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+IMAGE=${KUBIK_TESTENV_IMAGE:-kubik-testenv}
+[ $# -eq 3 ] || { echo "uso: $0 <pacote> <cenário.sh> <saída>" >&2; exit 2; }
+PKG=$(realpath "$1")
+SCENARIO=$(realpath "$2")
+OUT=$(realpath -m "$3")
+
+case "$PKG/" in "$ROOT"/*) ;; *) echo "erro: o pacote precisa estar dentro de $ROOT" >&2; exit 2;; esac
+case "$SCENARIO" in "$ROOT"/*) ;; *) echo "erro: o cenário precisa estar dentro de $ROOT" >&2; exit 2;; esac
+
+vgem_node() {
+    for d in /sys/class/drm/renderD*; do
+        [ "$(basename "$(readlink -f "$d/device")")" = vgem ] && { basename "$d"; return 0; }
+    done
+    return 1
+}
+NODE=$(vgem_node || { modprobe vgem && vgem_node; }) || { echo "erro: módulo vgem indisponível" >&2; exit 1; }
+
+docker image inspect "$IMAGE" >/dev/null 2>&1 || docker build -q -t "$IMAGE" "$ROOT/testenv" >/dev/null
+
+mkdir -p "$OUT"
+chmod 777 "$OUT"
+ID=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["KPlugin"]["Id"])' "$PKG/metadata.json")
+
+# O KWin acha a GPU pelo sysfs do host (nome real do nó) mas às vezes tenta o
+# primeiro nó (renderD128); expomos o vgem com os dois nomes.
+docker run --rm \
+    --device "/dev/dri/$NODE:/dev/dri/$NODE" \
+    --device "/dev/dri/$NODE:/dev/dri/renderD128" \
+    -u root \
+    -v "$ROOT:/work:ro" -v "$OUT:/out" \
+    -e XDG_RUNTIME_DIR=/tmp/xdg \
+    -e QT_FORCE_STDERR_LOGGING=1 \
+    -e QT_QUICK_BACKEND=software \
+    -e PKG="/work/${PKG#"$ROOT"/}" -e SCENARIO="/work/${SCENARIO#"$ROOT"/}" -e ID="$ID" \
+    "$IMAGE" bash -c '
+        chmod 666 /dev/dri/renderD*
+        exec su tester -c "
+            set -e
+            mkdir -p /tmp/xdg
+            kpackagetool6 -t KWin/Script -i \"\$PKG\" >/dev/null
+            kwriteconfig6 --file kwinrc --group Plugins --key \"\${ID}Enabled\" true
+            dbus-run-session -- kwin_wayland --virtual --width 1280 --height 800 \
+                --exit-with-session \"bash \$SCENARIO\" > /out/kwin.log 2>&1 || true
+        "'
+echo "$OUT/kwin.log"
