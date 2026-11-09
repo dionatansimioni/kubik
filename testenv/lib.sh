@@ -5,7 +5,26 @@
 QML_BIN=$(command -v /usr/lib/qt6/bin/qml /usr/lib64/qt6/bin/qml | head -n1)
 open_window() {
     "$QML_BIN" /work/testenv/clients/window.qml -- "$1" "${2:-400x300}" >/dev/null 2>&1 &
+    echo $! > "/tmp/window-$1.pid"
     sleep 1
+}
+
+# Fecha a janela de teste aberta com open_window <título>.
+close_window() {
+    kill "$(cat "/tmp/window-$1.pid")"
+    sleep 1
+}
+
+# Imprime no kwin.log a geometria real de cada janela: "WINDOW <tag> {json}".
+dump_windows() {
+    local tag=$1 file="/tmp/dump-$1.js" id
+    sed "s/@TAG@/$tag/" /work/testenv/probe/dump.js > "$file"
+    id=$(dbus-send --session --print-reply --dest=org.kde.KWin /Scripting \
+        org.kde.kwin.Scripting.loadScript "string:$file" "string:dump-$tag" | awk '/int32/ {print $2}')
+    dbus-send --session --print-reply --dest=org.kde.KWin "/Scripting/Script$id" org.kde.kwin.Script.run >/dev/null
+    sleep 0.3
+    dbus-send --session --print-reply --dest=org.kde.KWin /Scripting \
+        org.kde.kwin.Scripting.unloadScript "string:dump-$tag" >/dev/null
 }
 
 # Salva um screenshot da tela inteira em /out/<nome>.png.
