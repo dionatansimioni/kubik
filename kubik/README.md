@@ -9,9 +9,21 @@ Baixe a versão mais recente em **Releases** e escolha uma das formas:
 - **Pela interface:** Configurações do Sistema › Scripts do KWin › *Instalar de arquivo…* › `kubik-<versão>.kwinscript`, e marque **Kubik**.
 - **Pelo terminal:** `tar xzf kubik-<versão>.tar.gz && ./kubik-<versão>/install.sh`.
 
-Para remover: `./kubik-<versão>/uninstall.sh`. Logs: `journalctl --user -b | grep '\[kubik\]'`.
+Para remover: `./kubik-<versão>/uninstall.sh`.
 
-## O que já funciona (0.2.0)
+O `.tar.gz` instala o script **e** o efeito de animação. Para instalar só pela interface, use o `.kwinscript` em *Scripts do KWin*. O efeito vem como `.kwineffect`, que por enquanto só o `install.sh` instala.
+
+### Ajustar as animações
+
+```sh
+kwriteconfig6 --file kwinrc --group Effect-kubikanimations --key Duration 300   # ms (1–2000)
+kwriteconfig6 --file kwinrc --group Effect-kubikanimations --key Curve OutQuint # Linear, OutQuad, OutCubic, OutQuart, OutQuint, OutExpo, OutCirc, OutBack, InOutCubic
+dbus-send --session --dest=org.kde.KWin /Effects org.kde.kwin.Effects.reconfigureEffect string:kubikanimations
+```
+
+O padrão é 250 ms com `OutCubic`. Para algo mais próximo do Hyprland, experimente `OutQuint` ou `OutBack` (que tem um leve "quique"). Logs: `journalctl --user -b | grep '\[kubik\]'`.
+
+## O que já funciona (0.3.0)
 
 - Janelas novas são organizadas em árvore BSP. A janela focada é dividida ao meio pelo lado mais longo.
 - Fechar ou minimizar uma janela devolve o espaço às vizinhas.
@@ -21,11 +33,13 @@ Para remover: `./kubik-<versão>/uninstall.sh`. Logs: `journalctl --user -b | gr
 - **Mouse:**
   - Arrastar uma janela pela barra de título mostra uma prévia translúcida do destino. Soltar sobre outra janela troca as duas de lugar; soltar em outra tela leva a janela para a árvore de lá; soltar num gap devolve a janela ao lugar.
   - Puxar a borda entre duas janelas redimensiona as duas ao vivo, e a proporção fica gravada na árvore.
-- **Meta+Y** liga e desliga o tiling. Ao desligar, as janelas voltam à posição e ao tamanho de antes.
+- **Tamanhos mínimos:** as divisões cedem para cada app caber no mínimo dele (conteúdo + barra de título). Se a janela nova não cabe dividindo a focada, ela divide a maior; se nem assim couber, ela fica flutuante, com o motivo no log.
+- **Animações** (efeito *Kubik: animações*, instalado junto): as janelas deslizam e redimensionam suavemente quando o layout muda. Ficam de fora o arrasto com o mouse, a tela cheia e o maximizar, que têm animação própria do KWin. A velocidade global de animação do Plasma também vale.
+- **Meta+Y** liga e desliga o tiling. Ao religar, a árvore é reconstruída equilibrada. Ao desligar, as janelas voltam à posição e ao tamanho de antes.
 
 ## Ainda não
 
-Animações, navegação e movimento por teclado, stacking, borda ativa, ícone na bandeja, configurações. Ver `docs/DESIGN.md`.
+Navegação e movimento por teclado, stacking, borda ativa, ícone na bandeja, configurações. Ver `docs/DESIGN.md`.
 
 ## Desenvolvimento
 
@@ -39,5 +53,6 @@ python3 -m unittest discover -s tests # tudo, inclusive o KWin real do testenv
 
 - `src/core/`: a árvore BSP e a geometria, sem nenhuma dependência do KWin.
 - `src/kwin/`: o controlador, que liga a árvore ao KWin por meio da interface mínima de `api.ts`. É testado contra o KWin falso de `test/fake-kwin.ts`.
+- `src/effect/`: o efeito de animação. A decisão e o cálculo ficam em `morph.ts`, que é puro e testado; `main.ts` liga isso à API de efeitos. O resultado vai para `effect/`.
 - `src/qml/Kubik.qml`: o modelo em que o build embute o bundle.
 - `package/`: o pacote do KWin. O `main.qml` é só um carregador.

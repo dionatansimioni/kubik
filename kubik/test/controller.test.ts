@@ -255,4 +255,97 @@ describe("Controller", () => {
       expect(previews).toEqual([]);
     });
   });
+
+  describe("tamanhos mínimos", () => {
+    it("respeita o mínimo redistribuindo a divisão", () => {
+      const a = ws.open(win("a"));
+      const b = win("b");
+      b.minSize = { width: 900, height: 300 };
+      ws.open(b);
+      expect(b.frameGeometry.width).toBe(900);
+      expect(a.frameGeometry).toEqual(rect(4, 4, 368, 792));
+    });
+
+    it("janela que não cabe de jeito nenhum vira flutuante e as outras se reorganizam", () => {
+      const a = win("a");
+      a.minSize = { width: 800, height: 300 };
+      ws.open(a);
+      const b = win("b");
+      b.minSize = { width: 800, height: 300 };
+      const before = b.frameGeometry;
+      ws.open(b);
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(b.frameGeometry).toBe(before);
+      expect(logs).toContain("flutuante 'b': não cabe (mínimo 800×300)");
+    });
+
+    it("muitas janelas grandes: as que não cabem flutuam e nenhuma fica abaixo do mínimo", () => {
+      const all: FakeWindow[] = [];
+      for (let i = 0; i < 14; i++) {
+        const w = win(`w${i}`);
+        w.minSize = { width: 300, height: 300 };
+        all.push(ws.open(w));
+      }
+      const floated = all.filter((w) => w.frameGeometry.x === 100 && w.frameGeometry.y === 100);
+      expect(floated.length).toBeGreaterThan(0);
+      for (const w of all.filter((x) => !floated.includes(x))) {
+        expect(w.frameGeometry.width).toBeGreaterThanOrEqual(300);
+        expect(w.frameGeometry.height).toBeGreaterThanOrEqual(300);
+      }
+      expect(logs.some((l) => l.includes("não cabe"))).toBe(true);
+    });
+  });
+
+  describe("imperfeições achadas no estresse com 12 janelas", () => {
+    it("o mínimo do app vale para o conteúdo: a moldura ganha a barra de título", () => {
+      // Como o KCalc: mínimo de CONTEÚDO, barra de título de 36 px. Mínimo 370
+      // cabe no tile de 394 se contar só o conteúdo, mas a moldura precisa de 406.
+      const t = new Controller(fakeHost(ws).host, {
+        gaps: { outer: 4, inner: 4 },
+        floatingClasses: [],
+      });
+      ctl.stop();
+      t.start();
+      const a = ws.open(win("a"));
+      const calc = win("calc");
+      calc.decoration = { width: 0, height: 36 };
+      calc.minSize = { width: 235, height: 370 };
+      ws.open(calc);
+      ws.activate(calc);
+      const c = ws.open(win("c")); // divide a calc ao meio na vertical: 394 de altura cada
+      expect(calc.frameGeometry.height).toBeGreaterThanOrEqual(370 + 36);
+      expect(c.frameGeometry.y).toBe(calc.frameGeometry.y + calc.frameGeometry.height + 4);
+      expect(a.frameGeometry.width).toBe(634);
+    });
+
+    it("religar o tiling reconstrói a árvore equilibrada (divide sempre a maior)", () => {
+      const all: FakeWindow[] = [];
+      for (let i = 0; i < 8; i++) {
+        const w = win(`w${i}`);
+        w.minSize = { width: 150, height: 150 };
+        all.push(ws.open(w));
+      }
+      ctl.toggle();
+      ctl.toggle();
+      const floating = logs.filter((l) => l.includes("não cabe"));
+      expect(floating).toEqual([]);
+      const areas = all.map((w) => w.frameGeometry.width * w.frameGeometry.height);
+      expect(Math.max(...areas) / Math.min(...areas)).toBeLessThanOrEqual(2.1);
+    });
+
+    it("janela nova que não cabe dividindo a focada tenta a maior antes de flutuar", () => {
+      // Sempre focando a última: a divisão em cadeia afina cada vez mais o canto.
+      const all: FakeWindow[] = [];
+      for (let i = 0; i < 12; i++) {
+        const w = win(`w${i}`);
+        w.minSize = { width: 150, height: 150 };
+        all.push(ws.open(w));
+      }
+      expect(logs.filter((l) => l.includes("não cabe"))).toEqual([]);
+      for (const w of all) {
+        expect(w.frameGeometry.width).toBeGreaterThanOrEqual(150);
+        expect(w.frameGeometry.height).toBeGreaterThanOrEqual(150);
+      }
+    });
+  });
 });

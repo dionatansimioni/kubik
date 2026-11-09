@@ -1,3 +1,4 @@
 node_modules/
 .build/
 package/contents/ui/Kubik.qml
+effect/contents/code/main.js

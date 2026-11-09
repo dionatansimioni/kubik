@@ -10,6 +10,11 @@ Gera em dist/:
 Uso: scripts/build.py [diretório-do-pacote]   (padrão: kubik/package)
 Imprime os caminhos dos arquivos gerados, um por linha.
 
+Pacotes companheiros (metadata "X-Kubik-Companions", caminhos relativos ao
+pacote, ex.: o efeito de animação) ganham o próprio arquivo instalável e vão
+juntos no .tar.gz, em packages/<Id>/; o install.sh instala todos.
+Saída: o arquivo do pacote principal, o .tar.gz, e depois os dos companheiros.
+
 Se o diretório pai do pacote for um projeto Node (tem package.json), roda
 antes `npm run build` nele (via scripts/node.sh), que gera os arquivos do
 pacote a partir do TypeScript.
@@ -53,7 +58,21 @@ def read_metadata(pkg: Path):
     return meta["KPlugin"]["Id"], meta["KPlugin"]["Version"]
 
 
-def build_kwinscript(pkg: Path, out: Path):
+def companions(pkg: Path):
+    meta = json.loads((pkg / "metadata.json").read_text(encoding="utf-8"))
+    return [(pkg / c).resolve() for c in meta.get("X-Kubik-Companions", [])]
+
+
+EXTENSIONS = {"KWin/Script": "kwinscript", "KWin/Effect": "kwineffect"}
+
+
+def archive_name(pkg: Path) -> str:
+    meta = json.loads((pkg / "metadata.json").read_text(encoding="utf-8"))
+    plugin_id, version = read_metadata(pkg)
+    return f"{plugin_id}-{version}.{EXTENSIONS[meta['KPackageStructure']]}"
+
+
+def build_archive(pkg: Path, out: Path):
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for f in package_files(pkg):
             info = zipfile.ZipInfo(f.relative_to(pkg).as_posix(), FIXED_ZIP_DATE)
@@ -62,7 +81,7 @@ def build_kwinscript(pkg: Path, out: Path):
             z.writestr(info, f.read_bytes())
 
 
-def build_tarball(pkg: Path, plugin_id: str, version: str, out: Path):
+def build_tarball(pkgs, plugin_id: str, version: str, out: Path):
     top = f"{plugin_id}-{version}"
 
     def add(tar, data: bytes, name: str, mode: int):
@@ -71,11 +90,14 @@ def build_tarball(pkg: Path, plugin_id: str, version: str, out: Path):
         tar.addfile(info, io.BytesIO(data))
 
     with tarfile.open(out, "w:gz") as tar:
-        for f in package_files(pkg):
-            add(tar, f.read_bytes(), "package/" + f.relative_to(pkg).as_posix(), 0o644)
+        for pkg in pkgs:
+            pid, _ = read_metadata(pkg)
+            for f in package_files(pkg):
+                add(tar, f.read_bytes(), f"packages/{pid}/" + f.relative_to(pkg).as_posix(), 0o644)
         for script in ("install.sh", "uninstall.sh"):
             add(tar, (SCRIPTS / script).read_bytes(), script, 0o755)
-        readme = next((p for p in (pkg / "README.md", pkg.parent / "README.md") if p.is_file()), None)
+        main = pkgs[0]
+        readme = next((p for p in (main / "README.md", main.parent / "README.md") if p.is_file()), None)
         if readme:
             add(tar, readme.read_bytes(), "README.md", 0o644)
 
@@ -83,14 +105,18 @@ def build_tarball(pkg: Path, plugin_id: str, version: str, out: Path):
 def main(argv):
     pkg = (ROOT / (argv[1] if len(argv) > 1 else "kubik/package")).resolve()
     prebuild(pkg)
+    pkgs = [pkg] + companions(pkg)
     plugin_id, version = read_metadata(pkg)
     DIST.mkdir(exist_ok=True)
-    kwinscript = DIST / f"{plugin_id}-{version}.kwinscript"
+    archives = [DIST / archive_name(p) for p in pkgs]
     tarball = DIST / f"{plugin_id}-{version}.tar.gz"
-    build_kwinscript(pkg, kwinscript)
-    build_tarball(pkg, plugin_id, version, tarball)
-    print(kwinscript)
+    for p, a in zip(pkgs, archives):
+        build_archive(p, a)
+    build_tarball(pkgs, plugin_id, version, tarball)
+    print(archives[0])
     print(tarball)
+    for a in archives[1:]:
+        print(a)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,8 @@ export class FakeWindow implements KWinWindow {
   maxSize = { width: 0, height: 0 };
   onAllDesktops = false;
   skipSwitcher = false;
+  /** Tamanho da decoração (barra de título etc.); 0 = sem decoração. */
+  decoration = { width: 0, height: 0 };
   move = false;
   resize = false;
   readonly interactiveMoveResizeStarted = new FakeSignal();
@@ -86,6 +88,16 @@ export class FakeWindow implements KWinWindow {
     }
     this.move = this.resize = false;
     this.interactiveMoveResizeFinished.emit();
+  }
+
+  get clientGeometry(): Rect {
+    const g = this.geo;
+    return {
+      x: g.x,
+      y: g.y + this.decoration.height,
+      width: g.width - this.decoration.width,
+      height: g.height - this.decoration.height,
+    };
   }
 
   get minimized(): boolean {

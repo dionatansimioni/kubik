@@ -5,8 +5,6 @@
 import type { Host } from "./kwin/api";
 import { Controller } from "./kwin/controller";
 
-export { Controller } from "./kwin/controller";
-
 export function start(host: Host): Controller {
   const c = new Controller(host);
   c.start();

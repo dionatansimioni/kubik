@@ -163,3 +163,34 @@ describe("Tree: operações do mouse", () => {
     expect(l2.get("b")!.width).toBeGreaterThanOrEqual(60);
   });
 });
+
+describe("Tree: tamanhos mínimos", () => {
+  it("a divisão cede para a janela caber no mínimo dela", () => {
+    const t = tree("a", "b");
+    const l = t.layout(AREA, GAPS, new Map([["b", { width: 900, height: 0 }]]));
+    expect(l.get("b")!.width).toBe(900);
+    expect(l.get("a")).toEqual(rect(4, 4, 368, 792));
+  });
+
+  it("o mínimo de uma subárvore soma os filhos no eixo da divisão", () => {
+    const t = tree("a", "b", "c"); // a | (b / c)
+    const mins = new Map([["b", { width: 700, height: 0 }], ["c", { width: 750, height: 0 }]]);
+    const l = t.layout(AREA, GAPS, mins);
+    expect(l.get("b")!.width).toBe(750); // a subárvore b/c precisa de max(700, 750)
+    expect(l.get("a")!.width).toBe(1268 - 750);
+  });
+
+  it("mínimos impossíveis: divide proporcionalmente, sem sobrepor", () => {
+    const t = tree("a", "b");
+    const l = t.layout(AREA, GAPS, new Map([["a", { width: 1000, height: 0 }], ["b", { width: 1000, height: 0 }]]));
+    expect(l.get("a")!.width + l.get("b")!.width).toBe(1268);
+    expect(l.get("b")!.x).toBe(l.get("a")!.x + l.get("a")!.width + 4);
+  });
+
+  it("fits() aponta quem ficou abaixo do mínimo", () => {
+    const t = tree("a", "b");
+    const mins = new Map([["a", { width: 1000, height: 0 }], ["b", { width: 1000, height: 0 }]]);
+    expect(t.violations(AREA, GAPS, mins).sort()).toEqual(["a", "b"]);
+    expect(t.violations(AREA, GAPS, new Map([["a", { width: 500, height: 500 }]]))).toEqual([]);
+  });
+});

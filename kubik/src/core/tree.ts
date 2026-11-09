@@ -14,6 +14,16 @@ export interface Point {
 /** Menor tamanho (px) que um lado de uma divisão pode ter ao redimensionar. */
 export const MIN_SIDE = 60;
 
+export interface Size {
+  width: number;
+  height: number;
+}
+
+/** Tamanho mínimo de cada janela (ausente = sem mínimo). */
+export type Mins = ReadonlyMap<string, Size>;
+
+const NO_MINS: Mins = new Map();
+
 export interface Gaps {
   /** Espaço entre as janelas e a borda da área de trabalho. */
   outer: number;
@@ -120,16 +130,29 @@ export class Tree {
     this.replace(parent, sibling);
   }
 
-  /** Geometria de cada janela dentro de `area`, já com os gaps. */
-  layout(area: Rect, gaps: Gaps): Map<string, Rect> {
+  /**
+   * Geometria de cada janela dentro de `area`, já com os gaps. Com `mins`, as
+   * divisões cedem para cada janela caber no seu mínimo (quando possível).
+   */
+  layout(area: Rect, gaps: Gaps, mins: Mins = NO_MINS): Map<string, Rect> {
     const out = new Map<string, Rect>();
-    if (this.root) this.place(this.root, inset(area, gaps.outer), gaps.inner, out);
+    if (this.root) this.place(this.root, inset(area, gaps.outer), gaps.inner, out, new Map(), mins);
+    return out;
+  }
+
+  /** Janelas que, mesmo redistribuindo, ficam abaixo do mínimo (com 1 px de folga). */
+  violations(area: Rect, gaps: Gaps, mins: Mins): string[] {
+    const out: string[] = [];
+    for (const [id, r] of this.layout(area, gaps, mins)) {
+      const m = mins.get(id);
+      if (m && (r.width + 1 < m.width || r.height + 1 < m.height)) out.push(id);
+    }
     return out;
   }
 
   /** A janela cuja área contém `p` (os gaps não pertencem a ninguém). */
-  idAt(p: Point, area: Rect, gaps: Gaps): string | null {
-    for (const [id, r] of this.layout(area, gaps))
+  idAt(p: Point, area: Rect, gaps: Gaps, mins: Mins = NO_MINS): string | null {
+    for (const [id, r] of this.layout(area, gaps, mins))
       if (p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height) return id;
     return null;
   }
@@ -190,7 +213,7 @@ export class Tree {
 
   private nodeRects(area: Rect, gaps: Gaps): Map<Node, Rect> {
     const nodes = new Map<Node, Rect>();
-    if (this.root) this.place(this.root, inset(area, gaps.outer), gaps.inner, new Map(), nodes);
+    if (this.root) this.place(this.root, inset(area, gaps.outer), gaps.inner, new Map(), nodes, NO_MINS);
     return nodes;
   }
 
@@ -216,32 +239,53 @@ export class Tree {
     else p.second = next;
   }
 
+  /** Mínimo de uma subárvore: soma no eixo da divisão, máximo no outro. */
+  private minOf(n: Node, inner: number, mins: Mins): Size {
+    if (n.kind === "leaf") return mins.get(n.id) ?? { width: 0, height: 0 };
+    const a = this.minOf(n.first, inner, mins);
+    const b = this.minOf(n.second, inner, mins);
+    return n.orientation === "horizontal"
+      ? { width: a.width + inner + b.width, height: Math.max(a.height, b.height) }
+      : { width: Math.max(a.width, b.width), height: a.height + inner + b.height };
+  }
+
+  /** Tamanho do 1º filho: a proporção, cedendo para os mínimos dos dois lados. */
+  private firstSize(usable: number, ratio: number, minFirst: number, minSecond: number): number {
+    if (minFirst + minSecond > usable && minFirst + minSecond > 0)
+      return Math.round((usable * minFirst) / (minFirst + minSecond)); // impossível: proporcional
+    const wanted = Math.round(usable * ratio);
+    return Math.min(usable - minSecond, Math.max(minFirst, wanted));
+  }
+
   private place(
     n: Node,
     r: Rect,
     inner: number,
     out: Map<string, Rect>,
-    nodes: Map<Node, Rect> = new Map(),
+    nodes: Map<Node, Rect>,
+    mins: Mins,
   ): void {
     nodes.set(n, r);
     if (n.kind === "leaf") {
       out.set(n.id, r);
       return;
     }
+    const mf = this.minOf(n.first, inner, mins);
+    const ms = this.minOf(n.second, inner, mins);
     // Math.round (não floor): proporções vindas de um resize (ex.: 534/1268)
     // multiplicadas de volta precisam dar exatamente o tamanho pedido.
     if (n.orientation === "horizontal") {
       const usable = Math.max(0, r.width - inner);
-      const a = Math.max(1, Math.round(usable * n.ratio));
+      const a = Math.max(1, this.firstSize(usable, n.ratio, mf.width, ms.width));
       const b = Math.max(1, usable - a);
-      this.place(n.first, { x: r.x, y: r.y, width: a, height: r.height }, inner, out, nodes);
-      this.place(n.second, { x: r.x + a + inner, y: r.y, width: b, height: r.height }, inner, out, nodes);
+      this.place(n.first, { x: r.x, y: r.y, width: a, height: r.height }, inner, out, nodes, mins);
+      this.place(n.second, { x: r.x + a + inner, y: r.y, width: b, height: r.height }, inner, out, nodes, mins);
     } else {
       const usable = Math.max(0, r.height - inner);
-      const a = Math.max(1, Math.round(usable * n.ratio));
+      const a = Math.max(1, this.firstSize(usable, n.ratio, mf.height, ms.height));
       const b = Math.max(1, usable - a);
-      this.place(n.first, { x: r.x, y: r.y, width: r.width, height: a }, inner, out, nodes);
-      this.place(n.second, { x: r.x, y: r.y + a + inner, width: r.width, height: b }, inner, out, nodes);
+      this.place(n.first, { x: r.x, y: r.y, width: r.width, height: a }, inner, out, nodes, mins);
+      this.place(n.second, { x: r.x, y: r.y + a + inner, width: r.width, height: b }, inner, out, nodes, mins);
     }
   }
 }

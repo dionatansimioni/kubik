@@ -54,8 +54,8 @@ class BuildTest(unittest.TestCase):
         top = f"{ID}-{VERSION}"
         with tarfile.open(self.tarball) as t:
             members = {m.name: m for m in t.getmembers()}
-        for name in ("install.sh", "uninstall.sh", "package/metadata.json",
-                     "package/contents/" + META["X-Plasma-MainScript"]):
+        for name in ("install.sh", "uninstall.sh", f"packages/{ID}/metadata.json",
+                     f"packages/{ID}/contents/" + META["X-Plasma-MainScript"]):
             self.assertIn(f"{top}/{name}", members)
         self.assertTrue(members[f"{top}/install.sh"].mode & 0o111, "install.sh não é executável")
 
@@ -81,6 +81,25 @@ class KubikBuildTest(unittest.TestCase):
         self.assertNotIn("@@KUBIK_BUNDLE@@", kubik)
         self.assertFalse([n for n in names if n.endswith(".js")], "nenhum .js solto: o KWin o guardaria em cache")
 
+    def test_release_bundles_the_animation_effect(self):
+        version = json.loads((ROOT / "kubik" / "package" / "metadata.json").read_text())["KPlugin"]["Version"]
+        effect = json.loads((ROOT / "kubik" / "effect" / "metadata.json").read_text())
+        self.assertEqual(effect["KPlugin"]["Version"], version, "efeito e script devem ter a mesma versão")
+        with tempfile.TemporaryDirectory() as out:
+            proc = subprocess.run(["python3", str(ROOT / "scripts" / "build.py"), "kubik/package"],
+                                  env=dict(os.environ, KUBIK_DIST=out), check=True, capture_output=True, text=True)
+            files = [Path(p) for p in proc.stdout.split()]
+            self.assertEqual([f.name for f in files],
+                             [f"kubik-{version}.kwinscript", f"kubik-{version}.tar.gz", f"kubikanimations-{version}.kwineffect"])
+            with zipfile.ZipFile(files[2]) as z:
+                self.assertIn("contents/code/main.js", z.namelist())
+                self.assertIn("[kubik-animations] carregado", z.read("contents/code/main.js").decode())
+            with tarfile.open(files[1]) as t:
+                names = t.getnames()
+            top = f"kubik-{version}"
+            self.assertIn(f"{top}/packages/kubik/contents/ui/Kubik.qml", names)
+            self.assertIn(f"{top}/packages/kubikanimations/contents/code/main.js", names)
+
 
 class ShellScriptsTest(unittest.TestCase):
     SCRIPTS = [ROOT / "scripts" / n for n in ("install.sh", "uninstall.sh", "release.sh")]
@@ -94,13 +113,17 @@ class ShellScriptsTest(unittest.TestCase):
     def test_shellcheck(self):
         subprocess.run(["shellcheck", *map(str, self.SCRIPTS)], check=True)
 
-    def test_install_extracts_id_from_metadata(self):
-        # Mesmo sed do install.sh: precisa achar o Id real do pacote.
-        out = subprocess.run(
-            ["sed", "-n", r's/.*"Id": *"\([^"]*\)".*/\1/p', str(PKG / "metadata.json")],
-            capture_output=True, text=True, check=True,
-        ).stdout.split()
-        self.assertEqual(out[0], ID)
+    def test_install_extracts_metadata_fields(self):
+        # Mesmo sed do install.sh: precisa achar Id, Version e KPackageStructure.
+        def field(name, pkg=PKG):
+            return subprocess.run(
+                ["sed", "-n", rf's/.*"{name}": *"\([^"]*\)".*/\1/p', str(pkg / "metadata.json")],
+                capture_output=True, text=True, check=True,
+            ).stdout.split()[0]
+        self.assertEqual(field("Id"), ID)
+        self.assertEqual(field("Version"), VERSION)
+        self.assertEqual(field("KPackageStructure"), "KWin/Script")
+        self.assertEqual(field("KPackageStructure", ROOT / "kubik" / "effect"), "KWin/Effect")
 
     def test_scripts_do_not_require_qdbus(self):
         # qdbus6 não existe em várias distros (ex.: Plasma 6.8 do usuário); use dbus-send.

@@ -44,12 +44,15 @@ export interface KWinWindow {
   /** true enquanto o usuário move / redimensiona a janela com o mouse. */
   readonly move: boolean;
   readonly resize: boolean;
+  /** Mínimo do CONTEÚDO (sem a decoração), como o app declara. */
   readonly minSize: Size;
   readonly maxSize: Size;
   readonly desktops: VirtualDesktop[];
   readonly output: Output;
   /** Escrever pede a mudança; no Wayland ela só assenta depois. */
   frameGeometry: Rect;
+  /** Área do conteúdo (moldura sem a decoração). */
+  readonly clientGeometry: Rect;
 
   readonly minimizedChanged: Signal;
   readonly fullScreenChanged: Signal;

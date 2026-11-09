@@ -34,6 +34,10 @@ interface Tracked {
   key: string | null;
   /** Geometria antes do tiling, restaurada ao desligar. */
   saved: Rect | null;
+  /** Ordem de entrada no tiling (maior = mais recente). */
+  seq: number;
+  /** Tirada do tiling por não caber no mínimo; vale até o tiling ser religado. */
+  noFit: boolean;
   disconnect: () => void;
 }
 
@@ -70,6 +74,14 @@ export class Controller {
   private focusHistory: string[] = [];
   private enabled = true;
   private drag: Drag | null = null;
+  private seq = 0;
+  /**
+   * Reconstruindo várias janelas de uma vez (início, religar): cada uma divide
+   * a MAIOR janela, para a árvore sair equilibrada. Dividir sempre a focada
+   * (o normal para uma janela nova) deixava tiles minúsculos e janelas sem
+   * caber (achado no estresse com 12 janelas).
+   */
+  private balanced = false;
   private readonly unsubscribe: Array<() => void> = [];
 
   constructor(
@@ -97,7 +109,9 @@ export class Controller {
       () => ws.windowActivated.disconnect(onActivated),
     );
     if (ws.activeWindow) this.noteFocus(idOf(ws.activeWindow));
+    this.balanced = true;
     for (const w of ws.stackingOrder) this.track(w);
+    this.balanced = false;
     this.host.log(`iniciado; ${this.tiledCount()} janela(s) no tiling`);
   }
 
@@ -121,7 +135,10 @@ export class Controller {
       this.trees.clear();
       this.host.log("tiling desligado");
     } else {
+      for (const t of this.tracked.values()) t.noFit = false;
+      this.balanced = true;
       for (const t of this.tracked.values()) this.refresh(t);
+      this.balanced = false;
       this.host.log(`tiling ligado; ${this.tiledCount()} janela(s)`);
     }
   }
@@ -163,6 +180,8 @@ export class Controller {
       window: w,
       key: null,
       saved: null,
+      seq: 0,
+      noFit: false,
       disconnect: () => {
         signals.forEach((s) => s.disconnect(onChange));
         w.interactiveMoveResizeStarted.disconnect(onStarted);
@@ -194,7 +213,11 @@ export class Controller {
    */
   private refresh(t: Tracked, isNew = false): void {
     const w = t.window;
-    const reason = this.enabled ? floatReason(w, this.config.floatingClasses) : "tiling desligado";
+    const reason = !this.enabled
+      ? "tiling desligado"
+      : t.noFit
+        ? "não cabe"
+        : floatReason(w, this.config.floatingClasses);
     const place = reason === null ? { output: w.output, desktop: w.desktops[0] } : null;
     const key = place ? keyOf(place) : null;
     if (key === t.key && !isNew) return;
@@ -208,9 +231,9 @@ export class Controller {
     if (t.saved === null) t.saved = copy(w.frameGeometry);
     const id = idOf(w);
     const tree = this.treeFor(place);
-    const target = this.focusHistory.find((f) => f !== id && tree.has(f)) ?? null;
+    const target = this.balanced ? null : (this.focusHistory.find((f) => f !== id && tree.has(f)) ?? null);
     this.insertInto(t, place, target);
-    this.host.log(`tiling '${w.caption}' em ${key}`);
+    if (t.key !== null) this.host.log(`tiling '${w.caption}' em ${key}`);
   }
 
   private treeFor(place: Place): Tree {
@@ -224,12 +247,59 @@ export class Controller {
     return tree;
   }
 
-  /** Insere a janela (que não está em árvore nenhuma) dividindo `target`. */
+  /**
+   * Insere a janela (que não está em árvore nenhuma) dividindo `target`.
+   * Se alguém ficar abaixo do mínimo mesmo redistribuindo, a janela mais
+   * recente da árvore sai do tiling (flutuante) até caber.
+   */
   private insertInto(t: Tracked, place: Place, target: string | null): void {
     const key = keyOf(place);
-    this.treeFor(place).insert(idOf(t.window), target, this.area(key), this.config.gaps);
+    const tree = this.treeFor(place);
+    const id = idOf(t.window);
+    tree.insert(id, target, this.area(key), this.config.gaps);
+    if (target !== null && tree.violations(this.area(key), this.config.gaps, this.minsOf(tree)).length) {
+      // Dividir o alvo (a focada) não deixa todo mundo no mínimo: tenta a maior.
+      tree.remove(id);
+      tree.insert(id, null, this.area(key), this.config.gaps);
+    }
     t.key = key;
+    t.seq = ++this.seq;
+    for (;;) {
+      const bad = tree.violations(this.area(key), this.config.gaps, this.minsOf(tree));
+      if (bad.length === 0) break;
+      const newest = tree
+        .ids()
+        .map((id) => this.tracked.get(id)!)
+        .reduce((x, y) => (y.seq > x.seq ? y : x));
+      const m = newest.window.minSize;
+      tree.remove(idOf(newest.window));
+      newest.key = null;
+      newest.noFit = true;
+      this.host.log(`flutuante '${newest.window.caption}': não cabe (mínimo ${m.width}×${m.height})`);
+      // A recém-inserida ainda não foi movida; as anteriores voltam ao lugar de antes.
+      if (newest !== t && newest.saved) newest.window.frameGeometry = copy(newest.saved);
+    }
     this.retile(key);
+  }
+
+  private minsOf(tree: Tree): Map<string, { width: number; height: number }> {
+    const mins = new Map<string, { width: number; height: number }>();
+    for (const id of tree.ids()) {
+      const w = this.tracked.get(id)?.window;
+      if (!w) continue;
+      const m = w.minSize;
+      if (m.width <= 0 && m.height <= 0) continue;
+      // O mínimo do app é do CONTEÚDO; a árvore distribui molduras: soma a
+      // decoração (barra de título, bordas). Sem isso, o app recusa o tile e
+      // invade a vizinha (achado no estresse com o KCalc).
+      const f = w.frameGeometry;
+      const c = w.clientGeometry;
+      mins.set(id, {
+        width: m.width + Math.max(0, f.width - c.width),
+        height: m.height + Math.max(0, f.height - c.height),
+      });
+    }
+    return mins;
   }
 
   // ---- mouse ---------------------------------------------------------------
@@ -288,9 +358,10 @@ export class Controller {
     const tree = this.trees.get(key);
     const cursor = this.host.workspace.cursorPos;
     if (!tree || tree.size === 0) return { key, place, id: null, rect: inset(area, this.config.gaps.outer) };
-    const id = tree.idAt(cursor, area, this.config.gaps);
+    const mins = this.minsOf(tree);
+    const id = tree.idAt(cursor, area, this.config.gaps, mins);
     if (id === null || id === idOf(w)) return null;
-    return { key, place, id, rect: tree.layout(area, this.config.gaps).get(id)! };
+    return { key, place, id, rect: tree.layout(area, this.config.gaps, mins).get(id)! };
   }
 
   private removeFromTree(t: Tracked): void {
@@ -310,7 +381,7 @@ export class Controller {
   private retile(key: string, except?: string): void {
     const tree = this.trees.get(key);
     if (!tree || tree.size === 0) return;
-    const layout = tree.layout(this.area(key), this.config.gaps);
+    const layout = tree.layout(this.area(key), this.config.gaps, this.minsOf(tree));
     for (const [id, r] of layout) {
       const t = this.tracked.get(id);
       if (t && id !== except) t.window.frameGeometry = copy(r);

@@ -87,7 +87,9 @@ class TilingInKWinTest(unittest.TestCase):
     def test_toggle_on_tiles_everything_again(self):
         geos = self.w["on_again"]
         self.assertEqual(set(geos), {"Alpha", "Beta", "Delta"})
-        self.assertEqual(sorted(geos.values()), sorted([LEFT, RIGHT_TOP, RIGHT_BOTTOM]))
+        # Religar reconstrói a árvore equilibrada (cada janela divide a maior):
+        # uma metade inteira e dois quartos, em qualquer arranjo.
+        self.assertEqual(sorted(g[2:] for g in geos.values()), [(634, 394), (634, 394), (634, 792)])
 
 
 class TilingWithOverlayPrototypeTest(TilingInKWinTest):

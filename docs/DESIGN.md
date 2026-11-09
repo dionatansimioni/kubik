@@ -87,6 +87,11 @@ Validadas no `testenv/`:
 9. **Overlays de scripts aparecem como janelas normais.** Eles chegam como `normalWindow: true`, com `resourceClass` vazio e `skipSwitcher: true`. Sem uma regra, entram no tiling: a borda do protótipo ocupou metade da tela do usuário.
 10. **Durante um arrasto, `outputChanged` dispara a cada passo.** O kubik ignora esses sinais da janela arrastada, e quem decide o destino é o drop.
 
+11. **API de efeitos em JavaScript no 6.8:** `windowFrameGeometryChanged`, `windowStartUserMovedResized` e afins ficam **em cada janela**, não no objeto global `effects`. As propriedades são `geometry`, `move` e `resize`.
+12. **Configuração de efeito em script:** o `readConfig()` só lê chaves declaradas em `contents/config/main.xml`, e o `<group name="">` tem que ficar **vazio**, porque o KWin já posiciona a leitura em `[Effect-<id>]`.
+13. **`minSize` é do conteúdo, não da moldura.** A árvore distribui molduras, então o mínimo efetivo é `minSize + (frame − client)`. Sem isso, o app recusa o tile e invade o vizinho (achado no estresse com o KCalc).
+14. **Reconstruções em massa (início, religar) dividem sempre a maior janela.** Dividir a focada em cadeia gera tiles minúsculos. Uma janela nova que não cabe dividindo a focada tenta a maior antes de virar flutuante.
+
 ## Riscos
 
 - **Overlays QML num KWin Script** (borda ativa e barra de abas): ficam acima das janelas certas? Seguem a geometria sem atraso? Recebem clique sem roubar o foco? **Validado** no `testenv/`: a borda e a barra de abas aparecem e acompanham o foco. Ainda falta validar numa sessão real o clique na aba sem roubar o foco e a sobreposição com outras janelas.
