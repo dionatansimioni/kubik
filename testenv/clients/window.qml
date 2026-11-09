@@ -1,6 +1,8 @@
 // Janela de teste para o KWin headless.
-// Uso: qml window.qml -- <título> [<largura>x<altura>] [<cor>]
-// Sem cor, ela é derivada do título.
+// Uso: qml window.qml -- <título> [<L>x<A>] [<cor>]
+//   cor: sem cor (ou "-"), ela é derivada do título
+// Obs.: limites de tamanho (minimumWidth…) definidos aqui NÃO chegam ao KWin
+// via runtime `qml`; para mínimos reais os cenários usam apps (ex.: kcalc).
 import QtQuick
 import QtQuick.Window
 Window {
@@ -15,6 +17,6 @@ Window {
     width: size[0]
     height: size[1]
     title: args[0] || "window"
-    color: args[2] || Qt.hsla((win.title.length * 0.13) % 1, 0.5, 0.5, 1)
-    Text { anchors.centerIn: parent; text: win.title; font.pixelSize: 32; color: "white" }
+    color: (args[2] && args[2] !== "-") ? args[2] : Qt.hsla((win.title.length * 0.13) % 1, 0.5, 0.5, 1)
+    Text { anchors.centerIn: parent; text: win.title; font.pixelSize: 24; color: "white" }
 }

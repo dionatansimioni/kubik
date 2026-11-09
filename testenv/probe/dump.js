@@ -6,6 +6,7 @@ for (const w of workspace.stackingOrder) {
     const g = w.frameGeometry;
     console.warn("WINDOW @TAG@ " + JSON.stringify({
         caption: w.caption, x: g.x, y: g.y, width: g.width, height: g.height,
-        active: workspace.activeWindow === w,
+        active: workspace.activeWindow === w, minimized: w.minimized,
+        minWidth: w.minSize.width, minHeight: w.minSize.height,
     }));
 }

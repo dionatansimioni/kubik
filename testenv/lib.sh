@@ -61,3 +61,27 @@ drag_and_shoot() {
 mouse_move() {
     python3 /work/testenv/fakeinput.py move "$@"
 }
+
+# Executa JavaScript dentro do KWin (API de scripts: workspace, etc.).
+#   kwin_eval 'workspace.activeWindow.minimized = true'
+# Atalho: win("<título>") devolve a janela com aquele título.
+kwin_eval() {
+    local file; file=$(mktemp /tmp/eval-XXXX.js)
+    {
+        echo 'function win(t) { return workspace.stackingOrder.find(w => w.caption === t); }'
+        echo "$1"
+    } > "$file"
+    local name; name=$(basename "$file" .js)
+    local id; id=$(dbus-send --session --print-reply --dest=org.kde.KWin /Scripting \
+        org.kde.kwin.Scripting.loadScript "string:$file" "string:$name" | awk '/int32/ {print $2}')
+    dbus-send --session --print-reply --dest=org.kde.KWin "/Scripting/Script$id" org.kde.kwin.Script.run >/dev/null
+    sleep 0.3
+    dbus-send --session --print-reply --dest=org.kde.KWin /Scripting \
+        org.kde.kwin.Scripting.unloadScript "string:$name" >/dev/null
+}
+
+# Abre um app real e espera ele mapear: open_app <comando> [espera]
+open_app() {
+    $1 >/dev/null 2>&1 &
+    sleep "${2:-2.5}"
+}

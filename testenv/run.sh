@@ -3,14 +3,15 @@
 #
 # Uso: testenv/run.sh <diretório-do-pacote> <cenário.sh> <diretório-de-saída>
 #
-# O pacote é empacotado (scripts/build.py) e o .kwinscript resultante é
-# instalado e ativado ANTES do KWin iniciar. O cenário roda como a
+# O pacote é empacotado (scripts/build.py) e o arquivo resultante é instalado
+# e ativado ANTES do KWin iniciar (testenv/session.sh). O cenário roda como a
 # sessão do KWin (--exit-with-session) e pode usar as funções de testenv/lib.sh.
 # Saída: <saída>/kwin.log (log completo do KWin, incluindo console.* dos scripts)
 #        <saída>/*.png     (screenshots tirados pelo cenário)
 #
-# KUBIK_EXTRA_PKGS="dir1 dir2": pacotes instalados e ativados junto (ex.: para
-# reproduzir a convivência com outros scripts).
+# KUBIK_KWINRC="Grupo/Chave=Valor ...": kwinrc aplicado antes do KWin iniciar.
+# KUBIK_EXTRA_PKGS="dir1 dir2": pacotes (scripts ou efeitos) instalados e
+# ativados junto (ex.: o efeito de animação, ou outro script para convivência).
 #
 # Requisitos no host: docker e o módulo vgem (GPU virtual para o OpenGL por
 # software). O script carrega o vgem com modprobe se ele não estiver carregado.
@@ -44,14 +45,18 @@ docker build -q -t "$IMAGE" "$CONTEXT" >/dev/null
 
 mkdir -p "$OUT"
 chmod 777 "$OUT"
-ID=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["KPlugin"]["Id"])' "$PKG/metadata.json")
-# Instala o artefato gerado pelo build (o mesmo .kwinscript que o usuário baixa).
-KWINSCRIPT=$(KUBIK_DIST="$OUT/pkg" python3 "$ROOT/scripts/build.py" "$PKG" | head -n1)
-EXTRA=""
-for extra in ${KUBIK_EXTRA_PKGS:-}; do
-    f=$(KUBIK_DIST="$OUT/pkg" python3 "$ROOT/scripts/build.py" "$extra" | head -n1)
-    eid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["KPlugin"]["Id"])' "$ROOT/$extra/metadata.json")
-    EXTRA="$EXTRA /out/pkg/$(basename "$f"):$eid"
+# Empacota (scripts/build.py) o pacote principal e os extras e lista o que o
+# container deve instalar: "<arquivo> <KPackageStructure> <Id>" por linha.
+mkdir -p "$OUT/pkg"
+: > "$OUT/pkg/install.list"
+for p in "$PKG" ${KUBIK_EXTRA_PKGS:-}; do
+    p=$(realpath "$p")
+    f=$(KUBIK_DIST="$OUT/pkg" python3 "$ROOT/scripts/build.py" "$p" | head -n1)
+    python3 - "$p/metadata.json" "/out/pkg/$(basename "$f")" >> "$OUT/pkg/install.list" <<'PY'
+import json, sys
+m = json.load(open(sys.argv[1]))
+print(sys.argv[2], m["KPackageStructure"], m["KPlugin"]["Id"])
+PY
 done
 
 # O KWin acha a GPU pelo sysfs do host (nome real do nó) mas às vezes tenta o
@@ -65,19 +70,8 @@ docker run --rm \
     -e QT_FORCE_STDERR_LOGGING=1 \
     -e QT_QUICK_BACKEND=software \
     -e KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 \
-    -e PKG="/out/pkg/$(basename "$KWINSCRIPT")" -e EXTRA="$EXTRA" -e SCENARIO="/work/${SCENARIO#"$ROOT"/}" -e ID="$ID" \
-    "$IMAGE" bash -c '
-        chmod 666 /dev/dri/renderD*
-        exec su tester -c "
-            set -e
-            mkdir -p /tmp/xdg
-            kpackagetool6 -t KWin/Script -i \"\$PKG\" >/dev/null
-            kwriteconfig6 --file kwinrc --group Plugins --key \"\${ID}Enabled\" true
-            for e in \$EXTRA; do
-                kpackagetool6 -t KWin/Script -i \"\${e%%:*}\" >/dev/null
-                kwriteconfig6 --file kwinrc --group Plugins --key \"\${e##*:}Enabled\" true
-            done
-            dbus-run-session -- kwin_wayland --virtual --width 1280 --height 800 \
-                --exit-with-session \"bash \$SCENARIO\" > /out/kwin.log 2>&1 || true
-        "'
+    -e KWIN_EFFECTS_FORCE_ANIMATIONS=1 \
+    -e SCENARIO="/work/${SCENARIO#"$ROOT"/}" \
+    -e KUBIK_KWINRC="${KUBIK_KWINRC:-}" \
+    "$IMAGE" bash -c 'chmod 666 /dev/dri/renderD* && exec su tester -c "bash /work/testenv/session.sh"'
 echo "$OUT/kwin.log"

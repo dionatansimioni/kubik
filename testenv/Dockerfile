@@ -5,7 +5,7 @@ FROM archlinux:latest
 RUN pacman -Syu --noconfirm --needed \
         kwin kpackage kconfig qt6-wayland qt6-declarative \
         dbus python python-dbus python-pillow \
-        ttf-dejavu libcap which \
+        ttf-dejavu libcap which kcalc \
     && pacman -Scc --noconfirm \
     && setcap -r /usr/bin/kwin_wayland  # cap_sys_nice não existe no container
 

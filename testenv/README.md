@@ -15,7 +15,9 @@ testenv/run.sh <pacote> <cenário.sh> <saída>
    - `mark <fase>` escreve uma marca no log;
    - `dump_windows <tag>` imprime no log a geometria real das janelas (`WINDOW <tag> {json}`);
    - `close_window <título>` fecha uma janela de teste;
-   - `drag X1 Y1 X2 Y2 [passos]` / `drag_and_shoot <nome> …` arrastam com o mouse simulado (`fakeinput.py`, protocolo `org_kde_kwin_fake_input`).
+   - `drag X1 Y1 X2 Y2 [passos]` / `drag_and_shoot <nome> …` arrastam com o mouse simulado (`fakeinput.py`, protocolo `org_kde_kwin_fake_input`);
+   - `kwin_eval '<js>'` executa JavaScript dentro do KWin (`win("<título>")` acha uma janela pelo título);
+   - `open_app <comando>` abre um app real (as imagens têm o KCalc, que declara tamanho mínimo; janelas QML pelo runtime `qml` não repassam limites de tamanho ao KWin).
 3. Salva em `<saída>/`:
    - `kwin.log`, o log completo do KWin, incluindo `console.*` dos scripts;
    - `<nome>.png` (para olhar) e `<nome>.ppm` (para os testes lerem sem Pillow).
@@ -26,6 +28,8 @@ Os testes de integração (`tests/test_kwin_*.py`) usam esse fluxo e verificam o
 
 - `KUBIK_TESTENV=arch` (padrão): `testenv/Dockerfile`.
 - `KUBIK_TESTENV=fedora`: Fedora 44, a distro do usuário, em `testenv/fedora/Dockerfile`. Também tem KWin 6.8.2, mas com Qt 6.11.
+
+`KUBIK_KWINRC="Grupo/Chave=Valor …"` aplica configuração no `kwinrc` antes de o KWin iniciar (ex.: duração do efeito).
 
 `KUBIK_EXTRA_PKGS="prototype/overlay"` instala e ativa outros scripts junto, para testar a convivência.
 
@@ -46,6 +50,7 @@ O `run.sh` instala o `.kwinscript` gerado pelo `scripts/build.py`, ou seja, o me
 | `QT_FORCE_STDERR_LOGGING=1` | Sem isso o Qt manda os logs para o journald, que não existe no container, e `console.log` some. |
 | `KWIN_WAYLAND_NO_PERMISSION_CHECKS=1` | Libera o protocolo de entrada simulada (`org_kde_kwin_fake_input`) para o `fakeinput.py`. |
 | `plasma-breeze` na imagem Fedora | Sem a decoração Breeze, as alças de redimensionar não se estendem para fora da janela, e o arrasto da divisa não pega. O Fedora KDE do usuário tem Breeze. |
+| `KWIN_EFFECTS_FORCE_ANIMATIONS=1` | Com renderização por software (llvmpipe), o KWin desativa animações e nenhum efeito em JavaScript carrega. |
 | `KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1` | Libera a API D-Bus `ScreenShot2` para o `screenshot.py`. |
 
 ## Limites
