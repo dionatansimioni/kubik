@@ -19,6 +19,13 @@ testenv/run.sh <pacote> <cenário.sh> <saída>
 
 Os testes de integração (`tests/test_kwin_*.py`) usam esse fluxo e verificam o log e os pixels dos screenshots.
 
+## Distros
+
+- `KUBIK_TESTENV=arch` (padrão): `testenv/Dockerfile`.
+- `KUBIK_TESTENV=fedora`: Fedora 44, a distro do usuário, em `testenv/fedora/Dockerfile`. Também tem KWin 6.8.2, mas com Qt 6.11.
+
+O `run.sh` instala o `.kwinscript` gerado pelo `scripts/build.py`, ou seja, o mesmo arquivo que vai para o release.
+
 ## Requisitos do host
 
 - `docker`. A imagem `kubik-testenv` é construída automaticamente a partir do `Dockerfile` na primeira execução.

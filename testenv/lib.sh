@@ -2,8 +2,9 @@
 # Rodam DENTRO do container, como sessão do KWin.
 
 # Abre uma janela de teste e espera ela mapear: open_window <título> [LxA]
+QML_BIN=$(command -v /usr/lib/qt6/bin/qml /usr/lib64/qt6/bin/qml | head -n1)
 open_window() {
-    /usr/lib/qt6/bin/qml /work/testenv/clients/window.qml -- "$1" "${2:-400x300}" >/dev/null 2>&1 &
+    "$QML_BIN" /work/testenv/clients/window.qml -- "$1" "${2:-400x300}" >/dev/null 2>&1 &
     sleep 1
 }
 
