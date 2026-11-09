@@ -3,7 +3,7 @@
         "Id": "kubikoverlayproto",
         "Name": "Kubik Overlay Prototype",
         "Description": "Protótipo descartável: borda ativa e barra de abas em overlay QML.",
-        "Version": "0.0.2",
+        "Version": "0.0.3",
         "License": "GPL-3.0-or-later",
         "EnabledByDefault": false
     },

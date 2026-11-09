@@ -70,6 +70,15 @@ Comunicação com o script: o plasmoid aciona os atalhos globais do script via k
 - **Idiomas:** inglês e pt-BR via i18n (`.po`).
 - **Repositório:** GitHub.
 
+## Lições técnicas (KWin 6.8 / Qt 6.10+)
+
+Validadas no `testenv/`:
+
+1. **Import `org.kde.kwin` sempre com namespace** (`import org.kde.kwin as KWin`). O módulo exporta um tipo `Window` (não criável) que esconde o `Window` do QtQuick.
+2. **Overlays não podem ser declarados dentro do Item raiz.** Desde o Qt 6.7, um `Window` filho de um `Item` vira janela embutida na janela daquele Item, e num KWin Script o Item raiz não tem janela. Por isso os overlays são criados com `Component.createObject(null)`.
+3. **Escrever `frameGeometry` é assíncrono no Wayland.** Ler de volta em seguida devolve o valor antigo. **A árvore de tiling é a fonte da verdade**: nunca derive estado da geometria lida logo após aplicá-la.
+4. O Plasma esconde `console.log` do journal. Para logs de diagnóstico, use `console.warn`.
+
 ## Riscos
 
-- **Overlays QML num KWin Script** (borda ativa e barra de abas): ficam acima das janelas certas? Seguem a geometria sem atraso? Recebem clique sem roubar o foco? Isso está sendo validado em `prototype/overlay/` antes da estrutura do projeto.
+- **Overlays QML num KWin Script** (borda ativa e barra de abas): ficam acima das janelas certas? Seguem a geometria sem atraso? Recebem clique sem roubar o foco? **Validado** no `testenv/`: a borda e a barra de abas aparecem e acompanham o foco. Ainda falta validar numa sessão real o clique na aba sem roubar o foco e a sobreposição com outras janelas.
