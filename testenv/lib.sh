@@ -1,10 +1,10 @@
 # Funções para cenários do testenv (source /work/testenv/lib.sh).
 # Rodam DENTRO do container, como sessão do KWin.
 
-# Abre uma janela de teste e espera ela mapear: open_window <título> [LxA]
+# Abre uma janela de teste e espera ela mapear: open_window <título> [LxA] [cor]
 QML_BIN=$(command -v /usr/lib/qt6/bin/qml /usr/lib64/qt6/bin/qml | head -n1)
 open_window() {
-    "$QML_BIN" /work/testenv/clients/window.qml -- "$1" "${2:-400x300}" >/dev/null 2>&1 &
+    "$QML_BIN" /work/testenv/clients/window.qml -- "$1" "${2:-400x300}" ${3:+"$3"} >/dev/null 2>&1 &
     echo $! > "/tmp/window-$1.pid"
     sleep 1
 }
@@ -42,4 +42,22 @@ shortcut() {
 # Marca um ponto no kwin.log, para o teste saber em que fase está.
 mark() {
     echo "=== MARK $1 ===" >&2
+}
+
+# Mouse simulado (testenv/fakeinput.py): drag X1 Y1 X2 Y2 [passos]
+drag() {
+    python3 /work/testenv/fakeinput.py drag "$@"
+    sleep 0.5
+}
+
+# Como drag, mas tira o screenshot <nome> com o botão ainda pressionado.
+drag_and_shoot() {
+    local name=$1; shift
+    FAKEINPUT_BEFORE_RELEASE="python3 /work/testenv/screenshot.py /out/$name.png >/dev/null" \
+        python3 /work/testenv/fakeinput.py drag "$@"
+    sleep 0.5
+}
+
+mouse_move() {
+    python3 /work/testenv/fakeinput.py move "$@"
 }

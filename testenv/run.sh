@@ -9,6 +9,9 @@
 # Saída: <saída>/kwin.log (log completo do KWin, incluindo console.* dos scripts)
 #        <saída>/*.png     (screenshots tirados pelo cenário)
 #
+# KUBIK_EXTRA_PKGS="dir1 dir2": pacotes instalados e ativados junto (ex.: para
+# reproduzir a convivência com outros scripts).
+#
 # Requisitos no host: docker e o módulo vgem (GPU virtual para o OpenGL por
 # software). O script carrega o vgem com modprobe se ele não estiver carregado.
 set -euo pipefail
@@ -36,13 +39,20 @@ vgem_node() {
 }
 NODE=$(vgem_node || { modprobe vgem && vgem_node; }) || { echo "erro: módulo vgem indisponível" >&2; exit 1; }
 
-docker image inspect "$IMAGE" >/dev/null 2>&1 || docker build -q -t "$IMAGE" "$CONTEXT" >/dev/null
+# Sempre: com cache é ~1 s, e mudanças no Dockerfile entram sem passo manual.
+docker build -q -t "$IMAGE" "$CONTEXT" >/dev/null
 
 mkdir -p "$OUT"
 chmod 777 "$OUT"
 ID=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["KPlugin"]["Id"])' "$PKG/metadata.json")
 # Instala o artefato gerado pelo build (o mesmo .kwinscript que o usuário baixa).
 KWINSCRIPT=$(KUBIK_DIST="$OUT/pkg" python3 "$ROOT/scripts/build.py" "$PKG" | head -n1)
+EXTRA=""
+for extra in ${KUBIK_EXTRA_PKGS:-}; do
+    f=$(KUBIK_DIST="$OUT/pkg" python3 "$ROOT/scripts/build.py" "$extra" | head -n1)
+    eid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["KPlugin"]["Id"])' "$ROOT/$extra/metadata.json")
+    EXTRA="$EXTRA /out/pkg/$(basename "$f"):$eid"
+done
 
 # O KWin acha a GPU pelo sysfs do host (nome real do nó) mas às vezes tenta o
 # primeiro nó (renderD128); expomos o vgem com os dois nomes.
@@ -54,7 +64,8 @@ docker run --rm \
     -e XDG_RUNTIME_DIR=/tmp/xdg \
     -e QT_FORCE_STDERR_LOGGING=1 \
     -e QT_QUICK_BACKEND=software \
-    -e PKG="/out/pkg/$(basename "$KWINSCRIPT")" -e SCENARIO="/work/${SCENARIO#"$ROOT"/}" -e ID="$ID" \
+    -e KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 \
+    -e PKG="/out/pkg/$(basename "$KWINSCRIPT")" -e EXTRA="$EXTRA" -e SCENARIO="/work/${SCENARIO#"$ROOT"/}" -e ID="$ID" \
     "$IMAGE" bash -c '
         chmod 666 /dev/dri/renderD*
         exec su tester -c "
@@ -62,6 +73,10 @@ docker run --rm \
             mkdir -p /tmp/xdg
             kpackagetool6 -t KWin/Script -i \"\$PKG\" >/dev/null
             kwriteconfig6 --file kwinrc --group Plugins --key \"\${ID}Enabled\" true
+            for e in \$EXTRA; do
+                kpackagetool6 -t KWin/Script -i \"\${e%%:*}\" >/dev/null
+                kwriteconfig6 --file kwinrc --group Plugins --key \"\${e##*:}Enabled\" true
+            done
             dbus-run-session -- kwin_wayland --virtual --width 1280 --height 800 \
                 --exit-with-session \"bash \$SCENARIO\" > /out/kwin.log 2>&1 || true
         "'
