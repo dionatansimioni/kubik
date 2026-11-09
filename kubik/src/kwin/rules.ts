@@ -1,0 +1,42 @@
+import type { KWinWindow } from "./api";
+
+/** Classes que nunca entram no tiling (comparação sem maiúsculas). */
+export const DEFAULT_FLOATING_CLASSES = [
+  "plasmashell",
+  "org.kde.plasmashell",
+  "krunner",
+  "org.kde.krunner",
+  "yakuake",
+  "org.kde.yakuake",
+  "kwin",
+  "org.kde.kwin",
+  "ksmserver-logout-greeter",
+  "org.kde.polkit-kde-authentication-agent-1",
+  "org.kde.spectacle",
+];
+
+/**
+ * Motivo para a janela NÃO entrar no tiling, ou null se ela deve entrar.
+ * Devolver o motivo (em vez de um booleano) deixa o log explicável.
+ */
+export function floatReason(w: KWinWindow, floatingClasses: readonly string[]): string | null {
+  if (!w.normalWindow) return "não é janela normal";
+  if (w.dialog) return "diálogo";
+  if (w.splash) return "splash";
+  if (w.utility) return "utilitário";
+  if (w.specialWindow) return "janela especial";
+  if (w.transient) return "transiente";
+  if (!w.resizeable) return "não redimensionável";
+  if (
+    w.minSize.width > 0 &&
+    w.minSize.width === w.maxSize.width &&
+    w.minSize.height === w.maxSize.height
+  )
+    return "tamanho fixo";
+  if (w.minimized) return "minimizada";
+  if (w.fullScreen) return "tela cheia";
+  if (w.onAllDesktops || w.desktops.length !== 1) return "em vários desktops";
+  const cls = (w.resourceClass || "").toLowerCase();
+  if (floatingClasses.some((c) => c.toLowerCase() === cls)) return `classe flutuante (${cls})`;
+  return null;
+}

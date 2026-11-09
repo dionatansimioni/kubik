@@ -7,12 +7,17 @@ Gera em dist/:
                             (ou kpackagetool6 -t KWin/Script -i arquivo)
   <id>-<versão>.tar.gz      pacote + install.sh / uninstall.sh
 
-Uso: scripts/build.py [diretório-do-pacote]   (padrão: prototype/overlay)
+Uso: scripts/build.py [diretório-do-pacote]   (padrão: kubik/package)
 Imprime os caminhos dos arquivos gerados, um por linha.
+
+Se o diretório pai do pacote for um projeto Node (tem package.json), roda
+antes `npm run build` nele (via scripts/node.sh), que gera os arquivos do
+pacote a partir do TypeScript.
 """
 import io
 import json
 import os
+import subprocess
 import sys
 import tarfile
 import zipfile
@@ -23,6 +28,18 @@ DIST = Path(os.environ.get("KUBIK_DIST", ROOT / "dist"))
 SCRIPTS = ROOT / "scripts"
 # Data fixa nos arquivos para builds reproduzíveis.
 FIXED_ZIP_DATE = (2026, 1, 1, 0, 0, 0)
+
+
+def prebuild(pkg: Path):
+    project = pkg.parent
+    if not (project / "package.json").is_file():
+        return
+    rel = str(project.relative_to(ROOT))
+    node = [str(SCRIPTS / "node.sh"), rel]
+    # A saída do npm vai para o stderr: o stdout do build.py é só a lista de artefatos.
+    if not (project / "node_modules").is_dir():
+        subprocess.run(node + ["npm", "ci"], check=True, stdout=sys.stderr)
+    subprocess.run(node + ["npm", "run", "--silent", "build"], check=True, stdout=sys.stderr)
 
 
 def package_files(pkg: Path):
@@ -58,13 +75,14 @@ def build_tarball(pkg: Path, plugin_id: str, version: str, out: Path):
             add(tar, f.read_bytes(), "package/" + f.relative_to(pkg).as_posix(), 0o644)
         for script in ("install.sh", "uninstall.sh"):
             add(tar, (SCRIPTS / script).read_bytes(), script, 0o755)
-        readme = pkg.parent / "README.md"
-        if readme.is_file():
+        readme = next((p for p in (pkg / "README.md", pkg.parent / "README.md") if p.is_file()), None)
+        if readme:
             add(tar, readme.read_bytes(), "README.md", 0o644)
 
 
 def main(argv):
-    pkg = (ROOT / (argv[1] if len(argv) > 1 else "prototype/overlay")).resolve()
+    pkg = (ROOT / (argv[1] if len(argv) > 1 else "kubik/package")).resolve()
+    prebuild(pkg)
     plugin_id, version = read_metadata(pkg)
     DIST.mkdir(exist_ok=True)
     kwinscript = DIST / f"{plugin_id}-{version}.kwinscript"

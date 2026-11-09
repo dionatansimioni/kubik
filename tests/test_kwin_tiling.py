@@ -1,0 +1,90 @@
+"""Integração: o tiling do kubik num KWin 6 real (testenv/).
+
+Roda tests/scenarios/tiling.sh e confere a geometria REAL das janelas (lida
+por um script de inspeção dentro do KWin), não a que o kubik pediu.
+Tela virtual: 1280×800 sem painéis; gaps padrão de 4 px.
+"""
+import json
+import re
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+from test_kwin_overlay import ROOT, kwin_env_available
+
+FULL = (4, 4, 1272, 792)
+LEFT = (4, 4, 634, 792)
+RIGHT = (642, 4, 634, 792)
+RIGHT_TOP = (642, 4, 634, 394)
+RIGHT_BOTTOM = (642, 402, 634, 394)
+
+
+def parse_windows(log):
+    """{tag: {caption: (x, y, w, h)}} a partir das linhas 'WINDOW <tag> {json}'."""
+    out = {}
+    for m in re.finditer(r"WINDOW (\w+) (\{.*\})", log):
+        d = json.loads(m.group(2))
+        geo = tuple(round(d[k]) for k in ("x", "y", "width", "height"))
+        out.setdefault(m.group(1), {})[d["caption"]] = geo
+    return out
+
+
+@unittest.skipUnless(kwin_env_available(), "testenv indisponível (docker/vgem)")
+class TilingInKWinTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.out = tempfile.mkdtemp(prefix="kubik-tiling-")
+        subprocess.run(
+            [str(ROOT / "testenv" / "run.sh"), "kubik/package",
+             "tests/scenarios/tiling.sh", cls.out],
+            cwd=ROOT, check=True, capture_output=True, timeout=300,
+        )
+        with open(f"{cls.out}/kwin.log", errors="replace") as f:
+            cls.log = f.read()
+        cls.w = parse_windows(cls.log)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.out, ignore_errors=True)
+
+    def test_loads_without_errors(self):
+        self.assertIn("[kubik] iniciado", self.log)
+        for bad in ("Component failed to load", "TypeError", "ReferenceError", "falha ao carregar"):
+            self.assertNotIn(bad, self.log)
+
+    def test_single_window_fills_screen_minus_gaps(self):
+        self.assertEqual(self.w["one"], {"Alpha": FULL})
+
+    def test_second_window_splits_side_by_side(self):
+        self.assertEqual(self.w["two"], {"Alpha": LEFT, "Beta": RIGHT})
+
+    def test_third_window_splits_the_focused_one(self):
+        # Beta tinha o foco e é mais alta que larga: divide em cima/embaixo.
+        self.assertEqual(self.w["three"], {"Alpha": LEFT, "Beta": RIGHT_TOP, "Gamma": RIGHT_BOTTOM})
+
+    def test_closing_gives_space_back(self):
+        self.assertEqual(self.w["closed"], {"Alpha": LEFT, "Beta": RIGHT})
+
+    def natural_size(self):
+        # Delta abriu com o tiling desligado: é o tamanho natural de uma janela
+        # 400x300 com a decoração da distro (varia: Breeze no Arch, padrão no Fedora).
+        return self.w["off_new"]["Delta"][2:]
+
+    def test_toggle_off_restores_original_geometry(self):
+        for caption, geo in self.w["off"].items():
+            self.assertNotIn(geo, (LEFT, RIGHT, FULL), caption)
+            self.assertEqual(geo[2:], self.natural_size(), f"{caption} não voltou ao tamanho original")
+
+    def test_new_window_floats_while_off(self):
+        self.assertNotIn(self.w["off_new"]["Delta"], (LEFT, RIGHT, FULL, RIGHT_TOP, RIGHT_BOTTOM))
+        self.assertLess(self.natural_size()[0], 500)
+
+    def test_toggle_on_tiles_everything_again(self):
+        geos = self.w["on_again"]
+        self.assertEqual(set(geos), {"Alpha", "Beta", "Delta"})
+        self.assertEqual(sorted(geos.values()), sorted([LEFT, RIGHT_TOP, RIGHT_BOTTOM]))
+
+
+if __name__ == "__main__":
+    unittest.main()

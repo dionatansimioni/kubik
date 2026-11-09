@@ -1,0 +1,14 @@
+{
+    "KPlugin": {
+        "Id": "kubik",
+        "Name": "Kubik",
+        "Description": "Auto-tiling de janelas no estilo Pop!_Shell.",
+        "Version": "0.1.0",
+        "License": "GPL-3.0-or-later",
+        "Website": "https://github.com/dionatansimioni/kubik",
+        "EnabledByDefault": false
+    },
+    "X-Plasma-API": "declarativescript",
+    "X-Plasma-MainScript": "ui/main.qml",
+    "KPackageStructure": "KWin/Script"
+}

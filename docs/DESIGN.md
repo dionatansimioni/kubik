@@ -81,6 +81,9 @@ Validadas no `testenv/`:
 5. **O KWin guarda em memória o QML compilado, indexado pela URL, até reiniciar.** Atualizar o pacote com a sessão aberta recarregava o código antigo. O `main.qml` é só um carregador fixo que abre o código real por uma URL única (`Overlay.qml?load=<Date.now()>`). O caminho alternativo, um diretório por versão via `X-Plasma-MainScript`, não serve: o KPackage exige `contents/ui/main.qml`.
 6. **Overlays criados com `createObject(null)` precisam ser destruídos em `Component.onDestruction`.** Caso contrário, sobrevivem ao descarregamento do script como bordas fantasma.
 
+7. **JavaScript também é guardado em cache pela URL.** Por isso o bundle do TypeScript é embutido no `Kubik.qml`, carregado com URL única, em vez de importado de um `.js`.
+8. **Para uma janela nova, `windowActivated` chega ANTES de `windowAdded`.** O alvo da divisão vem de um histórico de foco, não de "a última ativa que eu conheço".
+
 ## Riscos
 
 - **Overlays QML num KWin Script** (borda ativa e barra de abas): ficam acima das janelas certas? Seguem a geometria sem atraso? Recebem clique sem roubar o foco? **Validado** no `testenv/`: a borda e a barra de abas aparecem e acompanham o foco. Ainda falta validar numa sessão real o clique na aba sem roubar o foco e a sobreposição com outras janelas.

@@ -45,7 +45,7 @@ class BuildTest(unittest.TestCase):
     def test_kwinscript_is_reproducible(self):
         with tempfile.TemporaryDirectory() as other:
             env = dict(os.environ, KUBIK_DIST=other)
-            subprocess.run(["python3", str(ROOT / "scripts" / "build.py")], env=env,
+            subprocess.run(["python3", str(ROOT / "scripts" / "build.py"), "prototype/overlay"], env=env,
                            check=True, capture_output=True)
             again = Path(other) / self.kwinscript.name
             self.assertEqual(again.read_bytes(), self.kwinscript.read_bytes())
@@ -58,6 +58,28 @@ class BuildTest(unittest.TestCase):
                      "package/contents/" + META["X-Plasma-MainScript"]):
             self.assertIn(f"{top}/{name}", members)
         self.assertTrue(members[f"{top}/install.sh"].mode & 0o111, "install.sh não é executável")
+
+
+@unittest.skipUnless(shutil.which("docker"), "docker indisponível (build do TypeScript)")
+class KubikBuildTest(unittest.TestCase):
+    """O pacote principal: o build.py compila o TypeScript e embute no QML."""
+
+    def test_kwinscript_has_loader_and_embedded_core(self):
+        meta = json.loads((ROOT / "kubik" / "package" / "metadata.json").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as out:
+            env = dict(os.environ, KUBIK_DIST=out)
+            proc = subprocess.run(["python3", str(ROOT / "scripts" / "build.py"), "kubik/package"],
+                                  env=env, check=True, capture_output=True, text=True)
+            kwinscript = Path(proc.stdout.split()[0])
+            self.assertEqual(kwinscript.name, f"kubik-{meta['KPlugin']['Version']}.kwinscript")
+            with zipfile.ZipFile(kwinscript) as z:
+                main = z.read("contents/ui/main.qml").decode()
+                kubik = z.read("contents/ui/Kubik.qml").decode()
+                names = z.namelist()
+        self.assertIn('Qt.resolvedUrl("Kubik.qml") + "?load=" + Date.now()', main)
+        self.assertIn("var Kubik = ", kubik)
+        self.assertNotIn("@@KUBIK_BUNDLE@@", kubik)
+        self.assertFalse([n for n in names if n.endswith(".js")], "nenhum .js solto: o KWin o guardaria em cache")
 
 
 class ShellScriptsTest(unittest.TestCase):

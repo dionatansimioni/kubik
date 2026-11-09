@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Publica uma versão de teste como GitHub Release (pré-release) com os pacotes anexados.
-# Uso: scripts/release.sh [diretório-do-pacote]   (padrão: prototype/overlay)
+# Uso: scripts/release.sh [diretório-do-pacote]   (padrão: kubik/package)
 # A versão vem de KPlugin.Version no metadata.json; a tag é <Id>-v<Versão>.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-PKG=${1:-prototype/overlay}
+PKG=${1:-kubik/package}
 
 if [ -n "$(git status --porcelain)" ]; then
     echo "erro: há mudanças não commitadas" >&2; exit 1
