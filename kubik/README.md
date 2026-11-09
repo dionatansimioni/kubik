@@ -11,7 +11,7 @@ Baixe a versão mais recente em **Releases** e escolha uma das formas:
 
 Para remover: `./kubik-<versão>/uninstall.sh`.
 
-O `.tar.gz` instala o script **e** o efeito de animação. Para instalar só pela interface, use o `.kwinscript` em *Scripts do KWin*. O efeito vem como `.kwineffect`, que por enquanto só o `install.sh` instala.
+O `.tar.gz` instala o script **e** o efeito de animação. **Na primeira instalação do efeito, saia e entre na sessão uma vez**: o KWin só reconhece efeitos novos ao iniciar, e o `install.sh` avisa quando é o caso. As atualizações seguintes valem na hora. Para instalar só pela interface, use o `.kwinscript` em *Scripts do KWin*. O efeito vem como `.kwineffect`, que por enquanto só o `install.sh` instala.
 
 ### Ajustar as animações
 
@@ -23,7 +23,7 @@ dbus-send --session --dest=org.kde.KWin /Effects org.kde.kwin.Effects.reconfigur
 
 O padrão é 250 ms com `OutCubic`. Para algo mais próximo do Hyprland, experimente `OutQuint` ou `OutBack` (que tem um leve "quique"). Logs: `journalctl --user -b | grep '\[kubik\]'`.
 
-## O que já funciona (0.3.0)
+## O que já funciona (0.3.1)
 
 - Janelas novas são organizadas em árvore BSP. A janela focada é dividida ao meio pelo lado mais longo.
 - Fechar ou minimizar uma janela devolve o espaço às vizinhas.
@@ -35,6 +35,7 @@ O padrão é 250 ms com `OutCubic`. Para algo mais próximo do Hyprland, experim
   - Puxar a borda entre duas janelas redimensiona as duas ao vivo, e a proporção fica gravada na árvore.
 - **Tamanhos mínimos:** as divisões cedem para cada app caber no mínimo dele (conteúdo + barra de título). Se a janela nova não cabe dividindo a focada, ela divide a maior; se nem assim couber, ela fica flutuante, com o motivo no log.
 - **Animações** (efeito *Kubik: animações*, instalado junto): as janelas deslizam e redimensionam suavemente quando o layout muda. Ficam de fora o arrasto com o mouse, a tela cheia e o maximizar, que têm animação própria do KWin. A velocidade global de animação do Plasma também vale.
+- **Apps que mudam a própria geometria** (Chrome e apps Electron como o Podman Desktop, em X11, ao restaurar o tamanho da sessão anterior) voltam ao tile. Se o app insistir, ele fica flutuante e as outras janelas se reorganizam.
 - **Meta+Y** liga e desliga o tiling. Ao religar, a árvore é reconstruída equilibrada. Ao desligar, as janelas voltam à posição e ao tamanho de antes.
 
 ## Ainda não

@@ -45,6 +45,26 @@ Item {
         }
     }
 
+    Component {
+        id: timerComponent
+
+        Timer {
+            repeat: false
+        }
+    }
+
+    // Agenda fn para daqui a ms milissegundos (o núcleo TS não tem relógio).
+    function later(ms, fn) {
+        const t = timerComponent.createObject(root, {
+            interval: ms
+        });
+        t.triggered.connect(() => {
+            fn();
+            t.destroy();
+        });
+        t.start();
+    }
+
     function showPreview(r) {
         if (!previewWin)
             return;
@@ -87,7 +107,8 @@ Item {
             workspace: KWin.Workspace,
             clientArea: (output, desktop) => KWin.Workspace.clientArea(maximizeArea, output, desktop),
             log: root.log,
-            preview: root.showPreview
+            preview: root.showPreview,
+            later: root.later
         });
     }
 

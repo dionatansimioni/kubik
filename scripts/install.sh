@@ -10,6 +10,8 @@ need kpackagetool6
 need kwriteconfig6
 need dbus-send
 
+NEEDS_RELOGIN=""
+
 meta() { sed -n "s/.*\"$2\": *\"\([^\"]*\)\".*/\1/p" "$1/metadata.json" | head -n1; }
 kwin() { dbus-send --session --print-reply --dest=org.kde.KWin "$@" >/dev/null 2>&1; }
 
@@ -34,14 +36,24 @@ for PKG in ./packages/*/; do
         KWin/Script) kwin /Scripting org.kde.kwin.Scripting.unloadScript "string:$ID" || true ;;
         KWin/Effect)
             kwin /Effects org.kde.kwin.Effects.unloadEffect "string:$ID" || true
-            kwin /Effects org.kde.kwin.Effects.loadEffect "string:$ID" || true ;;
+            kwin /Effects org.kde.kwin.Effects.loadEffect "string:$ID" || true
+            # O KWin só descobre efeitos NOVOS ao iniciar a sessão: na primeira
+            # instalação, o loadEffect falha até o próximo login.
+            if ! dbus-send --session --print-reply --dest=org.kde.KWin /Effects \
+                    org.kde.kwin.Effects.isEffectLoaded "string:$ID" 2>/dev/null | grep -q "boolean true"; then
+                NEEDS_RELOGIN="$NEEDS_RELOGIN $ID"
+            fi ;;
     esac
 done
 
 kwin /KWin org.kde.KWin.reconfigure || true
-if kwin /Scripting org.kde.kwin.Scripting.start; then
-    echo "Pronto: tudo instalado e ativo."
-else
+if ! kwin /Scripting org.kde.kwin.Scripting.start; then
     echo "Instalado. Não consegui recarregar o KWin: ative em Configurações do Sistema › Scripts do KWin / Efeitos."
+elif [ -n "$NEEDS_RELOGIN" ]; then
+    echo
+    echo "ATENÇÃO: instalado, mas${NEEDS_RELOGIN} só ativa depois de SAIR E ENTRAR na sessão."
+    echo "         (O KWin só reconhece efeitos novos ao iniciar. Nas próximas atualizações não precisa.)"
+else
+    echo "Pronto: tudo instalado e ativo."
 fi
 echo "Logs: journalctl --user -f | grep kubik"

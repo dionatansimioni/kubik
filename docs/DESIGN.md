@@ -92,6 +92,10 @@ Validadas no `testenv/`:
 13. **`minSize` é do conteúdo, não da moldura.** A árvore distribui molduras, então o mínimo efetivo é `minSize + (frame − client)`. Sem isso, o app recusa o tile e invade o vizinho (achado no estresse com o KCalc).
 14. **Reconstruções em massa (início, religar) dividem sempre a maior janela.** Dividir a focada em cadeia gera tiles minúsculos. Uma janela nova que não cabe dividindo a focada tenta a maior antes de virar flutuante.
 
+15. **O KWin só descobre efeitos NOVOS ao iniciar a sessão.** Na primeira instalação, o `loadEffect` falha até o próximo login (o `install.sh` avisa). Atualizações de um efeito já conhecido recarregam na hora.
+16. **Apps X11 (Chrome, Electron) mudam a própria geometria depois de abrir** (ConfigureRequest), por exemplo ao restaurar a sessão anterior. O kubik observa `frameGeometryChanged`; se uma janela no tiling sair do tile sozinha (fora de arrasto ou maximização), ele a devolve depois de 250 ms. Se o app insistir mais de 3 vezes, ela vira flutuante. No Wayland o KWin já impõe o tamanho do tile.
+17. **Apps com barra de título própria (CSD):** o "conteúdo" inclui as sombras e é **maior** que a moldura. Por isso a soma da decoração no mínimo é limitada a ≥ 0.
+
 ## Riscos
 
 - **Overlays QML num KWin Script** (borda ativa e barra de abas): ficam acima das janelas certas? Seguem a geometria sem atraso? Recebem clique sem roubar o foco? **Validado** no `testenv/`: a borda e a barra de abas aparecem e acompanham o foco. Ainda falta validar numa sessão real o clique na aba sem roubar o foco e a sobreposição com outras janelas.

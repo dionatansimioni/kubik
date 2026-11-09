@@ -58,6 +58,10 @@ export interface KWinWindow {
   readonly fullScreenChanged: Signal;
   readonly desktopsChanged: Signal;
   readonly outputChanged: Signal;
+  /** 0 = não maximizada (KWin: MaximizeRestore). */
+  readonly maximizeMode: number;
+  /** Qualquer mudança de geometria: nossas, do usuário ou do próprio app. */
+  readonly frameGeometryChanged: Signal;
   readonly interactiveMoveResizeStarted: Signal;
   /** Geometria que o usuário está arrastando (ainda não aplicada). */
   readonly interactiveMoveResizeStepped: Signal<[Rect]>;
@@ -79,6 +83,8 @@ export interface Host {
   /** Área útil (sem painéis) da tela × desktop. */
   clientArea(output: Output, desktop: VirtualDesktop): Rect;
   log(message: string): void;
+  /** Agenda `fn` para daqui a `ms` milissegundos. */
+  later(ms: number, fn: () => void): void;
   /** Mostra (ou esconde, com null) a prévia de onde a janela arrastada vai entrar. */
   preview(rect: Rect | null): void;
 }

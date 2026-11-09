@@ -77,6 +77,38 @@ class NoAnimationControlTest(_AnimationScenario):
         self.assertTrue(is_green(p), f"sem o efeito, {PROBE} já deveria ser da Beta: {p}")
 
 
+@unittest.skipUnless(kwin_env_available(), "testenv indisponível (docker/vgem)")
+class SwapAnimationTest(unittest.TestCase):
+    """Relato do usuário: ao trocar janelas de lugar não havia animação.
+    0,5 s depois de soltar a Alpha sobre a Beta (efeito em 2 s, linear), a
+    Beta ainda está deslizando para a esquerda: em (1000, 100) ela aparece
+    verde; no final esse ponto é da Alpha (vermelha)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.out = Path(tempfile.mkdtemp(prefix="kubik-swap-"))
+        subprocess.run(
+            [str(ROOT / "testenv" / "run.sh"), "kubik/package", "tests/scenarios/swap-animation.sh", str(cls.out)],
+            cwd=ROOT, check=True, capture_output=True, timeout=300,
+            env=dict(os.environ, KUBIK_EXTRA_PKGS="kubik/effect",
+                     KUBIK_KWINRC="Effect-kubikanimations/Duration=2000 Effect-kubikanimations/Curve=Linear"),
+        )
+        cls.log = (cls.out / "kwin.log").read_text(errors="replace")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.out, ignore_errors=True)
+
+    def test_swap_happened(self):
+        self.assertEqual(parse_windows(self.log)["end"], {"Alpha": RIGHT, "Beta": LEFT})
+
+    def test_swap_is_animated(self):
+        mid = Ppm(self.out / "mid.ppm").getpixel((1000, 100))
+        end = Ppm(self.out / "end.ppm").getpixel((1000, 100))
+        self.assertTrue(is_green(mid), f"a Beta deveria estar no meio do caminho: {mid}")
+        self.assertTrue(is_red(end), f"no final o ponto é da Alpha: {end}")
+
+
 del _AnimationScenario  # só as subclasses rodam
 
 if __name__ == "__main__":

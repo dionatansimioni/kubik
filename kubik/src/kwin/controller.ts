@@ -1,4 +1,11 @@
-import { type Rect, inset } from "../core/rect";
+import { type Rect, inset, sameRect } from "../core/rect";
+
+/** Espera antes de conferir se uma janela saiu do tile (mudanças assentarem). */
+const ENFORCE_DELAY_MS = 250;
+/** Quantas vezes seguidas o kubik devolve a janela antes de desistir dela. */
+const MAX_FIGHTS = 3;
+/** Depois deste tempo sem brigas, uma "briga" é esquecida. */
+const FIGHT_MEMORY_MS = 5000;
 import { type Gaps, Tree } from "../core/tree";
 import type { Host, KWinWindow, Output, VirtualDesktop } from "./api";
 
@@ -38,6 +45,13 @@ interface Tracked {
   seq: number;
   /** Tirada do tiling por não caber no mínimo; vale até o tiling ser religado. */
   noFit: boolean;
+  /** Tirada do tiling porque o app insiste em outra geometria (idem). */
+  rebel: boolean;
+  /** Última geometria que o kubik aplicou (o tile). */
+  target: Rect | null;
+  /** Vezes recentes em que o app saiu do tile sozinho. */
+  fights: number;
+  checkPending: boolean;
   disconnect: () => void;
 }
 
@@ -135,7 +149,7 @@ export class Controller {
       this.trees.clear();
       this.host.log("tiling desligado");
     } else {
-      for (const t of this.tracked.values()) t.noFit = false;
+      for (const t of this.tracked.values()) t.noFit = t.rebel = false;
       this.balanced = true;
       for (const t of this.tracked.values()) this.refresh(t);
       this.balanced = false;
@@ -168,11 +182,13 @@ export class Controller {
       // Durante um arrasto a tela da janela muda a cada passo; quem decide é o drop.
       if (t && this.drag?.id !== id) this.refresh(t);
     };
+    const onGeometry = () => this.geometryChanged(id);
     const onStarted = () => this.dragStarted(id);
     const onStepped = (r: Rect) => this.dragStepped(id, r);
     const onFinished = () => this.dragFinished(id);
     const signals = [w.minimizedChanged, w.fullScreenChanged, w.desktopsChanged, w.outputChanged];
     for (const s of signals) s.connect(onChange);
+    w.frameGeometryChanged.connect(onGeometry);
     w.interactiveMoveResizeStarted.connect(onStarted);
     w.interactiveMoveResizeStepped.connect(onStepped);
     w.interactiveMoveResizeFinished.connect(onFinished);
@@ -182,8 +198,13 @@ export class Controller {
       saved: null,
       seq: 0,
       noFit: false,
+      rebel: false,
+      target: null,
+      fights: 0,
+      checkPending: false,
       disconnect: () => {
         signals.forEach((s) => s.disconnect(onChange));
+        w.frameGeometryChanged.disconnect(onGeometry);
         w.interactiveMoveResizeStarted.disconnect(onStarted);
         w.interactiveMoveResizeStepped.disconnect(onStepped);
         w.interactiveMoveResizeFinished.disconnect(onFinished);
@@ -217,7 +238,9 @@ export class Controller {
       ? "tiling desligado"
       : t.noFit
         ? "não cabe"
-        : floatReason(w, this.config.floatingClasses);
+        : t.rebel
+          ? "o app não aceita o tile"
+          : floatReason(w, this.config.floatingClasses);
     const place = reason === null ? { output: w.output, desktop: w.desktops[0] } : null;
     const key = place ? keyOf(place) : null;
     if (key === t.key && !isNew) return;
@@ -302,6 +325,42 @@ export class Controller {
     return mins;
   }
 
+  // ---- apps que mudam a própria geometria -------------------------------------
+
+  /**
+   * Chrome/Electron em X11 (e outros) às vezes se movem/redimensionam sozinhos
+   * depois de abrir (restaurando a sessão anterior) ou recusam o tamanho do
+   * tile. Sem reação, a janela fica por cima das vizinhas. O kubik devolve a
+   * janela ao tile; se o app insistir, ela vira flutuante.
+   */
+  private geometryChanged(id: string): void {
+    const t = this.tracked.get(id);
+    if (!t || !this.deviates(t) || t.checkPending) return;
+    t.checkPending = true;
+    this.host.later(ENFORCE_DELAY_MS, () => {
+      t.checkPending = false;
+      if (this.tracked.get(id) !== t || !this.deviates(t)) return;
+      t.fights++;
+      this.host.later(FIGHT_MEMORY_MS, () => (t.fights = Math.max(0, t.fights - 1)));
+      if (t.fights > MAX_FIGHTS) {
+        t.rebel = true;
+        this.host.log(`flutuante '${t.window.caption}': o app não aceita o tile`);
+        this.removeFromTree(t);
+        return;
+      }
+      t.window.frameGeometry = copy(t.target!);
+    });
+  }
+
+  /** A janela está no tiling, fora do tile, e não por escolha do usuário. */
+  private deviates(t: Tracked): boolean {
+    const w = t.window;
+    if (t.key === null || t.target === null) return false;
+    if (this.drag?.id === idOf(w) || w.move || w.resize) return false;
+    if (w.maximizeMode !== 0 || w.fullScreen || w.minimized) return false;
+    return !sameRect(w.frameGeometry, t.target, 2);
+  }
+
   // ---- mouse ---------------------------------------------------------------
 
   private dragStarted(id: string): void {
@@ -384,7 +443,9 @@ export class Controller {
     const layout = tree.layout(this.area(key), this.config.gaps, this.minsOf(tree));
     for (const [id, r] of layout) {
       const t = this.tracked.get(id);
-      if (t && id !== except) t.window.frameGeometry = copy(r);
+      if (!t) continue;
+      t.target = copy(r);
+      if (id !== except) t.window.frameGeometry = copy(r);
     }
   }
 }

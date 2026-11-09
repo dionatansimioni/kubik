@@ -34,6 +34,8 @@ export class FakeWindow implements KWinWindow {
   maxSize = { width: 0, height: 0 };
   onAllDesktops = false;
   skipSwitcher = false;
+  maximizeMode = 0;
+  readonly frameGeometryChanged = new FakeSignal();
   /** Tamanho da decoração (barra de título etc.); 0 = sem decoração. */
   decoration = { width: 0, height: 0 };
   move = false;
@@ -70,6 +72,13 @@ export class FakeWindow implements KWinWindow {
   set frameGeometry(r: Rect) {
     this.geo = r;
     this.applied.push(r);
+    this.frameGeometryChanged.emit();
+  }
+
+  /** O PRÓPRIO APP muda a geometria (ex.: Chrome restaurando a sessão, X11). */
+  appSets(r: Rect): void {
+    this.geo = r;
+    this.frameGeometryChanged.emit();
   }
   /**
    * Simula o usuário arrastando a janela (mode "move") ou uma borda dela
@@ -82,6 +91,7 @@ export class FakeWindow implements KWinWindow {
     this.interactiveMoveResizeStarted.emit();
     for (const r of steps) {
       this.geo = r;
+      this.frameGeometryChanged.emit();
       if (ws && cursor) ws.cursorPos = cursor;
       if (output && output !== this._output) this.output = output;
       this.interactiveMoveResizeStepped.emit(r);
@@ -166,6 +176,7 @@ export const DESK_2: VirtualDesktop = { id: "desk-2" };
 export function fakeHost(ws: FakeWorkspace) {
   const logs: string[] = [];
   const previews: Array<Rect | null> = [];
+  const timers: Array<{ ms: number; fn: () => void }> = [];
   const areas: Record<string, Rect> = {
     "DP-1": { x: 0, y: 0, width: 1280, height: 800 },
     "HDMI-1": { x: 1280, y: 0, width: 1000, height: 1000 },
@@ -175,6 +186,13 @@ export function fakeHost(ws: FakeWorkspace) {
     clientArea: (o) => areas[o.name],
     log: (m) => logs.push(m),
     preview: (r) => previews.push(r),
+    later: (ms, fn) => timers.push({ ms, fn }),
   };
-  return { host, logs, previews };
+  /** Dispara os timers de até `upTo` ms (como se esse tempo tivesse passado). */
+  const tick = (upTo = 1000) => {
+    const due = timers.filter((t) => t.ms <= upTo);
+    timers.splice(0, timers.length, ...timers.filter((t) => t.ms > upTo));
+    for (const t of due) t.fn();
+  };
+  return { host, logs, previews, tick };
 }

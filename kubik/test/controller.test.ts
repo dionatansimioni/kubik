@@ -9,6 +9,7 @@ let ws: FakeWorkspace;
 let ctl: Controller;
 let logs: string[];
 let previews: Array<import("../src/core/rect").Rect | null>;
+let tick: () => void;
 
 function win(caption: string, output = SCREEN_A, desktop = DESK_1): FakeWindow {
   return new FakeWindow(caption, output, desktop);
@@ -19,6 +20,7 @@ beforeEach(() => {
   const h = fakeHost(ws);
   logs = h.logs;
   previews = h.previews;
+  tick = h.tick;
   ctl = new Controller(h.host);
   ctl.start();
 });
@@ -346,6 +348,58 @@ describe("Controller", () => {
         expect(w.frameGeometry.width).toBeGreaterThanOrEqual(150);
         expect(w.frameGeometry.height).toBeGreaterThanOrEqual(150);
       }
+    });
+  });
+
+  describe("apps que mudam a própria geometria (Chrome/Electron em X11)", () => {
+    it("o app sai do tile sozinho: o kubik o devolve", () => {
+      const a = ws.open(win("a"));
+      const chrome = ws.open(win("chrome"));
+      chrome.appSets(rect(60, 40, 1000, 700)); // "restaurando a sessão anterior"
+      tick();
+      expect(chrome.frameGeometry).toEqual(rect(642, 4, 634, 792));
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+    });
+
+    it("mudanças intermediárias que assentam no tile não geram escrita extra", () => {
+      ws.open(win("a"));
+      const b = ws.open(win("b"));
+      const writes = b.applied.length;
+      b.appSets(rect(642, 4, 400, 300)); // no meio do caminho (Wayland assíncrono)
+      b.appSets(rect(642, 4, 634, 792)); // assentou
+      tick();
+      expect(b.applied.length).toBe(writes);
+    });
+
+    it("app que insiste vira flutuante e as outras se reorganizam", () => {
+      const a = ws.open(win("a"));
+      const rebel = ws.open(win("rebel"));
+      for (let i = 0; i < 4; i++) {
+        rebel.appSets(rect(60, 40, 1000, 700));
+        tick();
+      }
+      expect(logs).toContain("flutuante 'rebel': o app não aceita o tile");
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(rebel.frameGeometry).toEqual(rect(60, 40, 1000, 700));
+    });
+
+    it("janela maximizada pelo usuário não é devolvida ao tile", () => {
+      ws.open(win("a"));
+      const b = ws.open(win("b"));
+      b.maximizeMode = 3;
+      b.appSets(rect(0, 0, 1280, 800));
+      tick();
+      expect(b.frameGeometry).toEqual(rect(0, 0, 1280, 800));
+    });
+
+    it("arrasto do usuário não é desfeito no meio", () => {
+      ws.open(win("a"));
+      const b = ws.open(win("b"));
+      b.move = true;
+      b.interactiveMoveResizeStarted.emit();
+      b.appSets(rect(300, 300, 634, 792));
+      tick();
+      expect(b.frameGeometry).toEqual(rect(300, 300, 634, 792));
     });
   });
 });
