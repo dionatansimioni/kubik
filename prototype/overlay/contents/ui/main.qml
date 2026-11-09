@@ -9,7 +9,9 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Window
-import org.kde.kwin
+// Namespace obrigatório: org.kde.kwin exporta um tipo 'Window' (não criável)
+// que esconderia o Window do QtQuick.Window.
+import org.kde.kwin as KWin
 
 Item {
     id: root
@@ -20,7 +22,7 @@ Item {
     readonly property real tolerance: 2
 
     property bool borderEnabled: true
-    property var active: Workspace.activeWindow
+    property var active: KWin.Workspace.activeWindow
     // Janelas que compartilham a geometria da ativa (inclui a ativa).
     property var stack: []
     // Retângulo da pilha inteira (barra de abas + área das janelas).
@@ -28,7 +30,8 @@ Item {
 
     SystemPalette { id: pal; colorGroup: SystemPalette.Active }
 
-    function log(msg) { console.log("[kubik-proto] " + msg); }
+    // console.warn: o Plasma costuma esconder console.log do journal.
+    function log(msg) { console.warn("[kubik-proto] " + msg); }
 
     function tileable(w) {
         return w && w.normalWindow && !w.minimized && !w.fullScreen && !w.onAllDesktops;
@@ -49,7 +52,7 @@ Item {
         const a = active;
         if (!tileable(a)) { stack = []; return; }
         const g = a.frameGeometry;
-        const members = Workspace.stackingOrder.filter(w =>
+        const members = KWin.Workspace.stackingOrder.filter(w =>
             tileable(w) && sameDesktop(w, a) && sameRect(w.frameGeometry, g));
         stack = members.length >= 2 ? members : [];
         if (stack.length)
@@ -66,7 +69,7 @@ Item {
             a.frameGeometry = Qt.rect(g.x, g.y + tabHeight, g.width, g.height - tabHeight);
         }
         const target = a.frameGeometry;
-        const order = Workspace.stackingOrder;
+        const order = KWin.Workspace.stackingOrder;
         let candidate = null;
         for (let i = order.length - 1; i >= 0; --i) {
             const w = order[i];
@@ -74,7 +77,7 @@ Item {
         }
         if (!candidate) { log("nenhuma janela para empilhar"); return; }
         candidate.frameGeometry = Qt.rect(target.x, target.y, target.width, target.height);
-        Workspace.activeWindow = candidate;
+        KWin.Workspace.activeWindow = candidate;
         refreshStack();
         log("empilhou '" + candidate.caption + "' em " + (Date.now() - t0) + "ms; pilha=" + stack.length);
     }
@@ -83,11 +86,11 @@ Item {
         if (stack.length < 2) return;
         const sorted = stack.slice().sort((x, y) => x.caption.localeCompare(y.caption));
         const i = sorted.indexOf(active);
-        Workspace.activeWindow = sorted[(i + 1) % sorted.length];
+        KWin.Workspace.activeWindow = sorted[(i + 1) % sorted.length];
     }
 
     Connections {
-        target: Workspace
+        target: KWin.Workspace
         function onWindowActivated() { root.refreshStack(); }
         function onWindowAdded() { root.refreshStack(); }
         function onWindowRemoved() { Qt.callLater(root.refreshStack); }
@@ -99,19 +102,19 @@ Item {
         function onFullScreenChanged() { root.refreshStack(); }
     }
 
-    ShortcutHandler {
+    KWin.ShortcutHandler {
         name: "Kubik Proto: Stack next window"
         text: "Kubik Proto: empilhar a próxima janela"
         sequence: "Meta+Ctrl+S"
         onActivated: root.stackNext()
     }
-    ShortcutHandler {
+    KWin.ShortcutHandler {
         name: "Kubik Proto: Next tab"
         text: "Kubik Proto: próxima aba"
         sequence: "Meta+Ctrl+Tab"
         onActivated: root.nextTab()
     }
-    ShortcutHandler {
+    KWin.ShortcutHandler {
         name: "Kubik Proto: Toggle border"
         text: "Kubik Proto: liga/desliga borda"
         sequence: "Meta+Ctrl+B"
@@ -178,7 +181,7 @@ Item {
                             anchors.fill: parent
                             onClicked: {
                                 root.log("clique na aba '" + tab.modelData.caption + "'");
-                                Workspace.activeWindow = tab.modelData;
+                                KWin.Workspace.activeWindow = tab.modelData;
                             }
                         }
                     }

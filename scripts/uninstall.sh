@@ -6,7 +6,6 @@ cd "$(dirname "$0")"
 ID=$(sed -n 's/.*"Id": *"\([^"]*\)".*/\1/p' package/metadata.json | head -n1)
 
 kwriteconfig6 --file kwinrc --group Plugins --key "${ID}Enabled" false || true
-QDBUS=$(command -v qdbus6 || command -v qdbus || true)
-[ -n "$QDBUS" ] && "$QDBUS" org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+dbus-send --session --print-reply --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true
 kpackagetool6 --type=KWin/Script --remove "$ID"
 echo "$ID removido."

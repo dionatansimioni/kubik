@@ -63,10 +63,24 @@ class QmlLintTest(unittest.TestCase):
                 continue
             kind, row, col, _, category = m.groups()
             snippet = source[int(row) - 1][int(col) - 1:]
-            if kind == "Warning" and category == "unqualified" and snippet.startswith("Workspace"):
-                continue  # singleton do org.kde.kwin, só existe dentro do KWin
+            if kind == "Warning" and category == "unqualified" and snippet.startswith("KWin."):
+                continue  # tipos do org.kde.kwin, só existem dentro do KWin
             unexpected.append(line)
         self.assertEqual(unexpected, [], "avisos inesperados:\n" + "\n".join(unexpected))
+
+
+class KWinImportTest(unittest.TestCase):
+    """Regressão da v0.0.1: 'import org.kde.kwin' sem namespace faz o tipo
+    Window do KWin (não criável) esconder o Window do QtQuick.Window, e o
+    script falha com "Type cannot be created in QML"."""
+
+    def test_kwin_module_is_namespaced(self):
+        for qml in PKG.rglob("*.qml"):
+            src = qml.read_text(encoding="utf-8")
+            with self.subTest(qml=qml.name):
+                self.assertNotRegex(src, r"(?m)^\s*import\s+org\.kde\.kwin\s*$")
+                if "org.kde.kwin" in src:
+                    self.assertRegex(src, r"(?m)^\s*import\s+org\.kde\.kwin\s+as\s+KWin\s*$")
 
 
 if __name__ == "__main__":

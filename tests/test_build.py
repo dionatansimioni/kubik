@@ -80,6 +80,14 @@ class ShellScriptsTest(unittest.TestCase):
         ).stdout.split()
         self.assertEqual(out[0], ID)
 
+    def test_scripts_do_not_require_qdbus(self):
+        # qdbus6 não existe em várias distros (ex.: Plasma 6.8 do usuário); use dbus-send.
+        for name in ("install.sh", "uninstall.sh"):
+            with self.subTest(script=name):
+                src = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+                self.assertNotIn("qdbus", src)
+                self.assertIn("dbus-send", src)
+
 
 if __name__ == "__main__":
     unittest.main()

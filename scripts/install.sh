@@ -8,6 +8,7 @@ PKG=./package
 need() { command -v "$1" >/dev/null 2>&1 || { echo "erro: '$1' não encontrado (Plasma 6 instalado?)" >&2; exit 1; }; }
 need kpackagetool6
 need kwriteconfig6
+need dbus-send
 
 ID=$(sed -n 's/.*"Id": *"\([^"]*\)".*/\1/p' "$PKG/metadata.json" | head -n1)
 VERSION=$(sed -n 's/.*"Version": *"\([^"]*\)".*/\1/p' "$PKG/metadata.json" | head -n1)
@@ -24,13 +25,12 @@ fi
 kwriteconfig6 --file kwinrc --group Plugins --key "${ID}Enabled" true
 
 # Recarrega o script: desativa e reativa para pegar a versão nova.
-QDBUS=$(command -v qdbus6 || command -v qdbus || true)
-if [ -n "$QDBUS" ]; then
-    "$QDBUS" org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "$ID" >/dev/null 2>&1 || true
-    "$QDBUS" org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
-    "$QDBUS" org.kde.KWin /Scripting org.kde.kwin.Scripting.start >/dev/null 2>&1 || true
+kwin() { dbus-send --session --print-reply --dest=org.kde.KWin "$@" >/dev/null 2>&1; }
+kwin /Scripting org.kde.kwin.Scripting.unloadScript "string:$ID" || true
+kwin /KWin org.kde.KWin.reconfigure || true
+if kwin /Scripting org.kde.kwin.Scripting.start; then
     echo "Pronto: $ID $VERSION instalado e ativo."
 else
-    echo "Instalado. qdbus6 não encontrado: ative em Configurações do Sistema › Scripts do KWin."
+    echo "Instalado. Não consegui recarregar o KWin: ative em Configurações do Sistema › Scripts do KWin."
 fi
 echo "Logs: journalctl --user -f | grep kubik"
