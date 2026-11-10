@@ -18,6 +18,7 @@ Decisões fechadas em 2026-11-09.
 
 - **Divisão:** BSP. A janela nova divide sempre uma das **maiores** janelas, ao meio e pelo lado mais longo. No empate, divide a focada. Resultado: 1 janela fica cheia, 2 ficam lado a lado, 3 ficam com uma metade e dois quadrantes, 4 ficam em quadrantes, e assim por diante. Decisão do usuário em 2026-11-10; antes a regra era dividir sempre a focada.
 - **Janelas minimizadas** saem do tiling e liberam o espaço; ao restaurar, voltam.
+- **Janelas em todos os desktops** entram na árvore do desktop visível daquela tela. Ao trocar de desktop, uma tela que só tem janelas assim leva a árvore inteira junto, com o mesmo arranjo; nas outras, cada uma muda de árvore. O padrão é ligado, e a bandeja terá uma opção por monitor. Decisão do usuário em 2026-11-10.
 - **Escopo:** uma árvore por tela × desktop virtual. Activities são ignoradas.
 - **Liga/desliga:** toggle global (Super+Y), com exceções por desktop/tela nas configurações. Ao desligar, as janelas voltam à geometria que tinham antes do tiling.
 - **Mouse:**

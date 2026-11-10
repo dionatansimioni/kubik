@@ -28,11 +28,18 @@ import { DEFAULT_FLOATING_CLASSES, floatReason } from "./rules";
 export interface Config {
   gaps: Gaps;
   floatingClasses: readonly string[];
+  /**
+   * Janelas "em todos os desktops" entram no tiling (na árvore do desktop
+   * atual). Com o plugin virtualdesktopsonlyonprimary, TODAS as janelas da
+   * tela secundária são assim. Futuro: uma opção por tela na bandeja.
+   */
+  tileAllDesktops: boolean;
 }
 
 export const DEFAULT_CONFIG: Config = {
   gaps: { outer: 4, inner: 4 },
   floatingClasses: DEFAULT_FLOATING_CLASSES,
+  tileAllDesktops: true,
 };
 
 interface Tracked {
@@ -117,7 +124,10 @@ export class Controller {
     ws.windowAdded.connect(onAdded);
     ws.windowRemoved.connect(onRemoved);
     ws.windowActivated.connect(onActivated);
+    const onDesktop = () => this.desktopSwitched();
+    ws.currentDesktopChanged.connect(onDesktop);
     this.unsubscribe.push(
+      () => ws.currentDesktopChanged.disconnect(onDesktop),
       () => ws.windowAdded.disconnect(onAdded),
       () => ws.windowRemoved.disconnect(onRemoved),
       () => ws.windowActivated.disconnect(onActivated),
@@ -269,7 +279,7 @@ export class Controller {
   private refresh(t: Tracked, isNew = false): void {
     const w = t.window;
     const reason = this.floatReasonOf(t);
-    const place = reason === null ? { output: w.output, desktop: w.desktops[0] } : null;
+    const place = reason === null ? this.placeOf(w) : null;
     const key = place ? keyOf(place) : null;
     if (key === t.key && !isNew) return;
 
@@ -290,7 +300,44 @@ export class Controller {
     if (!this.enabled) return "tiling desligado";
     if (t.noFit) return "não cabe";
     if (t.rebel) return "o app não aceita o tile";
-    return floatReason(t.window, this.config.floatingClasses);
+    const rule = floatReason(t.window, this.config.floatingClasses);
+    if (rule !== null) return rule;
+    if (t.window.onAllDesktops && !this.config.tileAllDesktops) return "em todos os desktops";
+    return null;
+  }
+
+  /** Tela × desktop da janela; "em todos os desktops" = o desktop atual. */
+  private placeOf(w: KWinWindow): Place {
+    return { output: w.output, desktop: w.onAllDesktops ? this.host.workspace.currentDesktop : w.desktops[0] };
+  }
+
+  /**
+   * Janelas "em todos os desktops" acompanham o desktop visível. Numa tela só
+   * com elas (a secundária, com o virtualdesktopsonlyonprimary), a árvore
+   * inteira muda de chave e mantém o arranjo; nas outras, cada uma muda de árvore.
+   */
+  private desktopSwitched(): void {
+    if (!this.enabled) return;
+    const current = this.host.workspace.currentDesktop;
+    for (const [key, tree] of [...this.trees]) {
+      const place = this.places.get(key)!;
+      if (place.desktop.id === current.id || tree.size === 0) continue;
+      const members = tree.ids().map((id) => this.tracked.get(id)!);
+      const sticky = members.filter((t) => t.window.onAllDesktops);
+      if (sticky.length === 0) continue;
+      const next: Place = { output: place.output, desktop: current };
+      const nextKey = keyOf(next);
+      if (sticky.length === members.length && !this.trees.get(nextKey)?.size) {
+        const before = this.area(key);
+        this.trees.delete(key);
+        this.trees.set(nextKey, tree);
+        this.places.set(nextKey, next);
+        for (const t of members) t.key = nextKey;
+        if (!sameRect(before, this.area(nextKey), 0)) this.retile(nextKey);
+      } else {
+        for (const t of sticky) this.refresh(t);
+      }
+    }
   }
 
   /**
@@ -445,9 +492,9 @@ export class Controller {
     this.drag = null;
     const t = this.tracked.get(id)!;
     if (t.key === null) return;
-    // Durante o arrasto a janela pode ter deixado de ser "tileável" (ex.: o
-    // plugin virtualdesktopsonlyonprimary a pôs em todos os desktops ao
-    // entrar na tela secundária): reavalia em vez de soltá-la numa árvore.
+    // Durante o arrasto a janela pode ter deixado de ser "tileável" (ex.:
+    // minimizada, ou em todos os desktops com a opção desligada; o plugin
+    // virtualdesktopsonlyonprimary faz isso ao entrar na tela secundária).
     if (this.floatReasonOf(t) !== null) {
       this.host.preview(null);
       this.refresh(t);
@@ -475,7 +522,7 @@ export class Controller {
   /** Destino de um drop com o cursor na posição atual, ou null (volta ao lugar). */
   private dropTarget(t: Tracked): DropTarget | null {
     const w = t.window;
-    const place = { output: w.output, desktop: w.desktops[0] };
+    const place = this.placeOf(w);
     const key = keyOf(place);
     const area = this.host.clientArea(place.output, place.desktop);
     const tree = this.trees.get(key);

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { rect } from "../src/core/rect";
-import { Controller } from "../src/kwin/controller";
+import { Controller, DEFAULT_CONFIG } from "../src/kwin/controller";
 import {
   DESK_1, DESK_2, FakeWindow, FakeWorkspace, SCREEN_A, SCREEN_B, fakeHost,
 } from "./fake-kwin";
@@ -168,6 +168,69 @@ describe("Controller", () => {
     expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
   });
 
+  describe("janelas em todos os desktops", () => {
+    function sticky(caption: string, output = SCREEN_A): FakeWindow {
+      const w = win(caption, output);
+      w.desktops = []; // KWin 6: em todos os desktops = lista vazia
+      return w;
+    }
+
+    it("entram no tiling junto com as janelas do desktop atual", () => {
+      const a = ws.open(win("a"));
+      const s = ws.open(sticky("s"));
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      expect(s.frameGeometry).toEqual(rect(642, 4, 634, 792));
+    });
+
+    it("arrastada para a tela secundária, onde o plugin a põe em todos os desktops: vai para o tiling de lá", () => {
+      // virtualdesktopsonlyonprimary muda os desktops NO MEIO do arrasto
+      // (achado no Fedora do usuário: o drop quebrava e o tile ficava reservado).
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      b.move = true;
+      b.interactiveMoveResizeStarted.emit();
+      b.output = SCREEN_B;
+      b.desktops = [];
+      ws.cursorPos = { x: 1500, y: 300 };
+      b.move = false;
+      expect(() => b.interactiveMoveResizeFinished.emit()).not.toThrow();
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(b.frameGeometry).toEqual(rect(1284, 4, 992, 992));
+    });
+
+    it("trocar de desktop: a tela só com janelas assim leva a árvore inteira junto, sem mexer nelas", () => {
+      const s1 = ws.open(sticky("s1", SCREEN_B));
+      const s2 = ws.open(sticky("s2", SCREEN_B));
+      const geos = [s1.frameGeometry, s2.frameGeometry];
+      const writes = s1.applied.length + s2.applied.length;
+      ws.switchTo(DESK_2);
+      expect([s1.frameGeometry, s2.frameGeometry]).toEqual(geos);
+      expect(s1.applied.length + s2.applied.length).toBe(writes);
+      expect(Object.keys(ctl.snapshot())).toEqual(["HDMI-1|desk-2"]);
+    });
+
+    it("trocar de desktop: numa tela com janelas do desktop, ela muda para a árvore do novo desktop", () => {
+      const a = ws.open(win("a"));
+      const s = ws.open(sticky("s"));
+      const c = ws.open(win("c", SCREEN_A, DESK_2));
+      ws.switchTo(DESK_2);
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(c.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      expect(s.frameGeometry).toEqual(rect(642, 4, 634, 792));
+    });
+
+    it("com a opção desligada, ficam flutuantes", () => {
+      const h = fakeHost(ws);
+      ctl.stop();
+      const off = new Controller(h.host, { ...DEFAULT_CONFIG, tileAllDesktops: false });
+      off.start();
+      const a = ws.open(win("a"));
+      ws.open(sticky("s"));
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(h.logs).toContain("flutuante 's': em todos os desktops");
+    });
+  });
+
   describe("janelas que flutuam", () => {
     it("janela oculta (fora da barra e do Alt+Tab, ex.: xwaylandvideobridge) não ocupa tile", () => {
       const a = ws.open(win("a"));
@@ -197,21 +260,6 @@ describe("Controller", () => {
       expect(chrome.frameGeometry).toEqual(rect(642, 4, 634, 792));
     });
 
-    it("arrastada para uma tela onde fica em todos os desktops: sai do tiling e libera o espaço", () => {
-      // O plugin virtualdesktopsonlyonprimary põe em todos os desktops as janelas
-      // da tela secundária, durante o arrasto (achado no Fedora do usuário).
-      const a = ws.open(win("a"));
-      const b = ws.open(win("b"));
-      b.move = true;
-      b.interactiveMoveResizeStarted.emit();
-      b.output = SCREEN_B;
-      b.desktops = [];
-      b.move = false;
-      expect(() => b.interactiveMoveResizeFinished.emit()).not.toThrow();
-      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
-      expect(ctl.snapshot()).toEqual({ "DP-1|desk-1": a.internalId });
-    });
-
     const cases: Array<[string, (w: FakeWindow) => void]> = [
       ["diálogo", (w) => (w.dialog = true)],
       ["transiente", (w) => (w.transient = true)],
@@ -220,7 +268,7 @@ describe("Controller", () => {
       ["não normal", (w) => (w.normalWindow = false)],
       ["não redimensionável", (w) => (w.resizeable = false)],
       ["tamanho fixo", (w) => { w.minSize = { width: 300, height: 200 }; w.maxSize = { width: 300, height: 200 }; }],
-      ["em todos os desktops", (w) => (w.onAllDesktops = true)],
+      ["em alguns desktops (2 ou mais)", (w) => (w.desktops = [DESK_1, DESK_2])],
       ["classe da lista padrão", (w) => (w.resourceClass = "org.kde.krunner")],
       // Regressão: a borda do protótipo (janela interna do KWin) entrou no
       // tiling e empurrou as janelas do usuário para a metade direita.
@@ -389,7 +437,7 @@ describe("Controller", () => {
       // Como o KCalc: mínimo de CONTEÚDO, barra de título de 36 px. Mínimo 370
       // cabe no tile de 394 se contar só o conteúdo, mas a moldura precisa de 406.
       const t = new Controller(fakeHost(ws).host, {
-        gaps: { outer: 4, inner: 4 },
+        ...DEFAULT_CONFIG,
         floatingClasses: [],
       });
       ctl.stop();

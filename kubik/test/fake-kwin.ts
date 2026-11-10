@@ -18,6 +18,11 @@ export class FakeSignal<Args extends unknown[] = []> implements Signal<Args> {
   }
 }
 
+export const SCREEN_A: Output = { name: "DP-1" };
+export const SCREEN_B: Output = { name: "HDMI-1" };
+export const DESK_1: VirtualDesktop = { id: "desk-1" };
+export const DESK_2: VirtualDesktop = { id: "desk-2" };
+
 let nextId = 1;
 
 export class FakeWindow implements KWinWindow {
@@ -155,6 +160,13 @@ export class FakeWorkspace implements Workspace {
   readonly windowAdded = new FakeSignal<[KWinWindow]>();
   readonly windowRemoved = new FakeSignal<[KWinWindow]>();
   readonly windowActivated = new FakeSignal<[KWinWindow | null]>();
+  currentDesktop: VirtualDesktop = DESK_1;
+  readonly currentDesktopChanged = new FakeSignal();
+
+  switchTo(d: VirtualDesktop): void {
+    this.currentDesktop = d;
+    this.currentDesktopChanged.emit();
+  }
 
   /**
    * Abre a janela e a ativa na MESMA ORDEM do KWin 6 real (observada no
@@ -176,10 +188,6 @@ export class FakeWorkspace implements Workspace {
   }
 }
 
-export const SCREEN_A: Output = { name: "DP-1" };
-export const SCREEN_B: Output = { name: "HDMI-1" };
-export const DESK_1: VirtualDesktop = { id: "desk-1" };
-export const DESK_2: VirtualDesktop = { id: "desk-2" };
 
 export function fakeHost(ws: FakeWorkspace) {
   const logs: string[] = [];

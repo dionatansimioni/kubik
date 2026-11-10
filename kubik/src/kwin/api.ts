@@ -38,6 +38,7 @@ export interface KWinWindow {
   readonly resizeable: boolean;
   readonly minimized: boolean;
   readonly fullScreen: boolean;
+  /** Em todos os desktops (no KWin 6, `desktops` fica vazio). */
   readonly onAllDesktops: boolean;
   /** Fora do Alt+Tab. Junto com resourceClass vazio, indica janela interna do KWin. */
   readonly skipSwitcher: boolean;
@@ -80,6 +81,9 @@ export interface Workspace {
   readonly windowAdded: Signal<[KWinWindow]>;
   readonly windowRemoved: Signal<[KWinWindow]>;
   readonly windowActivated: Signal<[KWinWindow | null]>;
+  /** Desktop visível; janelas "em todos os desktops" entram na árvore dele. */
+  readonly currentDesktop: VirtualDesktop;
+  readonly currentDesktopChanged: Signal;
 }
 
 /** O que o lado QML entrega ao controlador. */

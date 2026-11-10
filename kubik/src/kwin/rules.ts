@@ -44,7 +44,9 @@ export function floatReason(w: KWinWindow, floatingClasses: readonly string[]): 
     return "tamanho fixo";
   if (w.minimized) return "minimizada";
   if (w.fullScreen) return "tela cheia";
-  if (w.onAllDesktops || w.desktops.length !== 1) return "em vários desktops";
+  // "Em todos os desktops" pode entrar no tiling (decisão do controlador,
+  // pela configuração); em ALGUNS desktops (2+), não: a árvore é por desktop.
+  if (!w.onAllDesktops && w.desktops.length !== 1) return "em vários desktops";
   const cls = (w.resourceClass || "").toLowerCase();
   if (floatingClasses.some((c) => c.toLowerCase() === cls)) return `classe flutuante (${cls})`;
   return null;
