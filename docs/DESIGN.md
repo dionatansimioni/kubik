@@ -23,7 +23,7 @@ Decisões fechadas em 2026-11-09.
 - **Liga/desliga:** toggle global (Super+Y), com exceções por desktop/tela nas configurações. Ao desligar, as janelas voltam à geometria que tinham antes do tiling.
 - **Mouse:**
   - Arrastar mostra uma prévia da posição final. As zonas sobre a janela-alvo, inspiradas no COSMIC e decididas pelo usuário em 2026-11-10:
-    - a faixa da barra de título empilha em abas;
+    - segurar parado sobre a janela por 800 ms empilha em abas (mudança do usuário em 2026-11-11: a faixa da barra de título era difícil de acertar e não existe em apps como o Chrome); a barra de abas de uma pilha empilha na hora;
     - o terço central troca de lugar (com uma segunda prévia, mais clara, para a outra janela);
     - fora do centro, a borda mais próxima (relativa ao tamanho) divide o alvo e a arrastada entra daquele lado.
   - Redimensionar pela borda ajusta a proporção da divisão.
@@ -105,6 +105,7 @@ Validadas no `testenv/`:
 20. **Plugins mexem na janela durante o arrasto.** O `virtualdesktopsonlyonprimary` põe em todos os desktops a janela que entra na tela secundária (`desktops` fica vazio). Ao soltar, o kubik reavalia se a janela ainda pode entrar no tiling antes de procurar o destino.
 21. **Overlay que segue janela em movimento sempre fica para trás.** A borda é uma janela à parte, atualizada um quadro depois da janela. Primeiro tentamos animá-la com a mesma curva do efeito: ficava de 8 a 12 px atrás, e o usuário via a borda "seguindo" a janela. Solução: esconder enquanto a janela se move (arrasto ou mudança de layout) e redesenhar quando ela parar por 300 ms (a animação padrão de 250 ms mais uma folga).
 22. **Pilhas sem esconder janelas.** O KWin não tem como esconder uma janela por script sem minimizá-la, e minimizada ela sairia do tiling. As abas de uma pilha ficam todas na mesma geometria, e a à vista fica na frente: ativar (`workspace.activeWindow = w`) também traz para a frente. Quando a aba à vista sai, a nova vem com `workspace.raiseWindow`. Uma aba escondida ativada por fora (Alt+Tab) vira a aba à vista.
+23. **Nunca feche e reabra um overlay.** Cada vez que um overlay (borda, prévia, barra de abas) voltava a ficar visível, o KWin o tratava como janela nova e aplicava a animação de abrir janela do usuário (no Fedora dele, crescendo do centro), o que parecia um glitch. Os overlays são criados uma vez e ficam sempre abertos: escondidos, ficam transparentes (a barra de abas, que recebe clique, vai para fora da tela). O que aparece, aparece com um fade nosso. O teste conta quantas vezes cada overlay é aberto.
 
 ## Riscos
 

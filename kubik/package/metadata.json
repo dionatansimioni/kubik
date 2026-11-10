@@ -3,7 +3,7 @@
         "Id": "kubik",
         "Name": "Kubik",
         "Description": "Auto-tiling de janelas no estilo Pop!_Shell.",
-        "Version": "0.6.0",
+        "Version": "0.6.1",
         "License": "GPL-3.0-or-later",
         "Website": "https://github.com/dionatansimioni/kubik",
         "EnabledByDefault": false

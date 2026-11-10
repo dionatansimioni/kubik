@@ -734,13 +734,12 @@ describe("Controller", () => {
   });
 
   describe("abas (pilhas)", () => {
-    /** a | b, e arrasta c para a barra de título da b (y logo abaixo do topo). */
+    /** a | b, e arrasta c sobre a b e SEGURA 800 ms: empilha. */
     function stackOnB(): { a: FakeWindow; b: FakeWindow; c: FakeWindow } {
       const a = ws.open(win("a"));
       const b = ws.open(win("b"));
-      b.decoration = { width: 0, height: 30 };
       const c = ws.open(win("c")); // c divide b: b em cima, c embaixo (à direita)
-      c.dragThrough("move", [rect(700, 20, 634, 394)], ws, { x: 900, y: 15 });
+      c.dragAndHold([rect(700, 100, 634, 394)], ws, { x: 900, y: 200 }, tick, 800);
       return { a, b, c };
     }
     const lastTabs = () => tabs[tabs.length - 1];
@@ -748,8 +747,8 @@ describe("Controller", () => {
     it("soltar na barra de título de outra janela empilha as duas no tile dela", () => {
       const { a, b, c } = stackOnB();
       expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
-      expect(b.frameGeometry).toEqual(rect(642, 32, 634, 764));
-      expect(c.frameGeometry).toEqual(rect(642, 32, 634, 764));
+      expect(b.frameGeometry).toEqual(rect(642, 36, 634, 760));
+      expect(c.frameGeometry).toEqual(rect(642, 36, 634, 760));
       expect(logs).toContain("empilhou 'c' com 'b'");
     });
 
@@ -757,24 +756,76 @@ describe("Controller", () => {
       stackOnB();
       expect(lastTabs()).toEqual([
         {
-          rect: rect(642, 4, 634, 28),
+          rect: rect(642, 4, 634, 32),
           tabs: [
-            { id: expect.any(String), caption: "b", active: false },
-            { id: expect.any(String), caption: "c", active: true },
+            { id: expect.any(String), caption: "b", active: false, icon: "icone-falso" },
+            { id: expect.any(String), caption: "c", active: true, icon: "icone-falso" },
           ],
         },
       ]);
     });
 
-    it("a prévia do empilhar mostra o tile final da pilha", () => {
-      const a = ws.open(win("a"));
-      const b = ws.open(win("b"));
-      b.decoration = { width: 0, height: 30 };
-      void a;
+    it("segurar sobre outra janela por 800 ms vira empilhar, com aviso na prévia", () => {
+      ws.open(win("a"));
+      ws.open(win("b"));
       const c = ws.open(win("c"));
-      c.dragThrough("move", [rect(700, 20, 634, 394)], ws, { x: 900, y: 15 });
-      expect(previews[0]).toEqual(rect(642, 4, 634, 792)); // a c sai de baixo: a b cresce
-      expect(stackHints).toEqual([true, false]); // a prévia avisa que vai empilhar
+      c.dragAndHold([rect(700, 100, 634, 394)], ws, { x: 900, y: 200 }, tick, 800);
+      // antes: zona normal (borda de cima da b → dividir); depois de 800 ms: empilhar
+      expect(stackHints).toEqual([false, true, false]);
+      expect(previews[1]).toEqual(rect(642, 4, 634, 792)); // a c sai de baixo: a pilha ocupa a direita
+    });
+
+    it("segurar menos de 800 ms não empilha", () => {
+      const a = ws.open(win("a"));
+      ws.open(win("b"));
+      const c = ws.open(win("c"));
+      c.dragAndHold([rect(200, 500, 634, 394)], ws, { x: 300, y: 700 }, tick, 500);
+      expect(logs).not.toContain("empilhou 'c' com 'a'");
+      expect(c.frameGeometry).toEqual(rect(4, 402, 634, 394)); // dividiu a a (metade de baixo)
+      void a;
+    });
+
+    it("mexer o cursor recomeça a contagem", () => {
+      ws.open(win("a"));
+      const b = ws.open(win("b"));
+      const c = ws.open(win("c"));
+      c.move = true;
+      c.interactiveMoveResizeStarted.emit();
+      ws.cursorPos = { x: 900, y: 200 };
+      c.interactiveMoveResizeStepped.emit(rect(700, 100, 634, 394));
+      tick(500); // timers de até 500 ms: o de 800 ainda não
+      ws.cursorPos = { x: 960, y: 260 }; // moveu bastante
+      c.interactiveMoveResizeStepped.emit(rect(760, 160, 634, 394));
+      tick(800); // o timer antigo é descartado; o novo dispara
+      c.move = false;
+      c.interactiveMoveResizeFinished.emit();
+      expect(logs).toContain("empilhou 'c' com 'b'");
+      void b;
+    });
+
+    it("empilhar funciona em qualquer parte da janela (apps sem barra de título do KDE, como o Chrome)", () => {
+      ws.open(win("a"));
+      const chrome = ws.open(win("chrome"));
+      chrome.decoration = { width: 0, height: -20 }; // CSD: o "cliente" é MAIOR que a moldura
+      const c = ws.open(win("c"));
+      c.dragAndHold([rect(700, 400, 634, 394)], ws, { x: 960, y: 300 }, tick, 900);
+      expect(logs).toContain("empilhou 'c' com 'chrome'");
+    });
+
+    it("soltar na barra de abas de uma pilha empilha na hora", () => {
+      const { a } = stackOnB();
+      a.dragThrough("move", [rect(700, 10, 634, 792)], ws, { x: 700, y: 15 });
+      expect(logs).toContain("empilhou 'a' com 'c'");
+    });
+
+    it("o × da aba tira a janela da pilha e a devolve ao tiling, ao lado da pilha", () => {
+      const { a, b, c } = stackOnB();
+      ctl.unstack(String(b.internalId));
+      expect(lastTabs()).toEqual([]);
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      expect(c.frameGeometry).toEqual(rect(642, 4, 634, 394));
+      expect(b.frameGeometry).toEqual(rect(642, 402, 634, 394));
+      expect(logs).toContain("tirou 'b' da pilha");
     });
 
     it("clicar numa aba (activateTab) ativa aquela janela e atualiza as abas", () => {

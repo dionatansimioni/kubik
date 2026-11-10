@@ -12,6 +12,7 @@ import QtQuick.Window
 // Namespace obrigatório: org.kde.kwin exporta um tipo 'Window' que esconderia
 // o do QtQuick.
 import org.kde.kwin as KWin
+import org.kde.kirigami as Kirigami
 
 Item {
     id: root
@@ -33,36 +34,126 @@ Item {
         colorGroup: SystemPalette.Active
     }
 
+    // IMPORTANTE: os overlays são criados uma vez e NUNCA fechados (visible
+    // fica true). Esconder = conteúdo transparente. Cada vez que um overlay
+    // reabria, o KWin o tratava como janela nova e aplicava a animação de
+    // abrir janela do usuário (ex.: crescer do centro), o que parecia um glitch.
+    // O que aparece, aparece com um fade curto nosso (fadeIn).
+
+    // Ícone de "janelas empilhadas": duas janelas sobrepostas.
+    component StackGlyph: Item {
+        id: glyph
+
+        property color color: pal.highlight
+        property real unit: 1
+
+        implicitWidth: 22 * unit
+        implicitHeight: 18 * unit
+
+        Rectangle {
+            x: 6 * glyph.unit
+            y: 0
+            width: 16 * glyph.unit
+            height: 12 * glyph.unit
+            radius: 3 * glyph.unit
+            color: "transparent"
+            border.width: Math.max(1.5, 1.6 * glyph.unit)
+            border.color: Qt.alpha(glyph.color, 0.6)
+        }
+        Rectangle {
+            x: 0
+            y: 6 * glyph.unit
+            width: 16 * glyph.unit
+            height: 12 * glyph.unit
+            radius: 3 * glyph.unit
+            color: glyph.color
+        }
+    }
+
+    // Conteúdo que aparece com fade (fadeIn) e some na hora (hideNow).
+    component FadingItem: Item {
+        id: fading
+
+        property int fadeMs: 120
+
+        function fadeIn() {
+            fadeAnim.stop();
+            opacity = 0;
+            fadeAnim.start();
+        }
+        function hideNow() {
+            fadeAnim.stop();
+            opacity = 0;
+        }
+
+        anchors.fill: parent
+        opacity: 0
+
+        NumberAnimation {
+            id: fadeAnim
+
+            target: fading
+            property: "opacity"
+            from: 0
+            to: 1
+            duration: fading.fadeMs
+            easing.type: Easing.OutQuad
+        }
+    }
+
     Component {
         id: previewComponent
 
         Window {
             id: previewWindow
 
+            property bool ghost: false
+            // O drop empilha: ícone de pilha e faixa de abas no topo.
+            property bool stack: false
+            property bool shown: false
+            readonly property alias content: previewContent
+
             flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint
             color: "transparent"
-            visible: false
+            visible: true
+            width: 1
+            height: 1
 
-            property bool ghost: false
-            // O drop empilha: uma faixa de abas no topo diferencia de "dividir".
-            property bool stack: false
+            FadingItem {
+                id: previewContent
 
-            Rectangle {
-                anchors.fill: parent
-                radius: 8
-                color: Qt.alpha(pal.highlight, previewWindow.ghost ? 0.10 : 0.25)
-                border.width: 2
-                border.color: Qt.alpha(pal.highlight, previewWindow.ghost ? 0.5 : 1)
-            }
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 10
+                    color: Qt.alpha(pal.highlight, previewWindow.ghost ? 0.10 : (previewWindow.stack ? 0.30 : 0.22))
+                    border.width: 2
+                    border.color: Qt.alpha(pal.highlight, previewWindow.ghost ? 0.5 : 1)
+                }
 
-            Rectangle {
-                visible: previewWindow.stack
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                height: 28
-                radius: 8
-                color: Qt.alpha(pal.highlight, 0.7)
+                Rectangle {
+                    visible: previewWindow.stack
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 6
+                    height: 26
+                    radius: 7
+                    color: Qt.alpha(pal.highlight, 0.75)
+                }
+
+                Rectangle {
+                    visible: previewWindow.stack
+                    anchors.centerIn: parent
+                    width: 112
+                    height: 96
+                    radius: 18
+                    color: Qt.alpha(pal.window, 0.85)
+
+                    StackGlyph {
+                        anchors.centerIn: parent
+                        unit: 3
+                    }
+                }
             }
         }
     }
@@ -71,18 +162,27 @@ Item {
         id: borderComponent
 
         Window {
-            id: borderWindow
+            property bool shown: false
+            readonly property alias content: borderContent
 
             flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint
             color: "transparent"
-            visible: false
+            visible: true
+            width: 1
+            height: 1
 
-            Rectangle {
-                anchors.fill: parent
-                color: "transparent"
-                radius: 8
-                border.width: 3
-                border.color: pal.highlight
+            FadingItem {
+                id: borderContent
+
+                fadeMs: 150
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: "transparent"
+                    radius: 10
+                    border.width: 3
+                    border.color: pal.highlight
+                }
             }
         }
     }
@@ -94,51 +194,137 @@ Item {
             id: tabBar
 
             property var tabs: []
+            property bool shown: false
+            readonly property alias content: tabContent
 
-            // Recebe clique, mas sem roubar o foco da janela.
+            // Recebe clique, mas sem roubar o foco da janela. Escondida, vai
+            // para fora da tela (transparente ainda receberia cliques).
             flags: Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint
             color: "transparent"
-            visible: false
+            visible: true
+            width: 1
+            height: 1
 
-            Row {
-                anchors.fill: parent
+            FadingItem {
+                id: tabContent
 
-                Repeater {
-                    model: tabBar.tabs
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 9
+                    color: Qt.alpha(pal.window, 0.97)
+                    border.width: 1
+                    border.color: Qt.alpha(pal.windowText, 0.12)
+                }
 
-                    Rectangle {
-                        id: tab
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: 3
+                    spacing: 3
 
-                        required property var modelData
-                        required property int index
+                    // Iconografia: deixa claro que é uma pilha de janelas.
+                    Item {
+                        width: 30
+                        height: parent.height
 
-                        width: tabBar.width / Math.max(1, tabBar.tabs.length)
-                        height: tabBar.height
-                        color: tab.modelData.active ? pal.highlight : (tabArea.containsMouse ? Qt.lighter(pal.window, 1.1) : pal.window)
-                        border.width: 1
-                        border.color: Qt.alpha(pal.windowText, 0.15)
-                        radius: 4
-
-                        Text {
-                            anchors.fill: parent
-                            anchors.leftMargin: 10
-                            anchors.rightMargin: 10
-                            verticalAlignment: Text.AlignVCenter
-                            horizontalAlignment: Text.AlignHCenter
-                            elide: Text.ElideRight
-                            text: tab.modelData.caption
-                            color: tab.modelData.active ? pal.highlightedText : pal.windowText
-                            font.bold: tab.modelData.active
+                        StackGlyph {
+                            anchors.centerIn: parent
                         }
+                    }
 
-                        MouseArea {
-                            id: tabArea
+                    Repeater {
+                        model: tabBar.tabs
 
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: {
-                                if (root.controller)
-                                    root.controller.activateTab(tab.modelData.id);
+                        Rectangle {
+                            id: tab
+
+                            required property var modelData
+
+                            readonly property bool active: tab.modelData.active
+                            readonly property bool hovered: tabArea.containsMouse || closeArea.containsMouse
+                            readonly property color fg: tab.active ? pal.highlightedText : pal.windowText
+
+                            width: (tabBar.width - 6 - 30 - 3 * tabBar.tabs.length) / Math.max(1, tabBar.tabs.length)
+                            height: parent.height
+                            radius: 7
+                            color: tab.active ? pal.highlight : (tab.hovered ? Qt.alpha(pal.highlight, 0.16) : "transparent")
+
+                            Behavior on color {
+                                ColorAnimation {
+                                    duration: 100
+                                }
+                            }
+
+                            MouseArea {
+                                id: tabArea
+
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                                onClicked: mouse => {
+                                    if (!root.controller)
+                                        return;
+                                    // Botão do meio: tira da pilha (como fechar aba no navegador).
+                                    if (mouse.button === Qt.MiddleButton)
+                                        root.controller.unstack(tab.modelData.id);
+                                    else
+                                        root.controller.activateTab(tab.modelData.id);
+                                }
+                            }
+
+                            Kirigami.Icon {
+                                id: appIcon
+
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 16
+                                height: 16
+                                source: tab.modelData.icon ? tab.modelData.icon : "application-x-executable"
+                            }
+
+                            Text {
+                                anchors.left: appIcon.right
+                                anchors.leftMargin: 7
+                                anchors.right: closeButton.left
+                                anchors.rightMargin: 4
+                                anchors.verticalCenter: parent.verticalCenter
+                                elide: Text.ElideRight
+                                text: tab.modelData.caption
+                                color: tab.fg
+                                font.pixelSize: 12
+                                font.weight: tab.active ? Font.DemiBold : Font.Normal
+                            }
+
+                            // ×: tira a janela da pilha (ela volta ao tiling, ao lado).
+                            Rectangle {
+                                id: closeButton
+
+                                anchors.right: parent.right
+                                anchors.rightMargin: 5
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 18
+                                height: 18
+                                radius: 9
+                                opacity: tab.hovered || tab.active ? 1 : 0
+                                color: closeArea.containsMouse ? Qt.alpha(tab.fg, 0.22) : "transparent"
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "\u2715"
+                                    color: tab.fg
+                                    font.pixelSize: 10
+                                }
+
+                                MouseArea {
+                                    id: closeArea
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: {
+                                        if (root.controller)
+                                            root.controller.unstack(tab.modelData.id);
+                                    }
+                                }
                             }
                         }
                     }
@@ -153,23 +339,32 @@ Item {
             wins.push(tabBarComponent.createObject(null));
         tabWins = wins;
         for (let i = 0; i < wins.length; i++) {
+            const w = wins[i];
             const b = bars[i];
             if (!b) {
-                wins[i].visible = false;
+                w.content.hideNow();
+                w.shown = false;
+                w.x = -20000;
+                w.y = -20000;
+                w.width = 1;
+                w.height = 1;
                 continue;
             }
-            wins[i].tabs = b.tabs;
-            wins[i].x = b.rect.x;
-            wins[i].y = b.rect.y;
-            wins[i].width = Math.max(1, b.rect.width);
-            wins[i].height = Math.max(1, b.rect.height);
-            wins[i].visible = true;
+            w.tabs = b.tabs;
+            w.x = b.rect.x;
+            w.y = b.rect.y;
+            w.width = Math.max(1, b.rect.width);
+            w.height = Math.max(1, b.rect.height);
+            if (!w.shown)
+                w.content.fadeIn();
+            w.shown = true;
         }
     }
 
-    // O controlador só mostra a borda com a janela parada (nunca a persegue).
+    // O controlador só mostra a borda com a janela parada (nunca a persegue):
+    // cada borda nova surge com fade.
     function showBorder(r) {
-        place(borderWin, r);
+        place(borderWin, r, true);
     }
 
     Component {
@@ -192,25 +387,30 @@ Item {
         t.start();
     }
 
-    function place(win, r) {
+    // Mostra o overlay em r (fade se estava escondido, ou sempre com
+    // `refade`) ou o esconde (r null). Nunca fecha a janela (ver acima).
+    function place(win, r, refade) {
         if (!win)
             return;
         if (!r) {
-            win.visible = false;
+            win.content.hideNow();
+            win.shown = false;
             return;
         }
         win.x = r.x;
         win.y = r.y;
         win.width = Math.max(1, r.width);
         win.height = Math.max(1, r.height);
-        win.visible = true;
+        if (!win.shown || refade)
+            win.content.fadeIn();
+        win.shown = true;
     }
 
     function showPreview(r, ghost, stack) {
         if (previewWin)
             previewWin.stack = !!stack;
-        place(ghostWin, r ? ghost : null);
-        place(previewWin, r);
+        place(ghostWin, r ? ghost : null, false);
+        place(previewWin, r, false);
     }
 
     function log(msg) {

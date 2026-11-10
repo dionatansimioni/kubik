@@ -70,6 +70,16 @@ drag_and_shoot() {
     sleep 0.5
 }
 
+# Arrasta e SEGURA parado no destino por <segundos> antes de soltar,
+# tirando o screenshot <nome> no fim da espera (botão ainda pressionado):
+#   drag_hold_and_shoot <nome> <segundos> X1 Y1 X2 Y2 [passos]
+drag_hold_and_shoot() {
+    local name=$1 secs=$2; shift 2
+    FAKEINPUT_BEFORE_RELEASE="sleep $secs; python3 /work/testenv/screenshot.py /out/$name.png >/dev/null" \
+        python3 /work/testenv/fakeinput.py drag "$@"
+    sleep 0.5
+}
+
 mouse_move() {
     python3 /work/testenv/fakeinput.py move "$@"
 }

@@ -14,6 +14,8 @@ import type { Host, KWinWindow, Output, TabBar, VirtualDesktop } from "./api";
 interface Drag {
   id: string;
   mode: "move" | "resize";
+  /** Segurar para empilhar: onde o cursor parou, sobre qual janela, e se já deu o tempo. */
+  hold: { x: number; y: number; target: string | null; gen: number; ready: boolean } | null;
 }
 
 /** Onde a janela arrastada vai entrar se for solta agora. */
@@ -53,7 +55,7 @@ export const DEFAULT_CONFIG: Config = {
   floatingClasses: DEFAULT_FLOATING_CLASSES,
   tileAllDesktops: true,
   border: { enabled: true, width: 3 },
-  tabs: { height: 28 },
+  tabs: { height: 32 },
 };
 
 /**
@@ -62,8 +64,10 @@ export const DEFAULT_CONFIG: Config = {
  */
 const BORDER_SETTLE_MS = 300;
 
-/** Faixa do topo do alvo que empilha, quando a janela não tem barra de título própria (CSD). */
-const DEFAULT_TITLE_BAND = 32;
+/** Segurar a janela arrastada parada sobre outra por este tempo empilha as duas. */
+const HOLD_TO_STACK_MS = 800;
+/** Quanto o cursor pode se mexer (px) sem recomeçar a contagem do segurar. */
+const HOLD_TOLERANCE = 12;
 
 interface Tracked {
   window: KWinWindow;
@@ -218,6 +222,20 @@ export class Controller {
     this.publishTabs();
   }
 
+  /** O × da aba: tira a janela da pilha e a põe ao lado dela, no tiling normal. */
+  unstack(id: string): void {
+    const t = this.tracked.get(id);
+    if (!t || t.key === null) return;
+    const tree = this.trees.get(t.key)!;
+    const rest = tree.stackOf(id).filter((x) => x !== id);
+    if (rest.length === 0) return;
+    const place = this.places.get(t.key)!;
+    this.removeFromTree(t);
+    this.insertInto(t, place, tree.activeOf(rest[0]));
+    this.host.workspace.activeWindow = t.window;
+    this.host.log(`tirou '${t.window.caption}' da pilha`);
+  }
+
   /** Atalho: próxima (+1) ou anterior (-1) aba da pilha da janela em foco. */
   cycleTab(delta: number): void {
     const w = this.host.workspace.activeWindow;
@@ -249,22 +267,18 @@ export class Controller {
         for (const st of tree.stacks(this.area(key), this.config.gaps, this.minsOf(tree)))
           bars.push({
             rect: st.bar,
-            tabs: st.ids.map((id) => ({ id, caption: this.tracked.get(id)?.window.caption ?? "", active: id === st.active })),
+            tabs: st.ids.map((id) => {
+              const w = this.tracked.get(id)?.window;
+              return { id, caption: w?.caption ?? "", active: id === st.active, icon: w?.icon };
+            }),
           });
       }
     }
-    const json = JSON.stringify(bars);
+    // O ícone (QIcon) não serializa; a classe do app basta para notar mudanças.
+    const json = JSON.stringify(bars, (k, v) => (k === "icon" ? undefined : v));
     if (json === this.lastTabs) return;
     this.lastTabs = json;
     this.host.tabs(bars);
-  }
-
-  /** Faixa do topo de `target` que empilha: a barra de título (e a de abas). */
-  private titleBand(target: string, tree: Tree): number {
-    const w = this.tracked.get(target)?.window;
-    const deco = w ? w.frameGeometry.height - w.clientGeometry.height : 0;
-    const band = deco >= 10 ? deco : DEFAULT_TITLE_BAND;
-    return tree.stackOf(target).length > 1 ? band + tree.tabHeight : band;
   }
 
   // ---- borda de destaque ----------------------------------------------------
@@ -659,7 +673,7 @@ export class Controller {
     if (!t || t.key === null) return;
     const w = t.window;
     const mode = w.move ? "move" : w.resize ? "resize" : null;
-    if (mode) this.drag = { id, mode };
+    if (mode) this.drag = { id, mode, hold: null };
   }
 
   private dragStepped(id: string, r: Rect): void {
@@ -670,14 +684,42 @@ export class Controller {
       this.trees.get(t.key)!.resizeTo(id, r, this.area(t.key), this.config.gaps);
       this.retile(t.key, id); // a janela arrastada é do KWin até soltar
     } else {
-      const drop = this.dropTarget(t);
-      this.host.preview(drop?.rect ?? null, drop?.ghost ?? null, drop?.id != null && drop.zone === "stack");
+      this.trackHold(t);
+      this.showDropPreview(t);
     }
+  }
+
+  private showDropPreview(t: Tracked): void {
+    const drop = this.dropTarget(t, this.drag?.hold ?? null);
+    this.host.preview(drop?.rect ?? null, drop?.ghost ?? null, drop?.id != null && drop.zone === "stack");
+  }
+
+  /**
+   * Segurar para empilhar: com o cursor parado (±HOLD_TOLERANCE) sobre a
+   * mesma janela por HOLD_TO_STACK_MS, o drop passa a empilhar. Funciona em
+   * qualquer parte da janela (apps como o Chrome não têm a barra de título
+   * do KDE). Mexer o cursor ou mudar de janela recomeça a contagem.
+   */
+  private trackHold(t: Tracked): void {
+    const drag = this.drag!;
+    const p = this.host.workspace.cursorPos;
+    const under = this.dropTarget(t)?.id ?? null;
+    const h = drag.hold;
+    if (h && h.target === under && Math.abs(p.x - h.x) <= HOLD_TOLERANCE && Math.abs(p.y - h.y) <= HOLD_TOLERANCE) return;
+    const gen = (h?.gen ?? 0) + 1;
+    drag.hold = { x: p.x, y: p.y, target: under, gen, ready: false };
+    if (under === null) return;
+    this.host.later(HOLD_TO_STACK_MS, () => {
+      if (this.drag !== drag || drag.hold?.gen !== gen) return;
+      drag.hold.ready = true;
+      this.showDropPreview(t);
+    });
   }
 
   private dragFinished(id: string): void {
     if (this.drag?.id !== id) return;
     const mode = this.drag.mode;
+    const hold = this.drag.hold;
     this.drag = null;
     const t = this.tracked.get(id)!;
     if (t.key === null) return;
@@ -694,7 +736,7 @@ export class Controller {
       return;
     }
     this.host.preview(null);
-    const drop = this.dropTarget(t);
+    const drop = this.dropTarget(t, hold);
     const name = t.window.caption;
     if (!drop) {
       this.retile(t.key); // solto num gap ou sobre si mesma: volta ao lugar
@@ -740,7 +782,7 @@ export class Controller {
   }
 
   /** Destino de um drop com o cursor na posição atual, ou null (volta ao lugar). */
-  private dropTarget(t: Tracked): DropTarget | null {
+  private dropTarget(t: Tracked, hold: Drag["hold"] = null): DropTarget | null {
     const w = t.window;
     const id = idOf(w);
     const place = this.placeOf(w);
@@ -755,7 +797,10 @@ export class Controller {
     const layout = tree.layout(area, gaps, mins);
     const target = tree.idAt(cursor, area, gaps, mins);
     if (target === null || target === id) return null;
-    const zone = dropZone(tree.tileRect(target, area, gaps, mins)!, cursor, this.titleBand(target, tree));
+    // A barra de abas de uma pilha empilha na hora; segurar empilha em qualquer lugar.
+    const held = hold?.ready === true && hold.target === target;
+    const band = tree.stackOf(target).length > 1 ? tree.tabHeight : 0;
+    const zone = held ? "stack" : dropZone(tree.tileRect(target, area, gaps, mins)!, cursor, band);
     if (zone === "swap") {
       return { key, place, id: target, zone, rect: layout.get(target)!, ghost: t.target };
     }

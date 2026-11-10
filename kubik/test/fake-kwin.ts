@@ -49,6 +49,8 @@ export class FakeWindow implements KWinWindow {
   }
   readonly maximizedChanged = new FakeSignal();
   readonly captionChanged = new FakeSignal();
+  /** QIcon no KWin; o controlador só repassa ao QML. */
+  icon: unknown = "icone-falso";
   /** O app muda o título (ex.: o navegador trocou de página). */
   retitle(c: string): void {
     this.caption = c;
@@ -116,6 +118,28 @@ export class FakeWindow implements KWinWindow {
       this.interactiveMoveResizeStepped.emit(r);
     }
     this.move = this.resize = false;
+    this.interactiveMoveResizeFinished.emit();
+  }
+
+  /**
+   * Como dragThrough("move"), mas SEGURA o cursor parado sobre o último ponto
+   * por `holdMs` antes de soltar (os timers do host disparam nesse tempo).
+   */
+  dragAndHold(
+    steps: Rect[], ws: FakeWorkspace, cursor: { x: number; y: number }, tick: (ms?: number) => void, holdMs: number,
+    output?: Output,
+  ): void {
+    this.move = true;
+    this.interactiveMoveResizeStarted.emit();
+    for (const r of steps) {
+      this.geo = r;
+      this.frameGeometryChanged.emit();
+      ws.cursorPos = cursor;
+      if (output && output !== this._output) this.output = output;
+      this.interactiveMoveResizeStepped.emit(r);
+    }
+    tick(holdMs);
+    this.move = false;
     this.interactiveMoveResizeFinished.emit();
   }
 

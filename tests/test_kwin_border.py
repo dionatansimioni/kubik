@@ -69,6 +69,12 @@ class BorderInKWinTest(unittest.TestCase):
         accent = [(x, y) for x in range(0, 1280, 8) for y in range(0, 800, 8) if is_accent(img.getpixel((x, y)))]
         self.assertEqual(accent, [])
 
+    def test_border_is_never_reopened(self):
+        # A borda aparece e some várias vezes no cenário, mas o overlay é aberto
+        # uma vez só (reabrir dispara a animação de abrir janela do usuário).
+        # Overlays: prévia, prévia-fantasma e borda.
+        self.assertEqual(self.log.count("flutuante '': janela interna do KWin"), 3)
+
     def test_overlay_is_not_tiled(self):
         self.assertEqual(set(self.w["alone"]), {"Alpha"})
         for bad in ("TypeError", "ReferenceError", "is not defined", "Cannot read"):

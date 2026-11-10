@@ -68,6 +68,8 @@ export interface KWinWindow {
   setMaximize(vertically: boolean, horizontally: boolean): void;
   readonly maximizedChanged: Signal;
   readonly captionChanged: Signal;
+  /** Ícone do app (QIcon), repassado às abas. */
+  readonly icon?: unknown;
   /** Qualquer mudança de geometria: nossas, do usuário ou do próprio app. */
   readonly frameGeometryChanged: Signal;
   readonly interactiveMoveResizeStarted: Signal;
@@ -94,7 +96,7 @@ export interface Workspace {
 /** Barra de abas de uma pilha, para o QML desenhar. */
 export interface TabBar {
   rect: Rect;
-  tabs: Array<{ id: string; caption: string; active: boolean }>;
+  tabs: Array<{ id: string; caption: string; active: boolean; icon: unknown }>;
 }
 
 /** O que o lado QML entrega ao controlador. */
