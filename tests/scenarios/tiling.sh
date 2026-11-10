@@ -23,3 +23,7 @@ dump_windows off_new
 shortcut "Kubik: Toggle tiling" 1
 dump_windows on_again
 screenshot on_again
+
+# Diagnóstico (scripts/diagnose.sh): o estado do kubik e as janelas vão pro log.
+mark diagnose
+bash /work/scripts/diagnose.sh /out/diag.txt >&2

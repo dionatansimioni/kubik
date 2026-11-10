@@ -54,10 +54,11 @@ class BuildTest(unittest.TestCase):
         top = f"{ID}-{VERSION}"
         with tarfile.open(self.tarball) as t:
             members = {m.name: m for m in t.getmembers()}
-        for name in ("install.sh", "uninstall.sh", f"packages/{ID}/metadata.json",
+        for name in ("install.sh", "uninstall.sh", "diagnose.sh", f"packages/{ID}/metadata.json",
                      f"packages/{ID}/contents/" + META["X-Plasma-MainScript"]):
             self.assertIn(f"{top}/{name}", members)
-        self.assertTrue(members[f"{top}/install.sh"].mode & 0o111, "install.sh não é executável")
+        for script in ("install.sh", "diagnose.sh"):
+            self.assertTrue(members[f"{top}/{script}"].mode & 0o111, f"{script} não é executável")
 
 
 @unittest.skipUnless(shutil.which("docker"), "docker indisponível (build do TypeScript)")
@@ -102,7 +103,7 @@ class KubikBuildTest(unittest.TestCase):
 
 
 class ShellScriptsTest(unittest.TestCase):
-    SCRIPTS = [ROOT / "scripts" / n for n in ("install.sh", "uninstall.sh", "release.sh")]
+    SCRIPTS = [ROOT / "scripts" / n for n in ("install.sh", "uninstall.sh", "release.sh", "diagnose.sh")]
 
     def test_bash_syntax(self):
         for s in self.SCRIPTS:
@@ -127,7 +128,7 @@ class ShellScriptsTest(unittest.TestCase):
 
     def test_scripts_do_not_require_qdbus(self):
         # qdbus6 não existe em várias distros (ex.: Plasma 6.8 do usuário); use dbus-send.
-        for name in ("install.sh", "uninstall.sh"):
+        for name in ("install.sh", "uninstall.sh", "diagnose.sh"):
             with self.subTest(script=name):
                 src = (ROOT / "scripts" / name).read_text(encoding="utf-8")
                 self.assertNotIn("qdbus", src)

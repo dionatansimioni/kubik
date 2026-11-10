@@ -99,6 +99,17 @@ Item {
         }
     }
 
+    // Sem tecla padrão: usado pelo scripts/diagnose.sh (kglobalaccel invokeShortcut).
+    KWin.ShortcutHandler {
+        name: "Kubik: Log state"
+        text: "Kubik: registra o estado no log (diagnóstico)"
+        sequence: ""
+        onActivated: {
+            if (root.controller)
+                root.controller.describe().forEach(l => root.log("[estado] " + l));
+        }
+    }
+
     Component.onCompleted: {
         previewWin = previewComponent.createObject(null);
         const core = loadCore();

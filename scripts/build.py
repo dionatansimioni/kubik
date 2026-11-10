@@ -5,7 +5,7 @@ Gera em dist/:
   <id>-<versão>.kwinscript  zip instalável em Configurações do Sistema ›
                             Scripts do KWin › "Instalar de arquivo…"
                             (ou kpackagetool6 -t KWin/Script -i arquivo)
-  <id>-<versão>.tar.gz      pacote + install.sh / uninstall.sh
+  <id>-<versão>.tar.gz      pacote + install.sh / uninstall.sh / diagnose.sh
 
 Uso: scripts/build.py [diretório-do-pacote]   (padrão: kubik/package)
 Imprime os caminhos dos arquivos gerados, um por linha.
@@ -94,7 +94,7 @@ def build_tarball(pkgs, plugin_id: str, version: str, out: Path):
             pid, _ = read_metadata(pkg)
             for f in package_files(pkg):
                 add(tar, f.read_bytes(), f"packages/{pid}/" + f.relative_to(pkg).as_posix(), 0o644)
-        for script in ("install.sh", "uninstall.sh"):
+        for script in ("install.sh", "uninstall.sh", "diagnose.sh"):
             add(tar, (SCRIPTS / script).read_bytes(), script, 0o755)
         main = pkgs[0]
         readme = next((p for p in (main / "README.md", main.parent / "README.md") if p.is_file()), None)

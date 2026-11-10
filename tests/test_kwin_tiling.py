@@ -57,6 +57,17 @@ class TilingInKWinTest(unittest.TestCase):
         for bad in ("Component failed to load", "TypeError", "ReferenceError", "falha ao carregar"):
             self.assertNotIn(bad, self.log)
 
+    def test_diagnose_reports_kubik_state_and_windows(self):
+        diag = self.log.split("=== MARK diagnose ===", 1)[1]
+        self.assertRegex(diag, r"\[kubik\] \[estado\] estado: tiling ligado; 3 no tiling")
+        self.assertRegex(diag, r"\[estado\]   'Alpha' \(org.qt-project.qml\) tile 4,4 634x394 real 4,4 634x394\n")
+        self.assertNotIn("FORA DO TILE", diag)
+        self.assertRegex(diag, r'JANELA \{"caption":"Alpha","cls":"org.qt-project.qml"')
+        report = open(f"{self.out}/diag.txt", encoding="utf-8").read()
+        for section in ("sistema", "pacotes do kubik", "estado do kubik", "janelas no KWin"):
+            self.assertIn(f"===== {section} =====", report)
+        self.assertRegex(report, r"KWin/Script kubik versão=\d+\.\d+\.\d+ ativado=true")
+
     def test_single_window_fills_screen_minus_gaps(self):
         self.assertEqual(self.w["one"], {"Alpha": FULL})
 

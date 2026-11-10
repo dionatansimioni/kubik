@@ -164,6 +164,40 @@ export class Controller {
     return out;
   }
 
+  /**
+   * Relatório legível do estado (atalho "Kubik: Log state", scripts/diagnose.sh):
+   * cada árvore com as janelas, o tile calculado e a geometria real, e as
+   * janelas flutuantes com o motivo.
+   */
+  describe(): string[] {
+    const fmt = (r: Rect) => `${r.x},${r.y} ${r.width}x${r.height}`;
+    const name = (w: KWinWindow) => `'${w.caption}' (${w.resourceClass || "sem classe"})`;
+    const floating = [...this.tracked.values()].filter((t) => t.key === null);
+    const lines = [
+      `estado: tiling ${this.enabled ? "ligado" : "desligado"}; ${this.tiledCount()} no tiling, ${floating.length} flutuante(s)`,
+    ];
+    for (const [key, tree] of this.trees) {
+      if (!tree.size) continue;
+      const area = this.area(key);
+      lines.push(`árvore ${key} área ${fmt(area)}: ${tree.size} janela(s)`);
+      const layout = tree.layout(area, this.config.gaps, this.minsOf(tree));
+      for (const id of tree.ids()) {
+        const t = this.tracked.get(id);
+        const tile = layout.get(id)!;
+        if (!t) {
+          lines.push(`  ${id} SEM JANELA (folha órfã) tile ${fmt(tile)}`);
+          continue;
+        }
+        const real = t.window.frameGeometry;
+        const off = sameRect(real, tile, 2) ? "" : " FORA DO TILE";
+        lines.push(`  ${name(t.window)} tile ${fmt(tile)} real ${fmt(real)}${off}`);
+      }
+      lines.push(`forma ${key} ${JSON.stringify(tree.shape())}`);
+    }
+    for (const t of floating) lines.push(`flutuante ${name(t.window)}: ${this.floatReasonOf(t) ?? "?"}`);
+    return lines;
+  }
+
   private noteFocus(id: string): void {
     this.focusHistory = [id, ...this.focusHistory.filter((x) => x !== id)].slice(0, 64);
   }
@@ -234,13 +268,7 @@ export class Controller {
    */
   private refresh(t: Tracked, isNew = false): void {
     const w = t.window;
-    const reason = !this.enabled
-      ? "tiling desligado"
-      : t.noFit
-        ? "não cabe"
-        : t.rebel
-          ? "o app não aceita o tile"
-          : floatReason(w, this.config.floatingClasses);
+    const reason = this.floatReasonOf(t);
     const place = reason === null ? { output: w.output, desktop: w.desktops[0] } : null;
     const key = place ? keyOf(place) : null;
     if (key === t.key && !isNew) return;
@@ -257,6 +285,14 @@ export class Controller {
     const target = this.balanced ? null : (this.focusHistory.find((f) => f !== id && tree.has(f)) ?? null);
     this.insertInto(t, place, target);
     if (t.key !== null) this.host.log(`tiling '${w.caption}' em ${key}`);
+  }
+
+  /** Por que a janela fica fora do tiling, ou null se ela deve estar nele. */
+  private floatReasonOf(t: Tracked): string | null {
+    if (!this.enabled) return "tiling desligado";
+    if (t.noFit) return "não cabe";
+    if (t.rebel) return "o app não aceita o tile";
+    return floatReason(t.window, this.config.floatingClasses);
   }
 
   private treeFor(place: Place): Tree {

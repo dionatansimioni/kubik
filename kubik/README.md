@@ -57,3 +57,14 @@ python3 -m unittest discover -s tests # tudo, inclusive o KWin real do testenv
 - `src/effect/`: o efeito de animação. A decisão e o cálculo ficam em `morph.ts`, que é puro e testado; `main.ts` liga isso à API de efeitos. O resultado vai para `effect/`.
 - `src/qml/Kubik.qml`: o modelo em que o build embute o bundle.
 - `package/`: o pacote do KWin. O `main.qml` é só um carregador.
+
+## Diagnóstico
+
+Se o tiling se comportar de um jeito estranho, rode `./diagnose.sh` (vem no `.tar.gz`) na sessão onde o problema aparece. Ele gera `kubik-diagnostico-<data>.txt` com:
+
+- as versões do Plasma e do KWin, as telas e os pacotes do kubik instalados;
+- o estado interno do kubik: cada árvore, com o tile calculado e a geometria real de cada janela;
+- todas as janelas que o KWin conhece;
+- o log do kubik desde o login.
+
+O estado também pode ir para o log pelo atalho "Kubik: registra o estado no log", que não tem tecla padrão.

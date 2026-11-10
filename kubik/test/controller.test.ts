@@ -402,4 +402,23 @@ describe("Controller", () => {
       expect(b.frameGeometry).toEqual(rect(300, 300, 634, 792));
     });
   });
+
+  describe("relatório de estado (diagnóstico)", () => {
+    it("lista cada árvore com as janelas, o tile e a geometria real, e as flutuantes com o motivo", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      const d = win("diálogo");
+      d.dialog = true;
+      ws.open(d);
+      b.appSets(rect(10, 10, 300, 200)); // fora do tile, ainda não corrigida
+      const lines = ctl.describe();
+      expect(lines[0]).toBe("estado: tiling ligado; 2 no tiling, 1 flutuante(s)");
+      expect(lines).toContain("árvore DP-1|desk-1 área 0,0 1280x800: 2 janela(s)");
+      expect(lines).toContain("  'a' (org.example.app) tile 4,4 634x792 real 4,4 634x792");
+      expect(lines).toContain("  'b' (org.example.app) tile 642,4 634x792 real 10,10 300x200 FORA DO TILE");
+      expect(lines).toContain("flutuante 'diálogo' (org.example.app): diálogo");
+      expect(lines.some((l) => l.startsWith("forma DP-1|desk-1 "))).toBe(true);
+      void a;
+    });
+  });
 });
