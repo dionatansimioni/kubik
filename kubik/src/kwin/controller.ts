@@ -42,12 +42,15 @@ export interface Config {
    * tela secundária são assim. Futuro: uma opção por tela na bandeja.
    */
   tileAllDesktops: boolean;
+  /** Borda de destaque em volta da janela em foco. */
+  border: { enabled: boolean; width: number };
 }
 
 export const DEFAULT_CONFIG: Config = {
   gaps: { outer: 4, inner: 4 },
   floatingClasses: DEFAULT_FLOATING_CLASSES,
   tileAllDesktops: true,
+  border: { enabled: true, width: 3 },
 };
 
 interface Tracked {
@@ -112,6 +115,9 @@ export class Controller {
    */
   private balanced = false;
   private readonly unsubscribe: Array<() => void> = [];
+  /** Última borda enviada ao QML (para não repetir) e de qual janela. */
+  private borderRect: Rect | null = null;
+  private borderOwner: string | null = null;
 
   constructor(
     private readonly host: Host,
@@ -128,6 +134,7 @@ export class Controller {
     const onRemoved = (w: KWinWindow) => this.untrack(w);
     const onActivated = (w: KWinWindow | null) => {
       if (w) this.noteFocus(idOf(w));
+      this.updateBorder();
     };
     ws.windowAdded.connect(onAdded);
     ws.windowRemoved.connect(onRemoved);
@@ -145,9 +152,11 @@ export class Controller {
     for (const w of ws.stackingOrder) this.track(w);
     this.balanced = false;
     this.host.log(`iniciado; ${this.tiledCount()} janela(s) no tiling`);
+    this.updateBorder();
   }
 
   stop(): void {
+    this.showBorder(null, false, null);
     for (const off of this.unsubscribe.splice(0)) off();
     for (const t of this.tracked.values()) t.disconnect();
     this.tracked.clear();
@@ -173,6 +182,43 @@ export class Controller {
       this.balanced = false;
       this.host.log(`tiling ligado; ${this.tiledCount()} janela(s)`);
     }
+    this.updateBorder();
+  }
+
+  // ---- borda de destaque ----------------------------------------------------
+
+  /** Recalcula a borda da janela em foco (chamado a cada mudança relevante). */
+  private updateBorder(): void {
+    const w = this.host.workspace.activeWindow;
+    const t = w ? this.tracked.get(idOf(w)) : undefined;
+    if (!w || !t || !this.enabled || !this.config.border.enabled || !this.borderable(w)) {
+      this.showBorder(null, false, null);
+      return;
+    }
+    const g = w.frameGeometry;
+    const bw = this.config.border.width;
+    const r = { x: g.x - bw, y: g.y - bw, width: g.width + 2 * bw, height: g.height + 2 * bw };
+    const id = idOf(w);
+    // Desliza só quando a MESMA janela muda de lugar sem o usuário arrastar
+    // (o efeito de animação está deslizando a janela junto).
+    const animate = this.borderOwner === id && this.borderRect !== null && !w.move && !w.resize && this.drag?.id !== id;
+    this.showBorder(r, animate, id);
+  }
+
+  private showBorder(r: Rect | null, animate: boolean, owner: string | null): void {
+    const same = r === null ? this.borderRect === null : this.borderRect !== null && sameRect(r, this.borderRect);
+    this.borderOwner = owner;
+    if (same) return;
+    this.borderRect = r ? copy(r) : null;
+    this.host.border(r, r !== null && animate);
+  }
+
+  /** Janelas "de verdade" à vista: diálogos, overlays e janelas ocultas não. */
+  private borderable(w: KWinWindow): boolean {
+    if (!w.normalWindow || w.splash || w.minimized || w.fullScreen || w.maximizeMode !== 0) return false;
+    if (!w.resourceClass && w.skipSwitcher) return false;
+    if ((w.skipTaskbar && w.skipSwitcher) || w.opacity === 0) return false;
+    return true;
   }
 
   /** Estado para testes e diagnóstico: chave → forma da árvore. */
@@ -240,6 +286,9 @@ export class Controller {
     const onFinished = () => this.dragFinished(id);
     const signals = [w.minimizedChanged, w.fullScreenChanged, w.desktopsChanged, w.outputChanged];
     for (const s of signals) s.connect(onChange);
+    const onBorder = () => this.updateBorder();
+    const borderSignals = [w.minimizedChanged, w.fullScreenChanged, w.maximizedChanged];
+    for (const s of borderSignals) s.connect(onBorder);
     w.frameGeometryChanged.connect(onGeometry);
     w.interactiveMoveResizeStarted.connect(onStarted);
     w.interactiveMoveResizeStepped.connect(onStepped);
@@ -256,6 +305,7 @@ export class Controller {
       checkPending: false,
       disconnect: () => {
         signals.forEach((s) => s.disconnect(onChange));
+        borderSignals.forEach((s) => s.disconnect(onBorder));
         w.frameGeometryChanged.disconnect(onGeometry);
         w.interactiveMoveResizeStarted.disconnect(onStarted);
         w.interactiveMoveResizeStepped.disconnect(onStepped);
@@ -264,6 +314,7 @@ export class Controller {
     };
     this.tracked.set(id, t);
     this.refresh(t, true);
+    this.updateBorder();
   }
 
   private untrack(w: KWinWindow): void {
@@ -278,6 +329,7 @@ export class Controller {
       this.host.preview(null);
     }
     this.removeFromTree(t);
+    this.updateBorder();
   }
 
   /**
@@ -446,6 +498,8 @@ export class Controller {
    * janela ao tile; se o app insistir, ela vira flutuante.
    */
   private geometryChanged(id: string): void {
+    const active = this.host.workspace.activeWindow;
+    if (active && idOf(active) === id) this.updateBorder();
     const t = this.tracked.get(id);
     if (!t || !this.deviates(t) || t.checkPending) return;
     t.checkPending = true;

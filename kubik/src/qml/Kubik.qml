@@ -23,6 +23,8 @@ Item {
     property var previewWin: null
     // Na troca: para onde vai a OUTRA janela (mais clara que a prévia principal).
     property var ghostWin: null
+    // Borda de destaque em volta da janela em foco (o controlador decide onde).
+    property var borderWin: null
 
     SystemPalette {
         id: pal
@@ -49,6 +51,74 @@ Item {
                 border.color: Qt.alpha(pal.highlight, previewWindow.ghost ? 0.5 : 1)
             }
         }
+    }
+
+    Component {
+        id: borderComponent
+
+        Window {
+            id: borderWindow
+
+            // true: desliza até a geometria nova (mesma curva padrão do efeito
+            // kubikanimations); false: pula direto (foco mudou, arrasto).
+            property bool animated: false
+
+            flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint
+            color: "transparent"
+            visible: false
+
+            Behavior on x {
+                enabled: borderWindow.animated
+                NumberAnimation {
+                    duration: 250
+                    easing.type: Easing.OutCubic
+                }
+            }
+            Behavior on y {
+                enabled: borderWindow.animated
+                NumberAnimation {
+                    duration: 250
+                    easing.type: Easing.OutCubic
+                }
+            }
+            Behavior on width {
+                enabled: borderWindow.animated
+                NumberAnimation {
+                    duration: 250
+                    easing.type: Easing.OutCubic
+                }
+            }
+            Behavior on height {
+                enabled: borderWindow.animated
+                NumberAnimation {
+                    duration: 250
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                color: "transparent"
+                radius: 8
+                border.width: 3
+                border.color: pal.highlight
+            }
+        }
+    }
+
+    function showBorder(r, animate) {
+        if (!borderWin)
+            return;
+        if (!r) {
+            borderWin.visible = false;
+            return;
+        }
+        borderWin.animated = animate && borderWin.visible;
+        borderWin.x = r.x;
+        borderWin.y = r.y;
+        borderWin.width = Math.max(1, r.width);
+        borderWin.height = Math.max(1, r.height);
+        borderWin.visible = true;
     }
 
     Component {
@@ -126,6 +196,7 @@ Item {
         ghostWin = previewComponent.createObject(null, {
             ghost: true
         });
+        borderWin = borderComponent.createObject(null);
         const core = loadCore();
         const maximizeArea = KWin.Workspace.MaximizeArea !== undefined ? KWin.Workspace.MaximizeArea : 2;
         controller = core.start({
@@ -133,6 +204,7 @@ Item {
             clientArea: (output, desktop) => KWin.Workspace.clientArea(maximizeArea, output, desktop),
             log: root.log,
             preview: root.showPreview,
+            border: root.showBorder,
             later: root.later
         });
     }
@@ -144,6 +216,8 @@ Item {
             previewWin.destroy();
         if (ghostWin)
             ghostWin.destroy();
+        if (borderWin)
+            borderWin.destroy();
         log("descarregado");
     }
 }

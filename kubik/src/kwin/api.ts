@@ -66,6 +66,7 @@ export interface KWinWindow {
   /** 0 = não maximizada (KWin: MaximizeRestore). */
   readonly maximizeMode: number;
   setMaximize(vertically: boolean, horizontally: boolean): void;
+  readonly maximizedChanged: Signal;
   /** Qualquer mudança de geometria: nossas, do usuário ou do próprio app. */
   readonly frameGeometryChanged: Signal;
   readonly interactiveMoveResizeStarted: Signal;
@@ -99,4 +100,10 @@ export interface Host {
    * ficar. `ghost`: na troca, para onde vai a OUTRA janela (prévia mais clara).
    */
   preview(rect: Rect | null, ghost?: Rect | null): void;
+  /**
+   * Borda de destaque (cor de destaque do sistema) em `rect`, ou nenhuma.
+   * `animate`: deslizar até lá (o layout mudou e o efeito anima a janela);
+   * false: pular direto (foco mudou, arrasto com o mouse).
+   */
+  border(rect: Rect | null, animate: boolean): void;
 }

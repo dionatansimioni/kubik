@@ -45,7 +45,9 @@ export class FakeWindow implements KWinWindow {
   /** Como o KWin: 1 = vertical, 2 = horizontal, 3 = as duas. */
   setMaximize(vertically: boolean, horizontally: boolean): void {
     this.maximizeMode = (vertically ? 1 : 0) | (horizontally ? 2 : 0);
+    this.maximizedChanged.emit();
   }
+  readonly maximizedChanged = new FakeSignal();
   readonly frameGeometryChanged = new FakeSignal();
   /** Tamanho da decoração (barra de título etc.); 0 = sem decoração. */
   decoration = { width: 0, height: 0 };
@@ -193,6 +195,7 @@ export function fakeHost(ws: FakeWorkspace) {
   const logs: string[] = [];
   const previews: Array<Rect | null> = [];
   const ghosts: Array<Rect | null> = [];
+  const borders: Array<{ rect: Rect | null; animate: boolean }> = [];
   const timers: Array<{ ms: number; fn: () => void }> = [];
   const areas: Record<string, Rect> = {
     "DP-1": { x: 0, y: 0, width: 1280, height: 800 },
@@ -207,6 +210,7 @@ export function fakeHost(ws: FakeWorkspace) {
       ghosts.push(ghost);
     },
     later: (ms, fn) => timers.push({ ms, fn }),
+    border: (rect, animate) => borders.push({ rect, animate }),
   };
   /** Dispara os timers de até `upTo` ms (como se esse tempo tivesse passado). */
   const tick = (upTo = 1000) => {
@@ -214,5 +218,5 @@ export function fakeHost(ws: FakeWorkspace) {
     timers.splice(0, timers.length, ...timers.filter((t) => t.ms > upTo));
     for (const t of due) t.fn();
   };
-  return { host, logs, previews, ghosts, tick };
+  return { host, logs, previews, ghosts, borders, tick };
 }

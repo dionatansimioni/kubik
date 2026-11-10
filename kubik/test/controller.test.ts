@@ -10,6 +10,7 @@ let ctl: Controller;
 let logs: string[];
 let previews: Array<import("../src/core/rect").Rect | null>;
 let ghosts: Array<import("../src/core/rect").Rect | null>;
+let borders: Array<{ rect: import("../src/core/rect").Rect | null; animate: boolean }>;
 let tick: () => void;
 
 function win(caption: string, output = SCREEN_A, desktop = DESK_1): FakeWindow {
@@ -22,6 +23,7 @@ beforeEach(() => {
   logs = h.logs;
   previews = h.previews;
   ghosts = h.ghosts;
+  borders = h.borders;
   tick = h.tick;
   ctl = new Controller(h.host);
   ctl.start();
@@ -604,6 +606,97 @@ describe("Controller", () => {
       expect(lines).toContain("flutuante 'diálogo' (org.example.app): diálogo");
       expect(lines.some((l) => l.startsWith("forma DP-1|desk-1 "))).toBe(true);
       void a;
+    });
+  });
+
+  describe("borda de destaque na janela em foco", () => {
+    /** A borda fica 3 px para fora da moldura. */
+    const around = (r: import("../src/core/rect").Rect) => rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6);
+    const last = () => borders[borders.length - 1];
+
+    it("aparece em volta da janela focada", () => {
+      ws.open(win("a"));
+      expect(last()).toEqual({ rect: around(rect(4, 4, 1272, 792)), animate: false });
+    });
+
+    it("muda de janela junto com o foco, sem deslizar entre elas", () => {
+      const a = ws.open(win("a"));
+      ws.open(win("b"));
+      ws.activate(a);
+      expect(last()).toEqual({ rect: around(rect(4, 4, 634, 792)), animate: false });
+    });
+
+    it("quando o layout muda, acompanha a janela deslizando (como a animação)", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      ws.activate(a);
+      ws.close(b);
+      expect(last()).toEqual({ rect: around(rect(4, 4, 1272, 792)), animate: true });
+    });
+
+    it("durante o arrasto acompanha o mouse sem atraso", () => {
+      ws.open(win("a"));
+      const b = ws.open(win("b"));
+      b.dragThrough("resize", [rect(600, 4, 676, 792)]);
+      expect(borders).toContainEqual({ rect: around(rect(600, 4, 676, 792)), animate: false });
+    });
+
+    it("some sem foco, minimizada, em tela cheia ou maximizada", () => {
+      const a = ws.open(win("a"));
+      ws.activate(null);
+      expect(last().rect).toBeNull();
+      ws.activate(a);
+      a.fullScreen = true;
+      expect(last().rect).toBeNull();
+      a.fullScreen = false;
+      expect(last().rect).toEqual(around(rect(4, 4, 1272, 792)));
+      a.setMaximize(true, true);
+      expect(last().rect).toBeNull();
+      a.setMaximize(false, false);
+      a.minimized = true;
+      expect(last().rect).toBeNull();
+    });
+
+    it("não aparece em diálogos, janelas internas e ocultas, mas sim em flutuantes normais", () => {
+      ws.open(win("a"));
+      const d = win("diálogo");
+      d.normalWindow = false;
+      d.dialog = true;
+      ws.open(d);
+      expect(last().rect).toBeNull();
+      const ghost = win("ponte");
+      ghost.skipTaskbar = ghost.skipSwitcher = true;
+      ws.open(ghost);
+      expect(last().rect).toBeNull();
+      const fixed = new FakeWindow("fixa", SCREEN_A, DESK_1, rect(100, 100, 300, 200));
+      fixed.resizeable = false; // flutua, mas é uma janela de verdade
+      ws.open(fixed);
+      expect(last().rect).toEqual(around(rect(100, 100, 300, 200)));
+    });
+
+    it("desligar o tiling esconde; religar mostra de novo", () => {
+      ws.open(win("a"));
+      ctl.toggle();
+      expect(last().rect).toBeNull();
+      ctl.toggle();
+      expect(last().rect).toEqual(around(rect(4, 4, 1272, 792)));
+    });
+
+    it("não repete a mesma borda (sem escrita inútil no overlay)", () => {
+      const a = ws.open(win("a"));
+      const n = borders.length;
+      a.appSets(a.frameGeometry);
+      ws.activate(a);
+      expect(borders.length).toBe(n);
+    });
+
+    it("com a borda desligada na configuração, nunca aparece", () => {
+      const h = fakeHost(ws);
+      ctl.stop();
+      const off = new Controller(h.host, { ...DEFAULT_CONFIG, border: { ...DEFAULT_CONFIG.border, enabled: false } });
+      off.start();
+      ws.open(win("a"));
+      expect(h.borders.filter((b) => b.rect !== null)).toEqual([]);
     });
   });
 });

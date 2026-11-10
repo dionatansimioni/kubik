@@ -40,13 +40,14 @@ O padrão é 250 ms com `OutCubic`. Para algo mais próximo do Hyprland, experim
   - Funciona também entre telas. Soltar num gap devolve a janela ao lugar.
   - Puxar a borda entre duas janelas redimensiona as duas ao vivo, e a proporção fica gravada na árvore.
 - **Tamanhos mínimos:** as divisões cedem para cada app caber no mínimo dele (conteúdo + barra de título). Se a janela nova não couber em nenhuma divisão possível couber, ela fica flutuante, com o motivo no log.
+- **Borda de destaque:** um contorno de 3 px, na cor de destaque do sistema, envolve a janela em foco, seja ela do tiling ou uma janela flutuante comum. Quando o layout muda, a borda desliza junto com a janela; ao trocar o foco ou arrastar com o mouse, ela acompanha sem atraso. Não aparece em diálogos, em tela cheia nem em janelas maximizadas.
 - **Animações** (efeito *Kubik: animações*, instalado junto): as janelas deslizam e redimensionam suavemente quando o layout muda. Ficam de fora o arrasto com o mouse, a tela cheia e o maximizar, que têm animação própria do KWin. A velocidade global de animação do Plasma também vale.
 - **Apps que mudam a própria geometria** (Chrome e apps Electron como o Podman Desktop, em X11, ao restaurar o tamanho da sessão anterior) voltam ao tile. Se o app insistir, ele fica flutuante e as outras janelas se reorganizam.
 - **Meta+Y** liga e desliga o tiling. Ao religar, a árvore é reconstruída equilibrada. Ao desligar, as janelas voltam à posição e ao tamanho de antes.
 
 ## Ainda não
 
-Navegação e movimento por teclado, stacking, borda ativa, ícone na bandeja, configurações. Ver `docs/DESIGN.md`.
+Abas (stacking), ícone na bandeja com as configurações, navegação e movimento por teclado. Ver `docs/DESIGN.md`.
 
 ## Desenvolvimento
 
