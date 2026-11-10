@@ -10,10 +10,10 @@ let ctl: Controller;
 let logs: string[];
 let previews: Array<import("../src/core/rect").Rect | null>;
 let ghosts: Array<import("../src/core/rect").Rect | null>;
-let borders: Array<{ rect: import("../src/core/rect").Rect | null; animate: boolean }>;
+let borders: Array<import("../src/core/rect").Rect | null>;
 let tabs: Array<import("../src/kwin/api").TabBar[]>;
 let stackHints: boolean[];
-let tick: () => void;
+let tick: (upTo?: number) => void;
 
 function win(caption: string, output = SCREEN_A, desktop = DESK_1): FakeWindow {
   return new FakeWindow(caption, output, desktop);
@@ -621,45 +621,72 @@ describe("Controller", () => {
 
     it("aparece em volta da janela focada", () => {
       ws.open(win("a"));
-      expect(last()).toEqual({ rect: around(rect(4, 4, 1272, 792)), animate: false });
+      expect(last()).toEqual(around(rect(4, 4, 1272, 792)));
     });
 
-    it("muda de janela junto com o foco, sem deslizar entre elas", () => {
+    it("muda de janela junto com o foco, na hora", () => {
       const a = ws.open(win("a"));
       ws.open(win("b"));
       ws.activate(a);
-      expect(last()).toEqual({ rect: around(rect(4, 4, 634, 792)), animate: false });
+      expect(last()).toEqual(around(rect(4, 4, 634, 792)));
     });
 
-    it("quando o layout muda, acompanha a janela deslizando (como a animação)", () => {
+    it("quando o layout muda, some e só volta com a janela já no lugar (não persegue a animação)", () => {
       const a = ws.open(win("a"));
       const b = ws.open(win("b"));
       ws.activate(a);
       ws.close(b);
-      expect(last()).toEqual({ rect: around(rect(4, 4, 1272, 792)), animate: true });
+      expect(last()).toBeNull();
+      tick(300);
+      expect(last()).toEqual(around(rect(4, 4, 1272, 792)));
     });
 
-    it("durante o arrasto acompanha o mouse sem atraso", () => {
+    it("mudanças seguidas reiniciam a espera (redesenha uma vez, no fim)", () => {
+      const a = ws.open(win("a"));
+      a.appSets(rect(10, 10, 500, 500));
+      a.appSets(rect(4, 4, 1272, 792));
+      tick(300);
+      const shown = borders.filter((r) => r !== null);
+      expect(shown[shown.length - 1]).toEqual(around(rect(4, 4, 1272, 792)));
+      expect(shown).not.toContainEqual(around(rect(10, 10, 500, 500)));
+    });
+
+    it("some durante o arrasto com o mouse e volta depois de soltar, já no lugar", () => {
       ws.open(win("a"));
       const b = ws.open(win("b"));
       b.dragThrough("resize", [rect(600, 4, 676, 792)]);
-      expect(borders).toContainEqual({ rect: around(rect(600, 4, 676, 792)), animate: false });
+      expect(borders).not.toContainEqual(around(rect(600, 4, 676, 792)));
+      expect(last()).toBeNull();
+      tick(300);
+      expect(last()).toEqual(around(b.frameGeometry));
+    });
+
+    it("arrastar uma janela flutuante também esconde a borda até soltar", () => {
+      const f = new FakeWindow("fixa", SCREEN_A, DESK_1, rect(100, 100, 300, 200));
+      f.resizeable = false;
+      ws.open(f);
+      f.dragThrough("move", [rect(150, 150, 300, 200), rect(200, 200, 300, 200)], ws, { x: 300, y: 300 });
+      expect(borders).not.toContainEqual(around(rect(150, 150, 300, 200)));
+      tick(300);
+      expect(last()).toEqual(around(rect(200, 200, 300, 200)));
     });
 
     it("some sem foco, minimizada, em tela cheia ou maximizada", () => {
       const a = ws.open(win("a"));
       ws.activate(null);
-      expect(last().rect).toBeNull();
+      expect(last()).toBeNull();
       ws.activate(a);
+      expect(last()).toEqual(around(rect(4, 4, 1272, 792)));
       a.fullScreen = true;
-      expect(last().rect).toBeNull();
+      expect(last()).toBeNull();
       a.fullScreen = false;
-      expect(last().rect).toEqual(around(rect(4, 4, 1272, 792)));
+      tick(300);
+      expect(last()).toEqual(around(rect(4, 4, 1272, 792)));
       a.setMaximize(true, true);
-      expect(last().rect).toBeNull();
+      expect(last()).toBeNull();
       a.setMaximize(false, false);
       a.minimized = true;
-      expect(last().rect).toBeNull();
+      expect(last()).toBeNull();
     });
 
     it("não aparece em diálogos, janelas internas e ocultas, mas sim em flutuantes normais", () => {
@@ -668,23 +695,24 @@ describe("Controller", () => {
       d.normalWindow = false;
       d.dialog = true;
       ws.open(d);
-      expect(last().rect).toBeNull();
+      expect(last()).toBeNull();
       const ghost = win("ponte");
       ghost.skipTaskbar = ghost.skipSwitcher = true;
       ws.open(ghost);
-      expect(last().rect).toBeNull();
+      expect(last()).toBeNull();
       const fixed = new FakeWindow("fixa", SCREEN_A, DESK_1, rect(100, 100, 300, 200));
       fixed.resizeable = false; // flutua, mas é uma janela de verdade
       ws.open(fixed);
-      expect(last().rect).toEqual(around(rect(100, 100, 300, 200)));
+      expect(last()).toEqual(around(rect(100, 100, 300, 200)));
     });
 
     it("desligar o tiling esconde; religar mostra de novo", () => {
       ws.open(win("a"));
       ctl.toggle();
-      expect(last().rect).toBeNull();
+      expect(last()).toBeNull();
       ctl.toggle();
-      expect(last().rect).toEqual(around(rect(4, 4, 1272, 792)));
+      tick(300);
+      expect(last()).toEqual(around(rect(4, 4, 1272, 792)));
     });
 
     it("não repete a mesma borda (sem escrita inútil no overlay)", () => {
@@ -701,7 +729,7 @@ describe("Controller", () => {
       const off = new Controller(h.host, { ...DEFAULT_CONFIG, border: { ...DEFAULT_CONFIG.border, enabled: false } });
       off.start();
       ws.open(win("a"));
-      expect(h.borders.filter((b) => b.rect !== null)).toEqual([]);
+      expect(h.borders.filter((r) => r !== null)).toEqual([]);
     });
   });
 
@@ -797,7 +825,8 @@ describe("Controller", () => {
 
     it("a borda envolve a pilha inteira (barra de abas + janela)", () => {
       stackOnB();
-      expect(borders[borders.length - 1].rect).toEqual(rect(639, 1, 640, 798));
+      tick(300);
+      expect(borders[borders.length - 1]).toEqual(rect(639, 1, 640, 798));
     });
 
     it("as abas de outro desktop não aparecem; voltam ao voltar", () => {

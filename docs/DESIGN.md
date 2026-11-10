@@ -45,7 +45,7 @@ Decisões fechadas em 2026-11-09.
    - Janelas da pilha ocupam a mesma geometria, com a ativa no topo.
    - Barra de abas em overlay QML para trocar entre elas.
    - Nada é minimizado.
-5. **Borda ativa** (feita na 0.5.0). Contorno com a cor de destaque do tema do KDE, em volta da janela em foco, tanto no tiling quanto flutuante, exceto diálogos, tela cheia e maximizadas. O controlador decide quando mostrar e se a borda desliza ou pula; o QML só desenha. A espessura (3 px) e o liga/desliga já estão na `Config`; a bandeja vai expô-los.
+5. **Borda ativa** (feita na 0.5.0). Contorno com a cor de destaque do tema do KDE, em volta da janela em foco, tanto no tiling quanto flutuante, exceto diálogos, tela cheia e maximizadas. O controlador decide quando mostrar; o QML só desenha. A borda some enquanto a janela se move e volta 300 ms depois da última mudança (pedido do usuário: animada, ela parecia arrastada pela janela). A espessura (3 px) e o liga/desliga já estão na `Config`; a bandeja vai expô-los.
 
 ## Bandeja (plasmoid)
 
@@ -103,7 +103,7 @@ Validadas no `testenv/`:
 18. **Janelas auxiliares invisíveis parecem normais.** A ponte de vídeo do XWayland (`xwaylandvideobridge`, presente no Fedora) é `normalWindow`, tem classe, opacidade 0 e `skipTaskbar` + `skipSwitcher`. Sem uma regra própria, ela ocupava metade da tela vazia (achado pelo `diagnose.sh` no Fedora do usuário).
 19. **Apps abrem maximizados e continuam com `maximizeMode = 3` dentro do tile.** O Chrome, o FileZilla e o Konsole restauram a sessão maximizados. O Breeze não desenha contorno em janela maximizada, e o "devolver ao tile" ignora maximizadas. Ao entrar no tile, o kubik chama `setMaximize(false, false)`.
 20. **Plugins mexem na janela durante o arrasto.** O `virtualdesktopsonlyonprimary` põe em todos os desktops a janela que entra na tela secundária (`desktops` fica vazio). Ao soltar, o kubik reavalia se a janela ainda pode entrar no tiling antes de procurar o destino.
-21. **A borda não consegue ler a configuração do efeito.** O efeito anima a janela com a curva dele (padrão: 250 ms, OutCubic); a borda é um overlay QML do script e anima com `Behavior`, usando a mesma curva fixa. No testenv, a borda fica de 8 a 12 px atrás da janela no começo da curva, cerca de um quadro. Quando a bandeja configurar as duas coisas, ela deve passar a mesma duração e curva para ambas.
+21. **Overlay que segue janela em movimento sempre fica para trás.** A borda é uma janela à parte, atualizada um quadro depois da janela. Primeiro tentamos animá-la com a mesma curva do efeito: ficava de 8 a 12 px atrás, e o usuário via a borda "seguindo" a janela. Solução: esconder enquanto a janela se move (arrasto ou mudança de layout) e redesenhar quando ela parar por 300 ms (a animação padrão de 250 ms mais uma folga).
 22. **Pilhas sem esconder janelas.** O KWin não tem como esconder uma janela por script sem minimizá-la, e minimizada ela sairia do tiling. As abas de uma pilha ficam todas na mesma geometria, e a à vista fica na frente: ativar (`workspace.activeWindow = w`) também traz para a frente. Quando a aba à vista sai, a nova vem com `workspace.raiseWindow`. Uma aba escondida ativada por fora (Alt+Tab) vira a aba à vista.
 
 ## Riscos

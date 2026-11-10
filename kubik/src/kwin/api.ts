@@ -111,12 +111,8 @@ export interface Host {
    * `stack`: o drop empilha (a prévia ganha uma faixa de abas no topo).
    */
   preview(rect: Rect | null, ghost?: Rect | null, stack?: boolean): void;
-  /**
-   * Borda de destaque (cor de destaque do sistema) em `rect`, ou nenhuma.
-   * `animate`: deslizar até lá (o layout mudou e o efeito anima a janela);
-   * false: pular direto (foco mudou, arrasto com o mouse).
-   */
-  border(rect: Rect | null, animate: boolean): void;
+  /** Borda de destaque (cor de destaque do sistema) em `rect`, ou nenhuma. */
+  border(rect: Rect | null): void;
   /** As barras de abas à vista agora (lista vazia: nenhuma). */
   tabs(bars: TabBar[]): void;
 }

@@ -73,42 +73,9 @@ Item {
         Window {
             id: borderWindow
 
-            // true: desliza até a geometria nova (mesma curva padrão do efeito
-            // kubikanimations); false: pula direto (foco mudou, arrasto).
-            property bool animated: false
-
             flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint
             color: "transparent"
             visible: false
-
-            Behavior on x {
-                enabled: borderWindow.animated
-                NumberAnimation {
-                    duration: 250
-                    easing.type: Easing.OutCubic
-                }
-            }
-            Behavior on y {
-                enabled: borderWindow.animated
-                NumberAnimation {
-                    duration: 250
-                    easing.type: Easing.OutCubic
-                }
-            }
-            Behavior on width {
-                enabled: borderWindow.animated
-                NumberAnimation {
-                    duration: 250
-                    easing.type: Easing.OutCubic
-                }
-            }
-            Behavior on height {
-                enabled: borderWindow.animated
-                NumberAnimation {
-                    duration: 250
-                    easing.type: Easing.OutCubic
-                }
-            }
 
             Rectangle {
                 anchors.fill: parent
@@ -200,19 +167,9 @@ Item {
         }
     }
 
-    function showBorder(r, animate) {
-        if (!borderWin)
-            return;
-        if (!r) {
-            borderWin.visible = false;
-            return;
-        }
-        borderWin.animated = animate && borderWin.visible;
-        borderWin.x = r.x;
-        borderWin.y = r.y;
-        borderWin.width = Math.max(1, r.width);
-        borderWin.height = Math.max(1, r.height);
-        borderWin.visible = true;
+    // O controlador só mostra a borda com a janela parada (nunca a persegue).
+    function showBorder(r) {
+        place(borderWin, r);
     }
 
     Component {

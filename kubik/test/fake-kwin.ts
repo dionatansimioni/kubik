@@ -214,7 +214,7 @@ export function fakeHost(ws: FakeWorkspace) {
   const previews: Array<Rect | null> = [];
   const ghosts: Array<Rect | null> = [];
   const stackHints: boolean[] = [];
-  const borders: Array<{ rect: Rect | null; animate: boolean }> = [];
+  const borders: Array<Rect | null> = [];
   const tabs: TabBar[][] = [];
   const timers: Array<{ ms: number; fn: () => void }> = [];
   const areas: Record<string, Rect> = {
@@ -231,7 +231,7 @@ export function fakeHost(ws: FakeWorkspace) {
       stackHints.push(stack);
     },
     later: (ms, fn) => timers.push({ ms, fn }),
-    border: (rect, animate) => borders.push({ rect, animate }),
+    border: (rect) => borders.push(rect),
     tabs: (bars) => tabs.push(bars),
   };
   /** Dispara os timers de até `upTo` ms (como se esse tempo tivesse passado). */

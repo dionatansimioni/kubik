@@ -56,6 +56,12 @@ export const DEFAULT_CONFIG: Config = {
   tabs: { height: 28 },
 };
 
+/**
+ * Quanto tempo sem mudanças até a janela "assentar" e a borda ser redesenhada:
+ * a animação padrão do efeito (250 ms) e uma folga.
+ */
+const BORDER_SETTLE_MS = 300;
+
 /** Faixa do topo do alvo que empilha, quando a janela não tem barra de título própria (CSD). */
 const DEFAULT_TITLE_BAND = 32;
 
@@ -124,6 +130,8 @@ export class Controller {
   /** Última borda enviada ao QML (para não repetir) e de qual janela. */
   private borderRect: Rect | null = null;
   private borderOwner: string | null = null;
+  /** Geração do timer de "assentou" (só o último vale). */
+  private borderGen = 0;
   /** Últimas barras de abas enviadas ao QML (JSON, para não repetir). */
   private lastTabs = "[]";
 
@@ -167,7 +175,7 @@ export class Controller {
   }
 
   stop(): void {
-    this.showBorder(null, false, null);
+    this.showBorder(null, null);
     if (this.lastTabs !== "[]") this.host.tabs([]);
     this.lastTabs = "[]";
     for (const off of this.unsubscribe.splice(0)) off();
@@ -261,36 +269,61 @@ export class Controller {
 
   // ---- borda de destaque ----------------------------------------------------
 
-  /** Recalcula a borda da janela em foco (chamado a cada mudança relevante). */
-  private updateBorder(): void {
+  /**
+   * Recalcula a borda da janela em foco (chamado a cada mudança relevante).
+   *
+   * A borda NUNCA persegue a janela em movimento: como overlay, ela anda um
+   * quadro atrás e parece arrastada pela janela (reclamação do usuário).
+   * Enquanto a janela se move (arrasto, ou o efeito animando uma mudança de
+   * layout), ela some; volta quando a janela assenta (BORDER_SETTLE_MS sem
+   * mudanças). Trocar o foco é instantâneo.
+   * `settled`: chamado pelo timer, a janela já está no lugar.
+   */
+  private updateBorder(settled = false): void {
     const w = this.host.workspace.activeWindow;
     const t = w ? this.tracked.get(idOf(w)) : undefined;
-    if (!w || !t || !this.enabled || !this.config.border.enabled || !this.borderable(w)) {
-      this.showBorder(null, false, null);
+    if (!w || !t) {
+      this.showBorder(null, null);
+      return;
+    }
+    const id = idOf(w);
+    if (!this.enabled || !this.config.border.enabled || !this.borderable(w)) {
+      this.showBorder(null, id); // a mesma janela, ao voltar, espera assentar
       return;
     }
     let g = w.frameGeometry;
     // Numa pilha, a borda envolve o tile inteiro (barra de abas + janela).
-    if (t.key !== null && !w.move && !w.resize) {
+    if (t.key !== null) {
       const tree = this.trees.get(t.key)!;
-      if (tree.stackOf(idOf(w)).length > 1)
-        g = tree.tileRect(idOf(w), this.area(t.key), this.config.gaps, this.minsOf(tree)) ?? g;
+      if (tree.stackOf(id).length > 1)
+        g = tree.tileRect(id, this.area(t.key), this.config.gaps, this.minsOf(tree)) ?? g;
     }
     const bw = this.config.border.width;
     const r = { x: g.x - bw, y: g.y - bw, width: g.width + 2 * bw, height: g.height + 2 * bw };
-    const id = idOf(w);
-    // Desliza só quando a MESMA janela muda de lugar sem o usuário arrastar
-    // (o efeito de animação está deslizando a janela junto).
-    const animate = this.borderOwner === id && this.borderRect !== null && !w.move && !w.resize && this.drag?.id !== id;
-    this.showBorder(r, animate, id);
+    const moving = w.move || w.resize || this.drag?.id === id;
+    const changed = this.borderRect === null || !sameRect(r, this.borderRect);
+    if (moving || (this.borderOwner === id && changed && !settled)) {
+      this.showBorder(null, id);
+      if (!moving) this.settleBorder();
+      return;
+    }
+    this.showBorder(r, id);
   }
 
-  private showBorder(r: Rect | null, animate: boolean, owner: string | null): void {
+  /** Redesenha a borda quando a janela parar de mudar (reinicia a cada mudança). */
+  private settleBorder(): void {
+    const gen = ++this.borderGen;
+    this.host.later(BORDER_SETTLE_MS, () => {
+      if (gen === this.borderGen) this.updateBorder(true);
+    });
+  }
+
+  private showBorder(r: Rect | null, owner: string | null): void {
     const same = r === null ? this.borderRect === null : this.borderRect !== null && sameRect(r, this.borderRect);
     this.borderOwner = owner;
     if (same) return;
     this.borderRect = r ? copy(r) : null;
-    this.host.border(r, r !== null && animate);
+    this.host.border(r);
   }
 
   /** Janelas "de verdade" à vista: diálogos, overlays e janelas ocultas não. */
@@ -361,9 +394,17 @@ export class Controller {
       if (t && this.drag?.id !== id) this.refresh(t);
     };
     const onGeometry = () => this.geometryChanged(id);
-    const onStarted = () => this.dragStarted(id);
+    // A borda some no começo do arrasto (também de flutuantes) e volta,
+    // assentada, depois de soltar.
+    const onStarted = () => {
+      this.dragStarted(id);
+      this.updateBorder();
+    };
     const onStepped = (r: Rect) => this.dragStepped(id, r);
-    const onFinished = () => this.dragFinished(id);
+    const onFinished = () => {
+      this.dragFinished(id);
+      this.settleBorder();
+    };
     const signals = [w.minimizedChanged, w.fullScreenChanged, w.desktopsChanged, w.outputChanged];
     for (const s of signals) s.connect(onChange);
     const onBorder = () => this.updateBorder();

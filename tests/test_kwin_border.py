@@ -1,7 +1,7 @@
 """Integração: a borda de destaque em volta da janela em foco (KWin 6 real).
 
-Confere pelos pixels: a borda acompanha o foco e o layout e some sem janela
-em foco. Layout: Alpha (4,4 634×792) | Beta (642,4 634×792); a borda fica
+Confere pelos pixels: a borda acompanha o foco e o layout, some enquanto a
+janela anima (é redesenhada com ela parada) e some sem janela em foco. Layout: Alpha (4,4 634×792) | Beta (642,4 634×792); a borda fica
 3 px para fora da moldura, dentro dos gaps de 4 px.
 """
 import os
@@ -56,18 +56,13 @@ class BorderInKWinTest(unittest.TestCase):
         self.assertAccent("alpha_alone", (1278, 400))
         self.assertNoAccent("alpha_alone", (639, 400))  # nada de borda no lugar antigo
 
-    def test_border_slides_with_the_animated_window(self):
-        # Onde quer que a animação esteja no print, a borda está colada na
-        # borda direita da janela (não pulou para o destino final).
+    def test_no_border_while_the_window_is_animating(self):
+        # A borda não persegue a janela (pedido do usuário): no meio da
+        # animação ela não aparece em lugar nenhum; volta com a janela parada.
         img = Ppm(self.out / "growing.ppm")
-        row = [img.getpixel((x, 400)) for x in range(1280)]
-        red = [x for x, p in enumerate(row) if p[0] > 120 and p[1] < 70 and p[2] < 70]
-        accent = [x for x in range(645, 1280) if is_accent(row[x])]
-        self.assertTrue(accent, "sem borda no meio da animação")
-        # Tolerância: as duas animações começam com ~1 quadro de diferença
-        # (8–12 px no início da curva); pular direto seria ~100 px.
-        self.assertLessEqual(abs(min(accent) - (max(red) + 1)), 20,
-                             f"borda em {min(accent)}, janela termina em {max(red)}")
+        accent = [(x, y) for x in range(0, 1280, 4) for y in (2, 400, 798) if is_accent(img.getpixel((x, y)))]
+        self.assertEqual(accent, [], "borda desenhada durante a animação")
+        self.assertAccent("alpha_alone", (1278, 400))
 
     def test_no_border_without_focused_window(self):
         img = Ppm(self.out / "none.ppm")
