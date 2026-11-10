@@ -21,6 +21,8 @@ Item {
     // declarado dentro deste Item nunca apareceria: Qt 6.7+) e destruídos no
     // onDestruction (senão sobrevivem ao descarregamento do script).
     property var previewWin: null
+    // Na troca: para onde vai a OUTRA janela (mais clara que a prévia principal).
+    property var ghostWin: null
 
     SystemPalette {
         id: pal
@@ -31,16 +33,20 @@ Item {
         id: previewComponent
 
         Window {
+            id: previewWindow
+
             flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint
             color: "transparent"
             visible: false
 
+            property bool ghost: false
+
             Rectangle {
                 anchors.fill: parent
                 radius: 8
-                color: Qt.alpha(pal.highlight, 0.25)
+                color: Qt.alpha(pal.highlight, previewWindow.ghost ? 0.10 : 0.25)
                 border.width: 2
-                border.color: pal.highlight
+                border.color: Qt.alpha(pal.highlight, previewWindow.ghost ? 0.5 : 1)
             }
         }
     }
@@ -65,18 +71,23 @@ Item {
         t.start();
     }
 
-    function showPreview(r) {
-        if (!previewWin)
+    function place(win, r) {
+        if (!win)
             return;
         if (!r) {
-            previewWin.visible = false;
+            win.visible = false;
             return;
         }
-        previewWin.x = r.x;
-        previewWin.y = r.y;
-        previewWin.width = Math.max(1, r.width);
-        previewWin.height = Math.max(1, r.height);
-        previewWin.visible = true;
+        win.x = r.x;
+        win.y = r.y;
+        win.width = Math.max(1, r.width);
+        win.height = Math.max(1, r.height);
+        win.visible = true;
+    }
+
+    function showPreview(r, ghost) {
+        place(ghostWin, r ? ghost : null);
+        place(previewWin, r);
     }
 
     function log(msg) {
@@ -112,6 +123,9 @@ Item {
 
     Component.onCompleted: {
         previewWin = previewComponent.createObject(null);
+        ghostWin = previewComponent.createObject(null, {
+            ghost: true
+        });
         const core = loadCore();
         const maximizeArea = KWin.Workspace.MaximizeArea !== undefined ? KWin.Workspace.MaximizeArea : 2;
         controller = core.start({
@@ -128,6 +142,8 @@ Item {
             controller.stop();
         if (previewWin)
             previewWin.destroy();
+        if (ghostWin)
+            ghostWin.destroy();
         log("descarregado");
     }
 }

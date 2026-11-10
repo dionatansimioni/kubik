@@ -193,4 +193,42 @@ describe("Tree: tamanhos mínimos", () => {
     expect(t.violations(AREA, GAPS, mins).sort()).toEqual(["a", "b"]);
     expect(t.violations(AREA, GAPS, new Map([["a", { width: 500, height: 500 }]]))).toEqual([]);
   });
+
+  describe("reorganizar (arrastar com o mouse)", () => {
+    it("insertBeside: a janela entra ao lado pedido do alvo, dividindo-o ao meio", () => {
+      const t = tree("a");
+      t.insertBeside("b", "a", "left", AREA, GAPS);
+      expect(t.layout(AREA, GAPS).get("b")).toEqual(rect(4, 4, 634, 792));
+      t.insertBeside("c", "a", "down", AREA, GAPS);
+      const l = t.layout(AREA, GAPS);
+      expect(l.get("a")).toEqual(rect(642, 4, 634, 394));
+      expect(l.get("c")).toEqual(rect(642, 402, 634, 394));
+    });
+
+    it("o exemplo do usuário: 3 sobre a metade de baixo de 1 inverte o layout", () => {
+      const t = tree("1", "2", "3"); // 1 | (2 / 3)
+      t.remove("3");
+      t.insertBeside("3", "1", "down", AREA, GAPS);
+      const l = t.layout(AREA, GAPS);
+      expect(l.get("1")).toEqual(rect(4, 4, 634, 394));
+      expect(l.get("3")).toEqual(rect(4, 402, 634, 394));
+      expect(l.get("2")).toEqual(rect(642, 4, 634, 792));
+    });
+
+    it("replaceId troca a janela de uma folha sem mudar a forma", () => {
+      const t = tree("a", "b");
+      t.replaceId("a", "z");
+      expect(t.has("a")).toBe(false);
+      expect(t.layout(AREA, GAPS).get("z")).toEqual(rect(4, 4, 634, 792));
+    });
+
+    it("clone é independente do original", () => {
+      const t = tree("a", "b");
+      const c = t.clone();
+      c.remove("b");
+      expect(t.ids()).toEqual(["a", "b"]);
+      expect(c.ids()).toEqual(["a"]);
+      expect(t.clone().shape()).toEqual(t.shape());
+    });
+  });
 });

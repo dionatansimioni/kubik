@@ -1,12 +1,24 @@
 # Funções para cenários do testenv (source /work/testenv/lib.sh).
 # Rodam DENTRO do container, como sessão do KWin.
 
-# Abre uma janela de teste e espera ela mapear: open_window <título> [LxA] [cor]
+# Abre uma janela de teste e espera ela mapear: open_window <título> [LxA] [cor] [extras…]
 QML_BIN=$(command -v /usr/lib/qt6/bin/qml /usr/lib64/qt6/bin/qml | head -n1)
 open_window() {
-    "$QML_BIN" /work/testenv/clients/window.qml -- "$1" "${2:-400x300}" ${3:+"$3"} >/dev/null 2>&1 &
+    "$QML_BIN" /work/testenv/clients/window.qml -- "$@" >/dev/null 2>&1 &
     echo $! > "/tmp/window-$1.pid"
-    sleep 1
+    wait_window "$1"
+}
+
+# Espera o KWin conhecer a janela <título> (até ~10 s) e o layout assentar.
+# Um sleep fixo falhava com a máquina carregada (a suíte inteira rodando).
+wait_window() {
+    local i
+    sleep 0.4
+    for i in $(seq 20); do
+        kwin_eval "if (win('$1')) console.warn('SEEN-WINDOW-$i ' + win('$1').caption)"
+        grep -q "SEEN-WINDOW-$i $1\$" /out/kwin.log && break
+    done
+    sleep 0.5
 }
 
 # Fecha a janela de teste aberta com open_window <título>.

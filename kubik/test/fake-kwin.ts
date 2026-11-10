@@ -192,6 +192,7 @@ export class FakeWorkspace implements Workspace {
 export function fakeHost(ws: FakeWorkspace) {
   const logs: string[] = [];
   const previews: Array<Rect | null> = [];
+  const ghosts: Array<Rect | null> = [];
   const timers: Array<{ ms: number; fn: () => void }> = [];
   const areas: Record<string, Rect> = {
     "DP-1": { x: 0, y: 0, width: 1280, height: 800 },
@@ -201,7 +202,10 @@ export function fakeHost(ws: FakeWorkspace) {
     workspace: ws,
     clientArea: (o) => areas[o.name],
     log: (m) => logs.push(m),
-    preview: (r) => previews.push(r),
+    preview: (r, ghost = null) => {
+      previews.push(r);
+      ghosts.push(ghost);
+    },
     later: (ms, fn) => timers.push({ ms, fn }),
   };
   /** Dispara os timers de até `upTo` ms (como se esse tempo tivesse passado). */
@@ -210,5 +214,5 @@ export function fakeHost(ws: FakeWorkspace) {
     timers.splice(0, timers.length, ...timers.filter((t) => t.ms > upTo));
     for (const t of due) t.fn();
   };
-  return { host, logs, previews, tick };
+  return { host, logs, previews, ghosts, tick };
 }

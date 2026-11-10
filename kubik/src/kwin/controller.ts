@@ -7,6 +7,7 @@ const MAX_FIGHTS = 3;
 /** Depois deste tempo sem brigas, uma "briga" é esquecida. */
 const FIGHT_MEMORY_MS = 5000;
 import { type Gaps, Tree } from "../core/tree";
+import { type Side, type Zone, dropZone } from "../core/zones";
 import type { Host, KWinWindow, Output, VirtualDesktop } from "./api";
 
 /** Janela sendo arrastada com o mouse. */
@@ -21,8 +22,15 @@ interface DropTarget {
   place: Place;
   /** Janela sob o cursor (null: árvore vazia naquela tela). */
   id: string | null;
+  /** O que acontece com a janela sob o cursor (ignorado se id for null). */
+  zone: Zone;
+  /** Onde a janela arrastada vai ficar. */
   rect: Rect;
+  /** Na troca: para onde vai a outra janela. */
+  ghost: Rect | null;
 }
+
+const SIDE_NAMES: Record<Side, string> = { left: "à esquerda de", right: "à direita de", up: "acima de", down: "para baixo de" };
 import { DEFAULT_FLOATING_CLASSES, floatReason } from "./rules";
 
 export interface Config {
@@ -375,12 +383,13 @@ export class Controller {
    * Se alguém ficar abaixo do mínimo mesmo redistribuindo, a janela mais
    * recente da árvore sai do tiling (flutuante) até caber.
    */
-  private insertInto(t: Tracked, place: Place, target: string | null): void {
+  private insertInto(t: Tracked, place: Place, target: string | null, side?: Side): void {
     const key = keyOf(place);
     const tree = this.treeFor(place);
     const id = idOf(t.window);
-    tree.insert(id, target, this.area(key), this.config.gaps);
-    if (target !== null && tree.violations(this.area(key), this.config.gaps, this.minsOf(tree)).length) {
+    if (side && target !== null) tree.insertBeside(id, target, side, this.area(key), this.config.gaps);
+    else tree.insert(id, target, this.area(key), this.config.gaps);
+    if (!side && target !== null && tree.violations(this.area(key), this.config.gaps, this.minsOf(tree)).length) {
       // Dividir o alvo (a focada) não deixa todo mundo no mínimo: tenta a maior.
       tree.remove(id);
       tree.insert(id, null, this.area(key), this.config.gaps);
@@ -482,7 +491,8 @@ export class Controller {
       this.trees.get(t.key)!.resizeTo(id, r, this.area(t.key), this.config.gaps);
       this.retile(t.key, id); // a janela arrastada é do KWin até soltar
     } else {
-      this.host.preview(this.dropTarget(t)?.rect ?? null);
+      const drop = this.dropTarget(t);
+      this.host.preview(drop?.rect ?? null, drop?.ghost ?? null);
     }
   }
 
@@ -506,32 +516,70 @@ export class Controller {
     }
     this.host.preview(null);
     const drop = this.dropTarget(t);
+    const name = t.window.caption;
     if (!drop) {
       this.retile(t.key); // solto num gap ou sobre si mesma: volta ao lugar
-    } else if (drop.key === t.key && drop.id !== null) {
-      this.trees.get(t.key)!.swap(id, drop.id);
-      this.retile(t.key);
-      this.host.log(`trocou '${t.window.caption}' de lugar`);
+    } else if (drop.id === null) {
+      this.removeFromTree(t);
+      this.insertInto(t, drop.place, null);
+      this.host.log(`moveu '${name}' para ${drop.key}`);
+    } else if (drop.zone === "swap" || drop.zone === "stack") {
+      // "stack" (faixa do título) só existe quando houver abas; até lá, troca.
+      this.swapWith(t, drop.key, drop.id);
+      this.host.log(`trocou '${name}' de lugar`);
     } else {
       this.removeFromTree(t);
-      this.insertInto(t, drop.place, drop.id);
-      this.host.log(`moveu '${t.window.caption}' para ${drop.key}`);
+      this.insertInto(t, drop.place, drop.id, drop.zone);
+      const other = this.tracked.get(drop.id)?.window.caption ?? "?";
+      this.host.log(`moveu '${name}' ${SIDE_NAMES[drop.zone]} '${other}'`);
     }
+  }
+
+  /** Troca `t` com a janela `otherId` da árvore `key` (a mesma ou de outra tela). */
+  private swapWith(t: Tracked, key: string, otherId: string): void {
+    const id = idOf(t.window);
+    const other = this.tracked.get(otherId)!;
+    const from = t.key!;
+    if (from === key) {
+      this.trees.get(key)!.swap(id, otherId);
+    } else {
+      this.trees.get(from)!.replaceId(id, otherId);
+      this.trees.get(key)!.replaceId(otherId, id);
+      other.key = from;
+      t.key = key;
+      this.retile(from);
+    }
+    this.retile(key);
   }
 
   /** Destino de um drop com o cursor na posição atual, ou null (volta ao lugar). */
   private dropTarget(t: Tracked): DropTarget | null {
     const w = t.window;
+    const id = idOf(w);
     const place = this.placeOf(w);
     const key = keyOf(place);
     const area = this.host.clientArea(place.output, place.desktop);
+    const gaps = this.config.gaps;
     const tree = this.trees.get(key);
     const cursor = this.host.workspace.cursorPos;
-    if (!tree || tree.size === 0) return { key, place, id: null, rect: inset(area, this.config.gaps.outer) };
+    if (!tree || tree.size === 0)
+      return { key, place, id: null, zone: "swap", rect: inset(area, gaps.outer), ghost: null };
     const mins = this.minsOf(tree);
-    const id = tree.idAt(cursor, area, this.config.gaps, mins);
-    if (id === null || id === idOf(w)) return null;
-    return { key, place, id, rect: tree.layout(area, this.config.gaps, mins).get(id)! };
+    const layout = tree.layout(area, gaps, mins);
+    const target = tree.idAt(cursor, area, gaps, mins);
+    if (target === null || target === id) return null;
+    const zone = dropZone(layout.get(target)!, cursor);
+    if (zone === "swap" || zone === "stack") {
+      return { key, place, id: target, zone, rect: layout.get(target)!, ghost: t.target };
+    }
+    // Simula o drop numa cópia para mostrar a posição final exata.
+    const sim = tree.clone();
+    sim.remove(id);
+    sim.insertBeside(id, target, zone, area, gaps);
+    const simMins = new Map(mins);
+    const m = this.minsOf(this.trees.get(t.key!) ?? tree).get(id);
+    if (m) simMins.set(id, m);
+    return { key, place, id: target, zone, rect: sim.layout(area, gaps, simMins).get(id)!, ghost: null };
   }
 
   private removeFromTree(t: Tracked): void {

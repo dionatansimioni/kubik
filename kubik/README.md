@@ -33,7 +33,11 @@ O padrão é 250 ms com `OutCubic`. Para algo mais próximo do Hyprland, experim
 - Gaps de 4 px.
 - Ficam flutuantes, fora do tiling: janelas internas do KWin (bordas e prévias de scripts), janelas auxiliares ocultas (fora da barra de tarefas e do Alt+Tab, ou com opacidade 0, como a ponte de vídeo do XWayland), diálogos, transientes, splash, janelas de tamanho fixo ou não redimensionáveis, janelas em alguns desktops (2 ou mais, mas não todos), tela cheia, e algumas classes do Plasma (krunner, plasmashell, yakuake…).
 - **Mouse:**
-  - Arrastar uma janela pela barra de título mostra uma prévia translúcida do destino. Soltar sobre outra janela troca as duas de lugar; soltar em outra tela leva a janela para a árvore de lá; soltar num gap devolve a janela ao lugar.
+  - Arrastar uma janela pela barra de título mostra uma prévia translúcida de **onde ela vai ficar**. O que acontece depende de onde o cursor está sobre a janela-alvo:
+    - **centro** (o terço do meio): as duas trocam de lugar, e uma segunda prévia, mais clara, mostra para onde vai a outra;
+    - **perto de uma borda**: a janela-alvo é dividida e a arrastada entra daquele lado, o que reorganiza o layout. Exemplo: com 1 à esquerda e 2 e 3 à direita, soltar a 3 na metade de baixo da 1 deixa 1 e 3 à esquerda e a 2 com a direita inteira;
+    - **barra de título**: reservada para empilhar em abas (próxima versão). Por enquanto, troca.
+  - Funciona também entre telas. Soltar num gap devolve a janela ao lugar.
   - Puxar a borda entre duas janelas redimensiona as duas ao vivo, e a proporção fica gravada na árvore.
 - **Tamanhos mínimos:** as divisões cedem para cada app caber no mínimo dele (conteúdo + barra de título). Se a janela nova não couber em nenhuma divisão possível couber, ela fica flutuante, com o motivo no log.
 - **Animações** (efeito *Kubik: animações*, instalado junto): as janelas deslizam e redimensionam suavemente quando o layout muda. Ficam de fora o arrasto com o mouse, a tela cheia e o maximizar, que têm animação própria do KWin. A velocidade global de animação do Plasma também vale.

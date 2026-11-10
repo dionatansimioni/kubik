@@ -1,4 +1,5 @@
 import { type Rect, inset } from "./rect";
+import type { Side } from "./zones";
 
 /**
  * "horizontal": filhos lado a lado (divide a largura).
@@ -113,6 +114,57 @@ export class Tree {
     this.replace(victim, split);
     victim.parent = split;
     leaf.parent = split;
+  }
+
+  /**
+   * Insere `id` ao lado `side` da janela `target`, dividindo-a ao meio
+   * (arrastar e soltar perto da borda do alvo). Sem alvo válido, usa insert().
+   */
+  insertBeside(id: string, target: string, side: Side, area: Rect, gaps: Gaps): void {
+    const victim = this.leaves.get(target);
+    if (this.leaves.has(id)) return;
+    if (!victim) return this.insert(id, null, area, gaps);
+    const leaf: Leaf = { kind: "leaf", id, parent: null };
+    this.leaves.set(id, leaf);
+    const before = side === "left" || side === "up";
+    const split: Split = {
+      kind: "split",
+      orientation: side === "left" || side === "right" ? "horizontal" : "vertical",
+      ratio: 0.5,
+      first: before ? leaf : victim,
+      second: before ? victim : leaf,
+      parent: victim.parent,
+    };
+    this.replace(victim, split);
+    victim.parent = split;
+    leaf.parent = split;
+  }
+
+  /** A folha de `oldId` passa a ser de `newId` (troca entre árvores). */
+  replaceId(oldId: string, newId: string): void {
+    const leaf = this.leaves.get(oldId);
+    if (!leaf || this.leaves.has(newId)) return;
+    this.leaves.delete(oldId);
+    leaf.id = newId;
+    this.leaves.set(newId, leaf);
+  }
+
+  /** Cópia independente (para simular um drop e mostrar a prévia). */
+  clone(): Tree {
+    const t = new Tree();
+    const copy = (n: Node, parent: Split | null): Node => {
+      if (n.kind === "leaf") {
+        const l: Leaf = { kind: "leaf", id: n.id, parent };
+        t.leaves.set(n.id, l);
+        return l;
+      }
+      const s: Split = { kind: "split", orientation: n.orientation, ratio: n.ratio, first: null!, second: null!, parent };
+      s.first = copy(n.first, s);
+      s.second = copy(n.second, s);
+      return s;
+    };
+    t.root = this.root ? copy(this.root, null) : null;
+    return t;
   }
 
   /** Remove `id`; o irmão ocupa o espaço que era do pai. */

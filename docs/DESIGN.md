@@ -22,7 +22,10 @@ Decisões fechadas em 2026-11-09.
 - **Escopo:** uma árvore por tela × desktop virtual. Activities são ignoradas.
 - **Liga/desliga:** toggle global (Super+Y), com exceções por desktop/tela nas configurações. Ao desligar, as janelas voltam à geometria que tinham antes do tiling.
 - **Mouse:**
-  - Arrastar mostra uma prévia e, ao soltar, troca a janela de lugar ou insere no nó.
+  - Arrastar mostra uma prévia da posição final. As zonas sobre a janela-alvo, inspiradas no COSMIC e decididas pelo usuário em 2026-11-10:
+    - a faixa da barra de título empilha em abas;
+    - o terço central troca de lugar (com uma segunda prévia, mais clara, para a outra janela);
+    - fora do centro, a borda mais próxima (relativa ao tamanho) divide o alvo e a arrastada entra daquele lado.
   - Redimensionar pela borda ajusta a proporção da divisão.
 - **Tamanho mínimo:** a proporção da divisão é redistribuída para a janela caber. Se não couber na tela, ela vira flutuante com uma notificação discreta.
 - **Maximizar/tela cheia:** a janela mantém seu nó na árvore e volta ao tile ao sair. Super+M alterna o maximizado.

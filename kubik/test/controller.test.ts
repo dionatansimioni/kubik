@@ -9,6 +9,7 @@ let ws: FakeWorkspace;
 let ctl: Controller;
 let logs: string[];
 let previews: Array<import("../src/core/rect").Rect | null>;
+let ghosts: Array<import("../src/core/rect").Rect | null>;
 let tick: () => void;
 
 function win(caption: string, output = SCREEN_A, desktop = DESK_1): FakeWindow {
@@ -20,6 +21,7 @@ beforeEach(() => {
   const h = fakeHost(ws);
   logs = h.logs;
   previews = h.previews;
+  ghosts = h.ghosts;
   tick = h.tick;
   ctl = new Controller(h.host);
   ctl.start();
@@ -374,11 +376,60 @@ describe("Controller", () => {
       const a = ws.open(win("a"));
       const b = ws.open(win("b"));
       const c = ws.open(win("c", SCREEN_B));
-      a.dragThrough("move", [rect(1500, 100, 634, 792)], ws, { x: 1700, y: 300 }, SCREEN_B);
+      // perto da borda direita da c: entra à direita dela
+      a.dragThrough("move", [rect(1500, 100, 634, 792)], ws, { x: 2200, y: 500 }, SCREEN_B);
       expect(b.frameGeometry).toEqual(rect(4, 4, 1272, 792));
-      // tela B é quadrada (992×992 úteis): empate divide lado a lado
       expect(c.frameGeometry).toEqual(rect(1284, 4, 494, 992));
       expect(a.frameGeometry).toEqual(rect(1782, 4, 494, 992));
+    });
+
+    it("soltar perto da borda de outra janela reorganiza: o exemplo do usuário (3 sobre a metade de baixo de 1)", () => {
+      const j1 = ws.open(win("1"));
+      const j2 = ws.open(win("2"));
+      const j3 = ws.open(win("3")); // 1 | (2 / 3)
+      j3.dragThrough("move", [rect(200, 500, 634, 394)], ws, { x: 300, y: 700 });
+      expect(j1.frameGeometry).toEqual(rect(4, 4, 634, 394));
+      expect(j3.frameGeometry).toEqual(rect(4, 402, 634, 394));
+      expect(j2.frameGeometry).toEqual(rect(642, 4, 634, 792));
+      expect(logs).toContain("moveu '3' para baixo de '1'");
+    });
+
+    it("a prévia mostra onde a janela vai ficar ao soltar (dividir)", () => {
+      ws.open(win("1"));
+      ws.open(win("2"));
+      const j3 = ws.open(win("3"));
+      j3.dragThrough("move", [rect(200, 500, 634, 394)], ws, { x: 300, y: 700 });
+      expect(previews).toEqual([rect(4, 402, 634, 394), null]);
+      expect(ghosts).toEqual([null, null]);
+    });
+
+    it("a prévia da troca mostra o destino e, mais clara, para onde vai a outra", () => {
+      const a = ws.open(win("a"));
+      ws.open(win("b"));
+      a.dragThrough("move", [rect(700, 60, 634, 792)], ws, { x: 900, y: 300 });
+      expect(previews).toEqual([rect(642, 4, 634, 792), null]);
+      expect(ghosts).toEqual([rect(4, 4, 634, 792), null]);
+    });
+
+    it("soltar perto da borda de uma janela de outra tela divide ela daquele lado", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      const c = ws.open(win("c", SCREEN_B));
+      a.dragThrough("move", [rect(1500, 100, 634, 792)], ws, { x: 1700, y: 950 }, SCREEN_B);
+      expect(b.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(c.frameGeometry).toEqual(rect(1284, 4, 992, 494));
+      expect(a.frameGeometry).toEqual(rect(1284, 502, 992, 494));
+    });
+
+    it("trocar com uma janela de outra tela: cada uma fica no lugar da outra", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      const c = ws.open(win("c", SCREEN_B));
+      a.dragThrough("move", [rect(1500, 100, 634, 792)], ws, { x: 1780, y: 500 }, SCREEN_B);
+      expect(a.frameGeometry).toEqual(rect(1284, 4, 992, 992));
+      expect(c.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      expect(b.frameGeometry).toEqual(rect(642, 4, 634, 792));
+      expect(ctl.snapshot()["HDMI-1|desk-1"]).toBe(a.internalId);
     });
 
     it("arrastar uma janela flutuante não mexe no tiling", () => {

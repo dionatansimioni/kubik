@@ -94,6 +94,9 @@ export interface Host {
   log(message: string): void;
   /** Agenda `fn` para daqui a `ms` milissegundos. */
   later(ms: number, fn: () => void): void;
-  /** Mostra (ou esconde, com null) a prévia de onde a janela arrastada vai entrar. */
-  preview(rect: Rect | null): void;
+  /**
+   * Mostra (ou esconde, com null) a prévia de onde a janela arrastada vai
+   * ficar. `ghost`: na troca, para onde vai a OUTRA janela (prévia mais clara).
+   */
+  preview(rect: Rect | null, ghost?: Rect | null): void;
 }
