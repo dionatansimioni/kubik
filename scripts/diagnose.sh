@@ -29,8 +29,9 @@ section() { printf '\n===== %s =====\n' "$1"; }
 
     section "pacotes do kubik"
     for t in KWin/Script KWin/Effect; do
-        kpackagetool6 --type="$t" --list 2>/dev/null | grep -i kubik | while read -r id; do
-            dir=$(kpackagetool6 --type="$t" --show "$id" 2>/dev/null | sed -n 's/^ *Path *: *//p')
+        LC_ALL=C kpackagetool6 --type="$t" --list 2>/dev/null | grep -i kubik | while read -r id; do
+            # LC_ALL=C: em pt-BR o kpackagetool6 traduz os rótulos ("Path").
+            dir=$(LC_ALL=C kpackagetool6 --type="$t" --show "$id" 2>/dev/null | sed -n 's/^ *Path *: *//p')
             ver=$(sed -n 's/.*"Version": *"\([^"]*\)".*/\1/p' "${dir%/}/metadata.json" 2>/dev/null | head -n1)
             en=$(kreadconfig6 --file kwinrc --group Plugins --key "${id}Enabled")
             echo "$t $id versão=${ver:-?} ativado=${en:-padrão}"
@@ -84,7 +85,8 @@ sleep 1
     section "janelas no KWin"
     journalctl --user -b --no-pager -o cat | grep -F "$STAMP" | sed "s/.*$STAMP //"
     section "log do kubik desde o login (últimas 400 linhas)"
-    journalctl --user -b --no-pager -o short-monotonic | grep -E '\[kubik' | grep -v -F '[estado]' | tail -n 400
+    # --since o boot (não -b): no Fedora do usuário o -b devolvia vazio.
+    journalctl --user --since "$(uptime -s)" --no-pager -o short-monotonic | grep -E '\[kubik' | grep -v -F '[estado]' | tail -n 400
 } >> "$OUT" 2>&1
 
 echo "Relatório salvo em: $OUT"

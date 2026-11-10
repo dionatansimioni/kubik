@@ -13,6 +13,8 @@ export const DEFAULT_FLOATING_CLASSES = [
   "ksmserver-logout-greeter",
   "org.kde.polkit-kde-authentication-agent-1",
   "org.kde.spectacle",
+  "xwaylandvideobridge",
+  "org.kde.xwaylandvideobridge",
 ];
 
 /**
@@ -24,6 +26,10 @@ export function floatReason(w: KWinWindow, floatingClasses: readonly string[]): 
   // Overlays do próprio KWin/scripts (bordas, prévias): sem classe e fora do
   // Alt+Tab. Sem esta regra, a borda do protótipo entrava no tiling.
   if (!w.resourceClass && w.skipSwitcher) return "janela interna do KWin";
+  // Auxiliares que o app esconde do usuário (ex.: a ponte de vídeo do
+  // XWayland, transparente): sem esta regra, ocupavam um tile vazio.
+  if (w.skipTaskbar && w.skipSwitcher) return "janela oculta (fora da barra de tarefas e do Alt+Tab)";
+  if (w.opacity === 0) return "invisível (opacidade 0)";
   if (w.dialog) return "diálogo";
   if (w.splash) return "splash";
   if (w.utility) return "utilitário";

@@ -41,6 +41,10 @@ export interface KWinWindow {
   readonly onAllDesktops: boolean;
   /** Fora do Alt+Tab. Junto com resourceClass vazio, indica janela interna do KWin. */
   readonly skipSwitcher: boolean;
+  /** Fora da barra de tarefas. Junto com skipSwitcher: janela auxiliar oculta. */
+  readonly skipTaskbar: boolean;
+  /** 0 = invisível (ex.: xwaylandvideobridge). */
+  readonly opacity: number;
   /** true enquanto o usuário move / redimensiona a janela com o mouse. */
   readonly move: boolean;
   readonly resize: boolean;
@@ -60,6 +64,7 @@ export interface KWinWindow {
   readonly outputChanged: Signal;
   /** 0 = não maximizada (KWin: MaximizeRestore). */
   readonly maximizeMode: number;
+  setMaximize(vertically: boolean, horizontally: boolean): void;
   /** Qualquer mudança de geometria: nossas, do usuário ou do próprio app. */
   readonly frameGeometryChanged: Signal;
   readonly interactiveMoveResizeStarted: Signal;

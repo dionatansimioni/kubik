@@ -281,9 +281,7 @@ export class Controller {
     }
     if (t.saved === null) t.saved = copy(w.frameGeometry);
     const id = idOf(w);
-    const tree = this.treeFor(place);
-    const target = this.balanced ? null : (this.focusHistory.find((f) => f !== id && tree.has(f)) ?? null);
-    this.insertInto(t, place, target);
+    this.insertInto(t, place, this.splitTarget(place, id));
     if (t.key !== null) this.host.log(`tiling '${w.caption}' em ${key}`);
   }
 
@@ -293,6 +291,25 @@ export class Controller {
     if (t.noFit) return "não cabe";
     if (t.rebel) return "o app não aceita o tile";
     return floatReason(t.window, this.config.floatingClasses);
+  }
+
+  /**
+   * Qual janela a nova divide: sempre uma das MAIORES (1 cheia, 2 lado a lado,
+   * 3 = metade + 2 quadrantes, 4 = quadrantes…). No empate, a focada mais
+   * recentemente; sem foco entre elas, a primeira na ordem da árvore.
+   */
+  private splitTarget(place: Place, id: string): string | null {
+    const key = keyOf(place);
+    const tree = this.treeFor(place);
+    const sizes = [...tree.layout(this.area(key), this.config.gaps, this.minsOf(tree))]
+      .filter(([leaf]) => leaf !== id)
+      .map(([leaf, r]) => [leaf, r.width * r.height] as const);
+    if (sizes.length === 0) return null;
+    const biggest = Math.max(...sizes.map(([, a]) => a));
+    // Tolerância: metades de um tamanho ímpar diferem em 1 px.
+    const largest = sizes.filter(([, a]) => a >= biggest * 0.98).map(([leaf]) => leaf);
+    if (this.balanced) return largest[0];
+    return this.focusHistory.find((f) => largest.includes(f)) ?? largest[0];
   }
 
   private treeFor(place: Place): Tree {
@@ -323,6 +340,9 @@ export class Controller {
     }
     t.key = key;
     t.seq = ++this.seq;
+    // Apps que abrem maximizados (Chrome restaurando a sessão) ficariam
+    // "maximizados" dentro do tile: sem contorno e sem a volta ao tile.
+    if (t.window.maximizeMode !== 0) t.window.setMaximize(false, false);
     for (;;) {
       const bad = tree.violations(this.area(key), this.config.gaps, this.minsOf(tree));
       if (bad.length === 0) break;
@@ -425,6 +445,14 @@ export class Controller {
     this.drag = null;
     const t = this.tracked.get(id)!;
     if (t.key === null) return;
+    // Durante o arrasto a janela pode ter deixado de ser "tileável" (ex.: o
+    // plugin virtualdesktopsonlyonprimary a pôs em todos os desktops ao
+    // entrar na tela secundária): reavalia em vez de soltá-la numa árvore.
+    if (this.floatReasonOf(t) !== null) {
+      this.host.preview(null);
+      this.refresh(t);
+      return;
+    }
     if (mode === "resize") {
       this.retile(t.key);
       return;

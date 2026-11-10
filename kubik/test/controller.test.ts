@@ -37,6 +37,49 @@ describe("Controller", () => {
     expect(c.frameGeometry).toEqual(rect(642, 402, 634, 394));
   });
 
+  it("divide sempre a maior: 1 cheia, 2 lado a lado, 3 metade + 2 quadrantes, 4 quadrantes", () => {
+    const a = ws.open(win("a"));
+    const b = ws.open(win("b"));
+    const c = ws.open(win("c"));
+    const d = ws.open(win("d")); // a (metade esquerda) é a maior: vira 2 quadrantes
+    expect(a.frameGeometry).toEqual(rect(4, 4, 634, 394));
+    expect(d.frameGeometry).toEqual(rect(4, 402, 634, 394));
+    expect(b.frameGeometry).toEqual(rect(642, 4, 634, 394));
+    expect(c.frameGeometry).toEqual(rect(642, 402, 634, 394));
+  });
+
+  it("entre as maiores (empate), divide a focada", () => {
+    const a = ws.open(win("a"));
+    ws.open(win("b"));
+    const c = ws.open(win("c"));
+    ws.open(win("d"));
+    ws.activate(c); // 4 quadrantes iguais: a 5ª divide a focada
+    const e = ws.open(win("e"));
+    expect(c.frameGeometry).toEqual(rect(642, 402, 315, 394));
+    expect(e.frameGeometry).toEqual(rect(961, 402, 315, 394));
+    expect(a.frameGeometry).toEqual(rect(4, 4, 634, 394));
+  });
+
+  it("a focada só é dividida se for uma das maiores", () => {
+    ws.open(win("a"));
+    const b = ws.open(win("b"));
+    const c = ws.open(win("c")); // b e c: quadrantes da direita
+    ws.activate(c);
+    const d = ws.open(win("d")); // a (metade) é maior que c (quadrante)
+    expect(d.frameGeometry).toEqual(rect(4, 402, 634, 394));
+    expect(b.frameGeometry).toEqual(rect(642, 4, 634, 394));
+  });
+
+  it("minimizada não ocupa espaço: a janela nova usa o lugar livre", () => {
+    const a = ws.open(win("a"));
+    const b = ws.open(win("b"));
+    b.minimized = true;
+    expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+    const c = ws.open(win("c"));
+    expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+    expect(c.frameGeometry).toEqual(rect(642, 4, 634, 792));
+  });
+
   it("a janela nova divide a que tinha foco antes dela (ativação chega antes do windowAdded)", () => {
     const a = ws.open(win("a"));
     const b = ws.open(win("b"));
@@ -126,6 +169,49 @@ describe("Controller", () => {
   });
 
   describe("janelas que flutuam", () => {
+    it("janela oculta (fora da barra e do Alt+Tab, ex.: xwaylandvideobridge) não ocupa tile", () => {
+      const a = ws.open(win("a"));
+      const ghost = win("Ponte de vídeo Xwayland");
+      ghost.resourceClass = "xwaylandvideobridge-qualquer";
+      ghost.skipTaskbar = ghost.skipSwitcher = true;
+      ws.open(ghost);
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(logs).toContain("flutuante 'Ponte de vídeo Xwayland': janela oculta (fora da barra de tarefas e do Alt+Tab)");
+    });
+
+    it("janela invisível (opacidade 0) não ocupa tile", () => {
+      const a = ws.open(win("a"));
+      const ghost = win("fantasma");
+      ghost.opacity = 0;
+      ws.open(ghost);
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(logs).toContain("flutuante 'fantasma': invisível (opacidade 0)");
+    });
+
+    it("janela que abre maximizada (app restaurando a sessão) é desmaximizada ao entrar no tile", () => {
+      ws.open(win("a"));
+      const chrome = win("chrome");
+      chrome.maximizeMode = 3;
+      ws.open(chrome);
+      expect(chrome.maximizeMode).toBe(0);
+      expect(chrome.frameGeometry).toEqual(rect(642, 4, 634, 792));
+    });
+
+    it("arrastada para uma tela onde fica em todos os desktops: sai do tiling e libera o espaço", () => {
+      // O plugin virtualdesktopsonlyonprimary põe em todos os desktops as janelas
+      // da tela secundária, durante o arrasto (achado no Fedora do usuário).
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      b.move = true;
+      b.interactiveMoveResizeStarted.emit();
+      b.output = SCREEN_B;
+      b.desktops = [];
+      b.move = false;
+      expect(() => b.interactiveMoveResizeFinished.emit()).not.toThrow();
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(ctl.snapshot()).toEqual({ "DP-1|desk-1": a.internalId });
+    });
+
     const cases: Array<[string, (w: FakeWindow) => void]> = [
       ["diálogo", (w) => (w.dialog = true)],
       ["transiente", (w) => (w.transient = true)],

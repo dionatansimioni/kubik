@@ -34,7 +34,13 @@ export class FakeWindow implements KWinWindow {
   maxSize = { width: 0, height: 0 };
   onAllDesktops = false;
   skipSwitcher = false;
+  skipTaskbar = false;
+  opacity = 1;
   maximizeMode = 0;
+  /** Como o KWin: 1 = vertical, 2 = horizontal, 3 = as duas. */
+  setMaximize(vertically: boolean, horizontally: boolean): void {
+    this.maximizeMode = (vertically ? 1 : 0) | (horizontally ? 2 : 0);
+  }
   readonly frameGeometryChanged = new FakeSignal();
   /** Tamanho da decoração (barra de título etc.); 0 = sem decoração. */
   decoration = { width: 0, height: 0 };
@@ -129,6 +135,8 @@ export class FakeWindow implements KWinWindow {
   }
   set desktops(v: VirtualDesktop[]) {
     this._desktops = v;
+    // Como no KWin 6: "em todos os desktops" = lista vazia.
+    this.onAllDesktops = v.length === 0;
     this.desktopsChanged.emit();
   }
   get output(): Output {

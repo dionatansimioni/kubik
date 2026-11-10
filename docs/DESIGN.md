@@ -16,7 +16,8 @@ Decisões fechadas em 2026-11-09.
 
 ## Comportamento do tiling
 
-- **Divisão:** BSP no estilo Pop. A janela focada é dividida ao meio pelo lado mais longo.
+- **Divisão:** BSP. A janela nova divide sempre uma das **maiores** janelas, ao meio e pelo lado mais longo. No empate, divide a focada. Resultado: 1 janela fica cheia, 2 ficam lado a lado, 3 ficam com uma metade e dois quadrantes, 4 ficam em quadrantes, e assim por diante. Decisão do usuário em 2026-11-10; antes a regra era dividir sempre a focada.
+- **Janelas minimizadas** saem do tiling e liberam o espaço; ao restaurar, voltam.
 - **Escopo:** uma árvore por tela × desktop virtual. Activities são ignoradas.
 - **Liga/desliga:** toggle global (Super+Y), com exceções por desktop/tela nas configurações. Ao desligar, as janelas voltam à geometria que tinham antes do tiling.
 - **Mouse:**
@@ -95,6 +96,9 @@ Validadas no `testenv/`:
 15. **O KWin só descobre efeitos NOVOS ao iniciar a sessão.** Na primeira instalação, o `loadEffect` falha até o próximo login (o `install.sh` avisa). Atualizações de um efeito já conhecido recarregam na hora.
 16. **Apps X11 (Chrome, Electron) mudam a própria geometria depois de abrir** (ConfigureRequest), por exemplo ao restaurar a sessão anterior. O kubik observa `frameGeometryChanged`; se uma janela no tiling sair do tile sozinha (fora de arrasto ou maximização), ele a devolve depois de 250 ms. Se o app insistir mais de 3 vezes, ela vira flutuante. No Wayland o KWin já impõe o tamanho do tile.
 17. **Apps com barra de título própria (CSD):** o "conteúdo" inclui as sombras e é **maior** que a moldura. Por isso a soma da decoração no mínimo é limitada a ≥ 0.
+18. **Janelas auxiliares invisíveis parecem normais.** A ponte de vídeo do XWayland (`xwaylandvideobridge`, presente no Fedora) é `normalWindow`, tem classe, opacidade 0 e `skipTaskbar` + `skipSwitcher`. Sem uma regra própria, ela ocupava metade da tela vazia (achado pelo `diagnose.sh` no Fedora do usuário).
+19. **Apps abrem maximizados e continuam com `maximizeMode = 3` dentro do tile.** O Chrome, o FileZilla e o Konsole restauram a sessão maximizados. O Breeze não desenha contorno em janela maximizada, e o "devolver ao tile" ignora maximizadas. Ao entrar no tile, o kubik chama `setMaximize(false, false)`.
+20. **Plugins mexem na janela durante o arrasto.** O `virtualdesktopsonlyonprimary` põe em todos os desktops a janela que entra na tela secundária (`desktops` fica vazio). Ao soltar, o kubik reavalia se a janela ainda pode entrar no tiling antes de procurar o destino.
 
 ## Riscos
 
