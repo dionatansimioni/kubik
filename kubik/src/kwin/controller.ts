@@ -8,7 +8,7 @@ const MAX_FIGHTS = 3;
 const FIGHT_MEMORY_MS = 5000;
 import { type Gaps, Tree } from "../core/tree";
 import { type Side, type Zone, dropZone } from "../core/zones";
-import type { Host, KWinWindow, Output, VirtualDesktop } from "./api";
+import type { Host, KWinWindow, Output, TabBar, VirtualDesktop } from "./api";
 
 /** Janela sendo arrastada com o mouse. */
 interface Drag {
@@ -44,6 +44,8 @@ export interface Config {
   tileAllDesktops: boolean;
   /** Borda de destaque em volta da janela em foco. */
   border: { enabled: boolean; width: number };
+  /** Pilhas (abas): altura da barra de abas. */
+  tabs: { height: number };
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -51,7 +53,11 @@ export const DEFAULT_CONFIG: Config = {
   floatingClasses: DEFAULT_FLOATING_CLASSES,
   tileAllDesktops: true,
   border: { enabled: true, width: 3 },
+  tabs: { height: 28 },
 };
+
+/** Faixa do topo do alvo que empilha, quando a janela não tem barra de título própria (CSD). */
+const DEFAULT_TITLE_BAND = 32;
 
 interface Tracked {
   window: KWinWindow;
@@ -118,6 +124,8 @@ export class Controller {
   /** Última borda enviada ao QML (para não repetir) e de qual janela. */
   private borderRect: Rect | null = null;
   private borderOwner: string | null = null;
+  /** Últimas barras de abas enviadas ao QML (JSON, para não repetir). */
+  private lastTabs = "[]";
 
   constructor(
     private readonly host: Host,
@@ -133,7 +141,10 @@ export class Controller {
     const onAdded = (w: KWinWindow) => this.track(w);
     const onRemoved = (w: KWinWindow) => this.untrack(w);
     const onActivated = (w: KWinWindow | null) => {
-      if (w) this.noteFocus(idOf(w));
+      if (w) {
+        this.noteFocus(idOf(w));
+        this.tabActivated(idOf(w));
+      }
       this.updateBorder();
     };
     ws.windowAdded.connect(onAdded);
@@ -157,6 +168,8 @@ export class Controller {
 
   stop(): void {
     this.showBorder(null, false, null);
+    if (this.lastTabs !== "[]") this.host.tabs([]);
+    this.lastTabs = "[]";
     for (const off of this.unsubscribe.splice(0)) off();
     for (const t of this.tracked.values()) t.disconnect();
     this.tracked.clear();
@@ -183,6 +196,67 @@ export class Controller {
       this.host.log(`tiling ligado; ${this.tiledCount()} janela(s)`);
     }
     this.updateBorder();
+    this.publishTabs();
+  }
+
+  // ---- abas (pilhas) ---------------------------------------------------------
+
+  /** Clique numa aba: põe a janela à vista e a ativa. */
+  activateTab(id: string): void {
+    const t = this.tracked.get(id);
+    if (!t || t.key === null) return;
+    this.trees.get(t.key)!.setActive(id);
+    this.host.workspace.activeWindow = t.window;
+    this.publishTabs();
+  }
+
+  /** Atalho: próxima (+1) ou anterior (-1) aba da pilha da janela em foco. */
+  cycleTab(delta: number): void {
+    const w = this.host.workspace.activeWindow;
+    const t = w ? this.tracked.get(idOf(w)) : undefined;
+    if (!w || !t || t.key === null) return;
+    const members = this.trees.get(t.key)!.stackOf(idOf(w));
+    if (members.length < 2) return;
+    const i = members.indexOf(idOf(w));
+    this.activateTab(members[(i + delta + members.length) % members.length]);
+  }
+
+  /** Uma aba escondida foi ativada por fora (Alt+Tab, clique na barra de tarefas). */
+  private tabActivated(id: string): void {
+    const t = this.tracked.get(id);
+    if (!t || t.key === null) return;
+    const tree = this.trees.get(t.key)!;
+    if (tree.stackOf(id).length < 2 || tree.activeOf(id) === id) return;
+    tree.setActive(id);
+    this.publishTabs();
+  }
+
+  /** Envia ao QML as barras de abas das pilhas à vista (desktop atual). */
+  private publishTabs(): void {
+    const bars: TabBar[] = [];
+    if (this.enabled) {
+      const current = this.host.workspace.currentDesktop.id;
+      for (const [key, tree] of this.trees) {
+        if (tree.size < 2 || this.places.get(key)!.desktop.id !== current) continue;
+        for (const st of tree.stacks(this.area(key), this.config.gaps, this.minsOf(tree)))
+          bars.push({
+            rect: st.bar,
+            tabs: st.ids.map((id) => ({ id, caption: this.tracked.get(id)?.window.caption ?? "", active: id === st.active })),
+          });
+      }
+    }
+    const json = JSON.stringify(bars);
+    if (json === this.lastTabs) return;
+    this.lastTabs = json;
+    this.host.tabs(bars);
+  }
+
+  /** Faixa do topo de `target` que empilha: a barra de título (e a de abas). */
+  private titleBand(target: string, tree: Tree): number {
+    const w = this.tracked.get(target)?.window;
+    const deco = w ? w.frameGeometry.height - w.clientGeometry.height : 0;
+    const band = deco >= 10 ? deco : DEFAULT_TITLE_BAND;
+    return tree.stackOf(target).length > 1 ? band + tree.tabHeight : band;
   }
 
   // ---- borda de destaque ----------------------------------------------------
@@ -195,7 +269,13 @@ export class Controller {
       this.showBorder(null, false, null);
       return;
     }
-    const g = w.frameGeometry;
+    let g = w.frameGeometry;
+    // Numa pilha, a borda envolve o tile inteiro (barra de abas + janela).
+    if (t.key !== null && !w.move && !w.resize) {
+      const tree = this.trees.get(t.key)!;
+      if (tree.stackOf(idOf(w)).length > 1)
+        g = tree.tileRect(idOf(w), this.area(t.key), this.config.gaps, this.minsOf(tree)) ?? g;
+    }
     const bw = this.config.border.width;
     const r = { x: g.x - bw, y: g.y - bw, width: g.width + 2 * bw, height: g.height + 2 * bw };
     const id = idOf(w);
@@ -289,6 +369,8 @@ export class Controller {
     const onBorder = () => this.updateBorder();
     const borderSignals = [w.minimizedChanged, w.fullScreenChanged, w.maximizedChanged];
     for (const s of borderSignals) s.connect(onBorder);
+    const onCaption = () => this.publishTabs();
+    w.captionChanged.connect(onCaption);
     w.frameGeometryChanged.connect(onGeometry);
     w.interactiveMoveResizeStarted.connect(onStarted);
     w.interactiveMoveResizeStepped.connect(onStepped);
@@ -306,6 +388,7 @@ export class Controller {
       disconnect: () => {
         signals.forEach((s) => s.disconnect(onChange));
         borderSignals.forEach((s) => s.disconnect(onBorder));
+        w.captionChanged.disconnect(onCaption);
         w.frameGeometryChanged.disconnect(onGeometry);
         w.interactiveMoveResizeStarted.disconnect(onStarted);
         w.interactiveMoveResizeStepped.disconnect(onStepped);
@@ -398,6 +481,7 @@ export class Controller {
         for (const t of sticky) this.refresh(t);
       }
     }
+    this.publishTabs(); // as abas de cada desktop só aparecem nele
   }
 
   /**
@@ -424,7 +508,7 @@ export class Controller {
     this.places.set(key, place);
     let tree = this.trees.get(key);
     if (!tree) {
-      tree = new Tree();
+      tree = new Tree(this.config.tabs.height);
       this.trees.set(key, tree);
     }
     return tree;
@@ -546,7 +630,7 @@ export class Controller {
       this.retile(t.key, id); // a janela arrastada é do KWin até soltar
     } else {
       const drop = this.dropTarget(t);
-      this.host.preview(drop?.rect ?? null, drop?.ghost ?? null);
+      this.host.preview(drop?.rect ?? null, drop?.ghost ?? null, drop?.id != null && drop.zone === "stack");
     }
   }
 
@@ -577,10 +661,18 @@ export class Controller {
       this.removeFromTree(t);
       this.insertInto(t, drop.place, null);
       this.host.log(`moveu '${name}' para ${drop.key}`);
-    } else if (drop.zone === "swap" || drop.zone === "stack") {
-      // "stack" (faixa do título) só existe quando houver abas; até lá, troca.
+    } else if (drop.zone === "swap") {
       this.swapWith(t, drop.key, drop.id);
       this.host.log(`trocou '${name}' de lugar`);
+    } else if (drop.zone === "stack") {
+      const other = this.tracked.get(drop.id)?.window.caption ?? "?";
+      this.removeFromTree(t);
+      this.treeFor(drop.place).stack(id, drop.id);
+      t.key = drop.key;
+      t.seq = ++this.seq;
+      if (t.window.maximizeMode !== 0) t.window.setMaximize(false, false);
+      this.retile(drop.key);
+      this.host.log(`empilhou '${name}' com '${other}'`);
     } else {
       this.removeFromTree(t);
       this.insertInto(t, drop.place, drop.id, drop.zone);
@@ -622,25 +714,36 @@ export class Controller {
     const layout = tree.layout(area, gaps, mins);
     const target = tree.idAt(cursor, area, gaps, mins);
     if (target === null || target === id) return null;
-    const zone = dropZone(layout.get(target)!, cursor);
-    if (zone === "swap" || zone === "stack") {
+    const zone = dropZone(tree.tileRect(target, area, gaps, mins)!, cursor, this.titleBand(target, tree));
+    if (zone === "swap") {
       return { key, place, id: target, zone, rect: layout.get(target)!, ghost: t.target };
     }
     // Simula o drop numa cópia para mostrar a posição final exata.
     const sim = tree.clone();
     sim.remove(id);
-    sim.insertBeside(id, target, zone, area, gaps);
+    if (zone === "stack") sim.stack(id, target);
+    else sim.insertBeside(id, target, zone, area, gaps);
     const simMins = new Map(mins);
     const m = this.minsOf(this.trees.get(t.key!) ?? tree).get(id);
     if (m) simMins.set(id, m);
-    return { key, place, id: target, zone, rect: sim.layout(area, gaps, simMins).get(id)!, ghost: null };
+    const rect = zone === "stack" ? sim.tileRect(id, area, gaps, simMins)! : sim.layout(area, gaps, simMins).get(id)!;
+    return { key, place, id: target, zone, rect, ghost: null };
   }
 
   private removeFromTree(t: Tracked): void {
     if (t.key === null) return;
     const key = t.key;
-    this.trees.get(key)?.remove(idOf(t.window));
+    const tree = this.trees.get(key);
+    const id = idOf(t.window);
+    const rest = (tree?.stackOf(id) ?? []).filter((x) => x !== id);
+    const wasShown = tree?.activeOf(id) === id;
+    tree?.remove(id);
     t.key = null;
+    // Saiu a aba à vista: a que ficou à vista vem para a frente.
+    if (tree && wasShown && rest.length > 0) {
+      const next = this.tracked.get(tree.activeOf(rest[0])!)?.window;
+      if (next) this.host.workspace.raiseWindow?.(next);
+    }
     this.retile(key);
   }
 
@@ -651,6 +754,11 @@ export class Controller {
 
   /** Aplica o layout da árvore `key` (menos `except`, se dado). */
   private retile(key: string, except?: string): void {
+    this.retileOnly(key, except);
+    this.publishTabs();
+  }
+
+  private retileOnly(key: string, except?: string): void {
     const tree = this.trees.get(key);
     if (!tree || tree.size === 0) return;
     const layout = tree.layout(this.area(key), this.config.gaps, this.minsOf(tree));

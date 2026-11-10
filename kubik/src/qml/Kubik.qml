@@ -25,6 +25,8 @@ Item {
     property var ghostWin: null
     // Borda de destaque em volta da janela em foco (o controlador decide onde).
     property var borderWin: null
+    // Barras de abas das pilhas à vista (reaproveitadas; as sobrando ficam escondidas).
+    property var tabWins: []
 
     SystemPalette {
         id: pal
@@ -42,6 +44,8 @@ Item {
             visible: false
 
             property bool ghost: false
+            // O drop empilha: uma faixa de abas no topo diferencia de "dividir".
+            property bool stack: false
 
             Rectangle {
                 anchors.fill: parent
@@ -49,6 +53,16 @@ Item {
                 color: Qt.alpha(pal.highlight, previewWindow.ghost ? 0.10 : 0.25)
                 border.width: 2
                 border.color: Qt.alpha(pal.highlight, previewWindow.ghost ? 0.5 : 1)
+            }
+
+            Rectangle {
+                visible: previewWindow.stack
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: 28
+                radius: 8
+                color: Qt.alpha(pal.highlight, 0.7)
             }
         }
     }
@@ -106,6 +120,86 @@ Item {
         }
     }
 
+    Component {
+        id: tabBarComponent
+
+        Window {
+            id: tabBar
+
+            property var tabs: []
+
+            // Recebe clique, mas sem roubar o foco da janela.
+            flags: Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint
+            color: "transparent"
+            visible: false
+
+            Row {
+                anchors.fill: parent
+
+                Repeater {
+                    model: tabBar.tabs
+
+                    Rectangle {
+                        id: tab
+
+                        required property var modelData
+                        required property int index
+
+                        width: tabBar.width / Math.max(1, tabBar.tabs.length)
+                        height: tabBar.height
+                        color: tab.modelData.active ? pal.highlight : (tabArea.containsMouse ? Qt.lighter(pal.window, 1.1) : pal.window)
+                        border.width: 1
+                        border.color: Qt.alpha(pal.windowText, 0.15)
+                        radius: 4
+
+                        Text {
+                            anchors.fill: parent
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 10
+                            verticalAlignment: Text.AlignVCenter
+                            horizontalAlignment: Text.AlignHCenter
+                            elide: Text.ElideRight
+                            text: tab.modelData.caption
+                            color: tab.modelData.active ? pal.highlightedText : pal.windowText
+                            font.bold: tab.modelData.active
+                        }
+
+                        MouseArea {
+                            id: tabArea
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: {
+                                if (root.controller)
+                                    root.controller.activateTab(tab.modelData.id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    function showTabs(bars) {
+        const wins = tabWins.slice();
+        while (wins.length < bars.length)
+            wins.push(tabBarComponent.createObject(null));
+        tabWins = wins;
+        for (let i = 0; i < wins.length; i++) {
+            const b = bars[i];
+            if (!b) {
+                wins[i].visible = false;
+                continue;
+            }
+            wins[i].tabs = b.tabs;
+            wins[i].x = b.rect.x;
+            wins[i].y = b.rect.y;
+            wins[i].width = Math.max(1, b.rect.width);
+            wins[i].height = Math.max(1, b.rect.height);
+            wins[i].visible = true;
+        }
+    }
+
     function showBorder(r, animate) {
         if (!borderWin)
             return;
@@ -155,7 +249,9 @@ Item {
         win.visible = true;
     }
 
-    function showPreview(r, ghost) {
+    function showPreview(r, ghost, stack) {
+        if (previewWin)
+            previewWin.stack = !!stack;
         place(ghostWin, r ? ghost : null);
         place(previewWin, r);
     }
@@ -177,6 +273,26 @@ Item {
         onActivated: {
             if (root.controller)
                 root.controller.toggle();
+        }
+    }
+
+    KWin.ShortcutHandler {
+        name: "Kubik: Next tab"
+        text: "Kubik: próxima aba da pilha"
+        sequence: "Meta+Ctrl+Tab"
+        onActivated: {
+            if (root.controller)
+                root.controller.cycleTab(1);
+        }
+    }
+
+    KWin.ShortcutHandler {
+        name: "Kubik: Previous tab"
+        text: "Kubik: aba anterior da pilha"
+        sequence: "Meta+Ctrl+Shift+Tab"
+        onActivated: {
+            if (root.controller)
+                root.controller.cycleTab(-1);
         }
     }
 
@@ -205,6 +321,7 @@ Item {
             log: root.log,
             preview: root.showPreview,
             border: root.showBorder,
+            tabs: root.showTabs,
             later: root.later
         });
     }
@@ -218,6 +335,8 @@ Item {
             ghostWin.destroy();
         if (borderWin)
             borderWin.destroy();
+        for (const w of tabWins)
+            w.destroy();
         log("descarregado");
     }
 }

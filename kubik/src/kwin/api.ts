@@ -67,6 +67,7 @@ export interface KWinWindow {
   readonly maximizeMode: number;
   setMaximize(vertically: boolean, horizontally: boolean): void;
   readonly maximizedChanged: Signal;
+  readonly captionChanged: Signal;
   /** Qualquer mudança de geometria: nossas, do usuário ou do próprio app. */
   readonly frameGeometryChanged: Signal;
   readonly interactiveMoveResizeStarted: Signal;
@@ -77,7 +78,10 @@ export interface KWinWindow {
 
 export interface Workspace {
   readonly stackingOrder: KWinWindow[];
-  readonly activeWindow: KWinWindow | null;
+  /** Escrever ativa a janela (e a traz para a frente). */
+  activeWindow: KWinWindow | null;
+  /** Traz para a frente sem ativar. */
+  raiseWindow?(w: KWinWindow): void;
   readonly cursorPos: Point;
   readonly windowAdded: Signal<[KWinWindow]>;
   readonly windowRemoved: Signal<[KWinWindow]>;
@@ -85,6 +89,12 @@ export interface Workspace {
   /** Desktop visível; janelas "em todos os desktops" entram na árvore dele. */
   readonly currentDesktop: VirtualDesktop;
   readonly currentDesktopChanged: Signal;
+}
+
+/** Barra de abas de uma pilha, para o QML desenhar. */
+export interface TabBar {
+  rect: Rect;
+  tabs: Array<{ id: string; caption: string; active: boolean }>;
 }
 
 /** O que o lado QML entrega ao controlador. */
@@ -98,12 +108,15 @@ export interface Host {
   /**
    * Mostra (ou esconde, com null) a prévia de onde a janela arrastada vai
    * ficar. `ghost`: na troca, para onde vai a OUTRA janela (prévia mais clara).
+   * `stack`: o drop empilha (a prévia ganha uma faixa de abas no topo).
    */
-  preview(rect: Rect | null, ghost?: Rect | null): void;
+  preview(rect: Rect | null, ghost?: Rect | null, stack?: boolean): void;
   /**
    * Borda de destaque (cor de destaque do sistema) em `rect`, ou nenhuma.
    * `animate`: deslizar até lá (o layout mudou e o efeito anima a janela);
    * false: pular direto (foco mudou, arrasto com o mouse).
    */
   border(rect: Rect | null, animate: boolean): void;
+  /** As barras de abas à vista agora (lista vazia: nenhuma). */
+  tabs(bars: TabBar[]): void;
 }

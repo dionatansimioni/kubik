@@ -41,7 +41,7 @@ Decisões fechadas em 2026-11-09.
    - Flutuam automaticamente: diálogos, transientes, splash, popups e janelas de tamanho fixo.
    - Regras do usuário: classe (`resourceClass`) com título ou regex opcional.
    - Lista padrão embutida (krunner, plasmashell, yakuake…).
-4. **Stacking.**
+4. **Stacking** (feito na 0.6.0). Soltar na barra de título empilha; arrastar para fora desempilha; atalhos de próxima e anterior aba (Meta+Ctrl+Tab e Meta+Ctrl+Shift+Tab).
    - Janelas da pilha ocupam a mesma geometria, com a ativa no topo.
    - Barra de abas em overlay QML para trocar entre elas.
    - Nada é minimizado.
@@ -104,6 +104,7 @@ Validadas no `testenv/`:
 19. **Apps abrem maximizados e continuam com `maximizeMode = 3` dentro do tile.** O Chrome, o FileZilla e o Konsole restauram a sessão maximizados. O Breeze não desenha contorno em janela maximizada, e o "devolver ao tile" ignora maximizadas. Ao entrar no tile, o kubik chama `setMaximize(false, false)`.
 20. **Plugins mexem na janela durante o arrasto.** O `virtualdesktopsonlyonprimary` põe em todos os desktops a janela que entra na tela secundária (`desktops` fica vazio). Ao soltar, o kubik reavalia se a janela ainda pode entrar no tiling antes de procurar o destino.
 21. **A borda não consegue ler a configuração do efeito.** O efeito anima a janela com a curva dele (padrão: 250 ms, OutCubic); a borda é um overlay QML do script e anima com `Behavior`, usando a mesma curva fixa. No testenv, a borda fica de 8 a 12 px atrás da janela no começo da curva, cerca de um quadro. Quando a bandeja configurar as duas coisas, ela deve passar a mesma duração e curva para ambas.
+22. **Pilhas sem esconder janelas.** O KWin não tem como esconder uma janela por script sem minimizá-la, e minimizada ela sairia do tiling. As abas de uma pilha ficam todas na mesma geometria, e a à vista fica na frente: ativar (`workspace.activeWindow = w`) também traz para a frente. Quando a aba à vista sai, a nova vem com `workspace.raiseWindow`. Uma aba escondida ativada por fora (Alt+Tab) vira a aba à vista.
 
 ## Riscos
 

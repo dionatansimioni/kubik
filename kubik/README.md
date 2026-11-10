@@ -36,10 +36,14 @@ O padrão é 250 ms com `OutCubic`. Para algo mais próximo do Hyprland, experim
   - Arrastar uma janela pela barra de título mostra uma prévia translúcida de **onde ela vai ficar**. O que acontece depende de onde o cursor está sobre a janela-alvo:
     - **centro** (o terço do meio): as duas trocam de lugar, e uma segunda prévia, mais clara, mostra para onde vai a outra;
     - **perto de uma borda**: a janela-alvo é dividida e a arrastada entra daquele lado, o que reorganiza o layout. Exemplo: com 1 à esquerda e 2 e 3 à direita, soltar a 3 na metade de baixo da 1 deixa 1 e 3 à esquerda e a 2 com a direita inteira;
-    - **barra de título**: reservada para empilhar em abas (próxima versão). Por enquanto, troca.
+    - **barra de título** (ou a barra de abas de uma pilha): as duas são **empilhadas em abas** no tile do alvo. A prévia ganha uma faixa de abas no topo para mostrar que vai empilhar.
   - Funciona também entre telas. Soltar num gap devolve a janela ao lugar.
   - Puxar a borda entre duas janelas redimensiona as duas ao vivo, e a proporção fica gravada na árvore.
 - **Tamanhos mínimos:** as divisões cedem para cada app caber no mínimo dele (conteúdo + barra de título). Se a janela nova não couber em nenhuma divisão possível couber, ela fica flutuante, com o motivo no log.
+- **Abas (pilhas):** as janelas de uma pilha dividem o mesmo tile, abaixo de uma barra de abas com a aba à vista na cor de destaque. A pilha se comporta como uma janela só: divide, troca e redimensiona inteira.
+  - Clique numa aba para trazer a janela dela; Alt+Tab ou a barra de tarefas também funcionam.
+  - **Meta+Ctrl+Tab**: próxima aba; **Meta+Ctrl+Shift+Tab**: anterior. As teclas podem ser trocadas em Configurações do Sistema › Atalhos › KWin.
+  - Para tirar uma janela da pilha, arraste-a pela barra de título dela (abaixo da barra de abas) e solte em outro lugar.
 - **Borda de destaque:** um contorno de 3 px, na cor de destaque do sistema, envolve a janela em foco, seja ela do tiling ou uma janela flutuante comum. Quando o layout muda, a borda desliza junto com a janela; ao trocar o foco ou arrastar com o mouse, ela acompanha sem atraso. Não aparece em diálogos, em tela cheia nem em janelas maximizadas.
 - **Animações** (efeito *Kubik: animações*, instalado junto): as janelas deslizam e redimensionam suavemente quando o layout muda. Ficam de fora o arrasto com o mouse, a tela cheia e o maximizar, que têm animação própria do KWin. A velocidade global de animação do Plasma também vale.
 - **Apps que mudam a própria geometria** (Chrome e apps Electron como o Podman Desktop, em X11, ao restaurar o tamanho da sessão anterior) voltam ao tile. Se o app insistir, ele fica flutuante e as outras janelas se reorganizam.
@@ -47,7 +51,7 @@ O padrão é 250 ms com `OutCubic`. Para algo mais próximo do Hyprland, experim
 
 ## Ainda não
 
-Abas (stacking), ícone na bandeja com as configurações, navegação e movimento por teclado. Ver `docs/DESIGN.md`.
+Ícone na bandeja com as configurações, navegação e movimento por teclado. Ver `docs/DESIGN.md`.
 
 ## Desenvolvimento
 

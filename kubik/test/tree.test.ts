@@ -231,4 +231,71 @@ describe("Tree: tamanhos mínimos", () => {
       expect(t.clone().shape()).toEqual(t.shape());
     });
   });
+
+  describe("pilhas (abas)", () => {
+    function stacked(): Tree {
+      const t = new Tree(28);
+      t.insert("a", null, AREA, GAPS);
+      t.insert("b", "a", AREA, GAPS); // a | b
+      t.stack("c", "b"); // b+c empilhadas à direita, c à vista
+      return t;
+    }
+
+    it("as janelas da pilha dividem o tile, abaixo da barra de abas", () => {
+      const t = stacked();
+      const l = t.layout(AREA, GAPS);
+      expect(l.get("a")).toEqual(rect(4, 4, 634, 792));
+      expect(l.get("b")).toEqual(rect(642, 32, 634, 764));
+      expect(l.get("c")).toEqual(rect(642, 32, 634, 764));
+      expect(t.stacks(AREA, GAPS)).toEqual([{ bar: rect(642, 4, 634, 28), ids: ["b", "c"], active: "c" }]);
+      expect(t.shape()).toEqual({ split: "horizontal", ratio: 0.5, first: "a", second: { stack: ["b", "c"], active: "c" } });
+    });
+
+    it("tirar a aba à vista mostra a vizinha; com uma só, a barra some", () => {
+      const t = stacked();
+      t.remove("c");
+      expect(t.activeOf("b")).toBe("b");
+      expect(t.stacks(AREA, GAPS)).toEqual([]);
+      expect(t.layout(AREA, GAPS).get("b")).toEqual(rect(642, 4, 634, 792));
+    });
+
+    it("tirar uma aba escondida mantém a mesma à vista", () => {
+      const t = stacked();
+      t.stack("d", "b"); // b, c, d (d à vista)
+      t.setActive("c");
+      t.remove("b");
+      expect(t.activeOf("c")).toBe("c");
+      expect(t.stackOf("c")).toEqual(["c", "d"]);
+    });
+
+    it("a pilha se comporta como um tile só: é dividida inteira e responde no ponto", () => {
+      const t = stacked();
+      t.insert("d", "c", AREA, GAPS); // divide o tile da pilha
+      const l = t.layout(AREA, GAPS);
+      expect(l.get("d")).toEqual(rect(642, 402, 634, 394));
+      expect(t.stacks(AREA, GAPS)[0].bar).toEqual(rect(642, 4, 634, 28));
+      expect(t.idAt({ x: 900, y: 10 }, AREA, GAPS)).toBe("c"); // na barra de abas: a aba à vista
+      expect(t.tileRect("b", AREA, GAPS)).toEqual(rect(642, 4, 634, 394));
+    });
+
+    it("o mínimo da pilha é o da maior janela, mais a barra", () => {
+      const t = stacked();
+      const mins = new Map([["c", { width: 100, height: 700 }]]);
+      t.insert("d", "c", AREA, GAPS);
+      expect(t.layout(AREA, GAPS, mins).get("c")!.height).toBe(700);
+    });
+
+    it("trocar uma aba com uma janela de fora troca só aquela aba", () => {
+      const t = stacked();
+      t.swap("a", "c");
+      expect(t.stackOf("b")).toEqual(["b", "a"]);
+      expect(t.layout(AREA, GAPS).get("c")).toEqual(rect(4, 4, 634, 792));
+    });
+
+    it("clone copia as pilhas", () => {
+      const t = stacked();
+      expect(t.clone().shape()).toEqual(t.shape());
+      expect(t.clone().stacks(AREA, GAPS)).toEqual(t.stacks(AREA, GAPS));
+    });
+  });
 });

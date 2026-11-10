@@ -11,6 +11,8 @@ let logs: string[];
 let previews: Array<import("../src/core/rect").Rect | null>;
 let ghosts: Array<import("../src/core/rect").Rect | null>;
 let borders: Array<{ rect: import("../src/core/rect").Rect | null; animate: boolean }>;
+let tabs: Array<import("../src/kwin/api").TabBar[]>;
+let stackHints: boolean[];
 let tick: () => void;
 
 function win(caption: string, output = SCREEN_A, desktop = DESK_1): FakeWindow {
@@ -24,6 +26,8 @@ beforeEach(() => {
   previews = h.previews;
   ghosts = h.ghosts;
   borders = h.borders;
+  tabs = h.tabs;
+  stackHints = h.stackHints;
   tick = h.tick;
   ctl = new Controller(h.host);
   ctl.start();
@@ -403,6 +407,7 @@ describe("Controller", () => {
       j3.dragThrough("move", [rect(200, 500, 634, 394)], ws, { x: 300, y: 700 });
       expect(previews).toEqual([rect(4, 402, 634, 394), null]);
       expect(ghosts).toEqual([null, null]);
+      expect(stackHints).toEqual([false, false]);
     });
 
     it("a prévia da troca mostra o destino e, mais clara, para onde vai a outra", () => {
@@ -697,6 +702,116 @@ describe("Controller", () => {
       off.start();
       ws.open(win("a"));
       expect(h.borders.filter((b) => b.rect !== null)).toEqual([]);
+    });
+  });
+
+  describe("abas (pilhas)", () => {
+    /** a | b, e arrasta c para a barra de título da b (y logo abaixo do topo). */
+    function stackOnB(): { a: FakeWindow; b: FakeWindow; c: FakeWindow } {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      b.decoration = { width: 0, height: 30 };
+      const c = ws.open(win("c")); // c divide b: b em cima, c embaixo (à direita)
+      c.dragThrough("move", [rect(700, 20, 634, 394)], ws, { x: 900, y: 15 });
+      return { a, b, c };
+    }
+    const lastTabs = () => tabs[tabs.length - 1];
+
+    it("soltar na barra de título de outra janela empilha as duas no tile dela", () => {
+      const { a, b, c } = stackOnB();
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      expect(b.frameGeometry).toEqual(rect(642, 32, 634, 764));
+      expect(c.frameGeometry).toEqual(rect(642, 32, 634, 764));
+      expect(logs).toContain("empilhou 'c' com 'b'");
+    });
+
+    it("a barra de abas mostra as janelas da pilha, com a arrastada à vista", () => {
+      stackOnB();
+      expect(lastTabs()).toEqual([
+        {
+          rect: rect(642, 4, 634, 28),
+          tabs: [
+            { id: expect.any(String), caption: "b", active: false },
+            { id: expect.any(String), caption: "c", active: true },
+          ],
+        },
+      ]);
+    });
+
+    it("a prévia do empilhar mostra o tile final da pilha", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      b.decoration = { width: 0, height: 30 };
+      void a;
+      const c = ws.open(win("c"));
+      c.dragThrough("move", [rect(700, 20, 634, 394)], ws, { x: 900, y: 15 });
+      expect(previews[0]).toEqual(rect(642, 4, 634, 792)); // a c sai de baixo: a b cresce
+      expect(stackHints).toEqual([true, false]); // a prévia avisa que vai empilhar
+    });
+
+    it("clicar numa aba (activateTab) ativa aquela janela e atualiza as abas", () => {
+      const { b } = stackOnB();
+      ctl.activateTab(String(b.internalId));
+      expect(ws.activeWindow).toBe(b);
+      expect(lastTabs()[0].tabs.map((t) => t.active)).toEqual([true, false]);
+    });
+
+    it("ativar uma aba escondida por fora (Alt+Tab) a põe à vista", () => {
+      const { b } = stackOnB();
+      ws.activate(b);
+      expect(lastTabs()[0].tabs.map((t) => t.active)).toEqual([true, false]);
+    });
+
+    it("atalho de próxima/anterior aba circula pela pilha", () => {
+      const { b, c } = stackOnB();
+      ctl.cycleTab(1);
+      expect(ws.activeWindow).toBe(b);
+      ctl.cycleTab(1);
+      expect(ws.activeWindow).toBe(c);
+      ctl.cycleTab(-1);
+      expect(ws.activeWindow).toBe(b);
+    });
+
+    it("fechar a aba à vista traz a vizinha para a frente e, com uma só, a barra some", () => {
+      const { b, c } = stackOnB();
+      ws.close(c);
+      expect(ws.raised).toContain(b);
+      expect(b.frameGeometry).toEqual(rect(642, 4, 634, 792));
+      expect(lastTabs()).toEqual([]);
+    });
+
+    it("arrastar uma aba para fora da pilha a tira de lá", () => {
+      const { a, b, c } = stackOnB();
+      c.dragThrough("move", [rect(100, 500, 634, 394)], ws, { x: 300, y: 700 }); // metade de baixo da a
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 394));
+      expect(c.frameGeometry).toEqual(rect(4, 402, 634, 394));
+      expect(b.frameGeometry).toEqual(rect(642, 4, 634, 792));
+      expect(lastTabs()).toEqual([]);
+    });
+
+    it("o título da aba acompanha o título da janela", () => {
+      const { b } = stackOnB();
+      b.retitle("b — página nova");
+      expect(lastTabs()[0].tabs[0].caption).toBe("b — página nova");
+    });
+
+    it("a borda envolve a pilha inteira (barra de abas + janela)", () => {
+      stackOnB();
+      expect(borders[borders.length - 1].rect).toEqual(rect(639, 1, 640, 798));
+    });
+
+    it("as abas de outro desktop não aparecem; voltam ao voltar", () => {
+      stackOnB();
+      ws.switchTo(DESK_2);
+      expect(lastTabs()).toEqual([]);
+      ws.switchTo(DESK_1);
+      expect(lastTabs()).toHaveLength(1);
+    });
+
+    it("desligar o tiling esconde as abas", () => {
+      stackOnB();
+      ctl.toggle();
+      expect(lastTabs()).toEqual([]);
     });
   });
 });

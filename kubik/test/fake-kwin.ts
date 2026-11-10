@@ -1,6 +1,6 @@
 /** KWin falso, só com o que o controlador usa (src/kwin/api.ts). */
 import type { Rect } from "../src/core/rect";
-import type { Host, KWinWindow, Output, Signal, VirtualDesktop, Workspace } from "../src/kwin/api";
+import type { Host, KWinWindow, Output, Signal, TabBar, VirtualDesktop, Workspace } from "../src/kwin/api";
 
 export class FakeSignal<Args extends unknown[] = []> implements Signal<Args> {
   private handlers: Array<(...a: Args) => void> = [];
@@ -48,6 +48,12 @@ export class FakeWindow implements KWinWindow {
     this.maximizedChanged.emit();
   }
   readonly maximizedChanged = new FakeSignal();
+  readonly captionChanged = new FakeSignal();
+  /** O app muda o título (ex.: o navegador trocou de página). */
+  retitle(c: string): void {
+    this.caption = c;
+    this.captionChanged.emit();
+  }
   readonly frameGeometryChanged = new FakeSignal();
   /** Tamanho da decoração (barra de título etc.); 0 = sem decoração. */
   decoration = { width: 0, height: 0 };
@@ -69,7 +75,7 @@ export class FakeWindow implements KWinWindow {
   private _output: Output;
 
   constructor(
-    readonly caption: string,
+    public caption: string,
     output: Output,
     desktop: VirtualDesktop,
     geo: Rect = { x: 100, y: 100, width: 400, height: 300 },
@@ -157,7 +163,19 @@ export class FakeWindow implements KWinWindow {
 
 export class FakeWorkspace implements Workspace {
   stackingOrder: FakeWindow[] = [];
-  activeWindow: FakeWindow | null = null;
+  private _active: FakeWindow | null = null;
+  /** Janelas que o controlador mandou para a frente (raiseWindow). */
+  readonly raised: FakeWindow[] = [];
+  /** Como no KWin: escrever ativa a janela (e emite windowActivated). */
+  get activeWindow(): FakeWindow | null {
+    return this._active;
+  }
+  set activeWindow(w: FakeWindow | null) {
+    this.activate(w);
+  }
+  raiseWindow(w: KWinWindow): void {
+    this.raised.push(w as FakeWindow);
+  }
   cursorPos = { x: 0, y: 0 };
   readonly windowAdded = new FakeSignal<[KWinWindow]>();
   readonly windowRemoved = new FakeSignal<[KWinWindow]>();
@@ -185,7 +203,7 @@ export class FakeWorkspace implements Workspace {
     this.windowRemoved.emit(w);
   }
   activate(w: FakeWindow | null): void {
-    this.activeWindow = w;
+    this._active = w;
     this.windowActivated.emit(w);
   }
 }
@@ -195,7 +213,9 @@ export function fakeHost(ws: FakeWorkspace) {
   const logs: string[] = [];
   const previews: Array<Rect | null> = [];
   const ghosts: Array<Rect | null> = [];
+  const stackHints: boolean[] = [];
   const borders: Array<{ rect: Rect | null; animate: boolean }> = [];
+  const tabs: TabBar[][] = [];
   const timers: Array<{ ms: number; fn: () => void }> = [];
   const areas: Record<string, Rect> = {
     "DP-1": { x: 0, y: 0, width: 1280, height: 800 },
@@ -205,12 +225,14 @@ export function fakeHost(ws: FakeWorkspace) {
     workspace: ws,
     clientArea: (o) => areas[o.name],
     log: (m) => logs.push(m),
-    preview: (r, ghost = null) => {
+    preview: (r, ghost = null, stack = false) => {
       previews.push(r);
       ghosts.push(ghost);
+      stackHints.push(stack);
     },
     later: (ms, fn) => timers.push({ ms, fn }),
     border: (rect, animate) => borders.push({ rect, animate }),
+    tabs: (bars) => tabs.push(bars),
   };
   /** Dispara os timers de até `upTo` ms (como se esse tempo tivesse passado). */
   const tick = (upTo = 1000) => {
@@ -218,5 +240,5 @@ export function fakeHost(ws: FakeWorkspace) {
     timers.splice(0, timers.length, ...timers.filter((t) => t.ms > upTo));
     for (const t of due) t.fn();
   };
-  return { host, logs, previews, ghosts, borders, tick };
+  return { host, logs, previews, ghosts, stackHints, borders, tabs, tick };
 }
