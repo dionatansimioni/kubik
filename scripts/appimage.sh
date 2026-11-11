@@ -6,8 +6,9 @@
 # Um AppImage tipo 2 é o runtime (um executável estático que monta ou extrai
 # o resto) + uma imagem squashfs com AppRun, o .desktop e o ícone. Fazemos
 # isso direto com o mksquashfs (é o que o appimagetool faz), com o runtime
-# oficial numa versão fixa e conferida por sha256. Nada de Qt dentro: o
-# instalador usa o kdialog e as ferramentas do próprio Plasma.
+# oficial numa versão fixa e conferida por sha256. Dentro vai também o
+# gerenciador (usr/: o app em Qt e o próprio Qt, de scripts/manager-app.sh),
+# para não depender do Qt nem dos módulos do Plasma da máquina.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -38,6 +39,7 @@ tar xzf "$TARBALL" -C "$APPDIR"
 BUNDLE=$(find "$APPDIR" -maxdepth 1 -type d -name 'kubik-*' | head -n1)
 VERSION=${BUNDLE##*/kubik-}
 
+"$ROOT/scripts/manager-app.sh" "$APPDIR" >/dev/null
 install -m755 "$ROOT/scripts/appimage/AppRun" "$APPDIR/AppRun"
 install -m644 "$ROOT/assets/kubik.svg" "$APPDIR/$APP_ID.svg"
 install -m644 "$ROOT/assets/kubik-256.png" "$APPDIR/.DirIcon"

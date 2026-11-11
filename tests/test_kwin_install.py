@@ -45,8 +45,10 @@ class FirstInstallTest(unittest.TestCase):
         self.assertIn("=== active after Meta+Left: Alpha", self.log)
         self.assertIn("=== after uninstall quicktile=[285212690] switchwin=[419430418] backup=no", self.log)
 
-    def test_app_icon_menu_entry_and_stored_uninstaller(self):
-        self.assertIn("=== files installed icon=yes menu=yes uninstaller=yes "
+    def test_app_icon_and_stored_uninstaller(self):
+        # Pelo .tar.gz não há gerenciador (ele é o AppImage), então nem entrada
+        # "Kubik" no menu; com o AppImage: test_kwin_appimage/test_kwin_manager.
+        self.assertIn("=== files installed icon=yes menu=no uninstaller=yes "
                       "list=[Plasma/Applet io.github.dionatansimioni.kubik,KWin/Script kubik,KWin/Effect kubikanimations]",
                       self.log)
         self.assertIn("=== files uninstalled icon=no menu=no uninstaller=no list=[]", self.log)

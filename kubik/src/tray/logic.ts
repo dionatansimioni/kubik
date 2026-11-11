@@ -289,6 +289,8 @@ export interface Release {
   version: string;
   /** O kubik-<versão>.tar.gz do release. */
   url: string;
+  /** O Kubik-<versão>-x86_64.AppImage do release (atualiza também o gerenciador), se houver. */
+  appimage?: string;
   /** Página do release (notas). */
   page: string;
 }
@@ -319,7 +321,10 @@ export function newerRelease(json: string, current: string | null): Release | nu
     if (!isSafeUrl(url)) continue;
     if (best && compareVersions(version, best.version) <= 0) continue;
     const page = String(r.html_url ?? "");
+    const ai = assets.find((a) => a && a.name === `Kubik-${version}-x86_64.AppImage`);
+    const appimage = ai ? String(ai.browser_download_url ?? "") : "";
     best = { version, url, page: isSafeUrl(page) ? page : `https://github.com/${REPO}/releases` };
+    if (isSafeUrl(appimage)) best.appimage = appimage;
   }
   if (!best) return null;
   return current && isVersion(current) && compareVersions(best.version, current) <= 0 ? null : best;
@@ -328,6 +333,13 @@ export function newerRelease(json: string, current: string | null): Release | nu
 /** Baixa o .tar.gz do release e roda o install.sh dele (o mesmo da instalação manual). */
 export function updateCommand(r: Release): string {
   if (!isSafeUrl(r.url) || !isVersion(r.version)) throw new Error(`release inválido: ${r.version} ${r.url}`);
+  // Com o AppImage, ele mesmo instala (e guarda a si próprio como o gerenciador).
+  if (r.appimage && isSafeUrl(r.appimage))
+    return (
+      `d=$(mktemp -d) && curl -fsSL --max-time 600 -o "$d/Kubik.AppImage" ${q(r.appimage)} && ` +
+      `chmod +x "$d/Kubik.AppImage" && "$d/Kubik.AppImage" --install --yes; ` +
+      `r=$?; rm -rf "$d"; exit $r`
+    );
   return (
     `d=$(mktemp -d) && curl -fsSL --max-time 600 -o "$d/kubik.tar.gz" ${q(r.url)} && ` +
     `tar xzf "$d/kubik.tar.gz" -C "$d" && "$d/kubik-${r.version}/install.sh"; ` +
@@ -335,5 +347,5 @@ export function updateCommand(r: Release): string {
   );
 }
 
-/** Onde o install.sh guarda o gerenciador e uma cópia do uninstall.sh. */
+/** Onde o install.sh guarda o gerenciador (Kubik.AppImage) e uma cópia do uninstall.sh. */
 export const DATA_DIR = "${XDG_DATA_HOME:-$HOME/.local/share}/kubik";

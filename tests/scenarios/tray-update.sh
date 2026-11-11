@@ -31,5 +31,4 @@ wait_log "[kubik-tray] atualizado para 99.0.0" 60
 sleep 1
 screenshot updated
 files updated
-echo "=== desktop exec: $(sed -n 's/^Exec=//p' "$DATA/applications/io.github.dionatansimioni.kubik.desktop")" >&2
 

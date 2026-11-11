@@ -156,6 +156,20 @@ describe("gerenciador", () => {
     expect(cmd).toMatch(/rm -rf "\$d"; exit \$r$/);
   });
 
+  it("com o AppImage anexado, atualiza por ele (que também guarda o gerenciador)", () => {
+    const r = rel("kubik-v0.12.0");
+    r.assets.push({ name: "Kubik-0.12.0-x86_64.AppImage", browser_download_url: "https://github.com/a/Kubik-0.12.0-x86_64.AppImage" });
+    const found = newerRelease(JSON.stringify([r]), "0.11.0");
+    expect(found?.appimage).toBe("https://github.com/a/Kubik-0.12.0-x86_64.AppImage");
+    const cmd = updateCommand(found!);
+    expect(cmd).toContain("-o \"$d/Kubik.AppImage\" 'https://github.com/a/Kubik-0.12.0-x86_64.AppImage'");
+    expect(cmd).toContain('"$d/Kubik.AppImage" --install --yes');
+    expect(cmd).toMatch(/rm -rf "\$d"; exit \$r$/);
+    // AppImage com endereço estranho: fica o .tar.gz.
+    r.assets[r.assets.length - 1].browser_download_url = "https://evil/'x";
+    expect(newerRelease(JSON.stringify([r]), "0.11.0")?.appimage).toBeUndefined();
+  });
+
   it("releasesCommand usa a API do GitHub (ou KUBIK_RELEASES_URL) e nunca falha", () => {
     const cmd = releasesCommand();
     expect(cmd).toContain(`\${KUBIK_RELEASES_URL:-${RELEASES_URL}}`);

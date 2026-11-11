@@ -59,27 +59,33 @@ for PKG in ./packages/*/; do
     esac
 done
 
-# O gerenciador (a mesma janela do AppImage) e, para ele desinstalar sem o
-# pacote, uma cópia do uninstall.sh e a lista do que foi instalado.
+# Para desinstalar sem o pacote: uma cópia do uninstall.sh e a lista do que
+# foi instalado.
 mkdir -p "$DATA/kubik"
 install -m755 ./uninstall.sh "$DATA/kubik/uninstall.sh"
 install -m644 ./shortcuts.sh "$DATA/kubik/shortcuts.sh"
-install -m755 ./open.sh "$DATA/kubik/open.sh"
 printf '%s' "$INSTALLED" > "$DATA/kubik/installed.list"
-# O gerenciador é um plasmoide oculto (fora da lista de widgets) que o
-# plasmawindowed abre numa janela; basta estar na pasta de plasmoides.
-if [ -d ./manager ]; then
-    MANAGER=$DATA/plasma/plasmoids/$APP_ID.manager
-    rm -rf "$MANAGER"
-    mkdir -p "$MANAGER"
-    cp -R ./manager/. "$MANAGER/"
+# O gerenciador é o próprio AppImage (um app Qt, com o Qt dentro): instalando
+# por ele (KUBIK_APPIMAGE, que o AppRun passa), ele se guarda aqui e a entrada
+# "Kubik" do menu o abre. Copia para um nome temporário e renomeia: um
+# AppImage aberto (o gerenciador rodando) continua com o arquivo antigo.
+# Sobras de versões anteriores (gerenciador no qml / no plasmawindowed) saem.
+rm -rf "$DATA/kubik/manager" "$DATA/kubik/manager.sh" "$DATA/kubik/open.sh" "$DATA/plasma/plasmoids/$APP_ID.manager"
+MANAGER=$DATA/kubik/Kubik.AppImage
+SRC=${KUBIK_APPIMAGE:-}
+if [ -n "$SRC" ] && [ -f "$SRC" ] && [ "$(readlink -f "$SRC")" != "$(readlink -f "$MANAGER")" ]; then
+    cp "$SRC" "$MANAGER.new" && chmod 755 "$MANAGER.new" && mv -f "$MANAGER.new" "$MANAGER"
 fi
 # Ícone do app (menu, Scripts do KWin) e a entrada "Kubik" no menu, que abre o
-# gerenciador pelo open.sh (ver lá por quê).
+# gerenciador (só se ele estiver guardado: instalado pelo .tar.gz, não há).
 if [ -d ./share ]; then
     install -Dm644 "./share/$APP_ID.svg" "$DATA/icons/hicolor/scalable/apps/$APP_ID.svg"
-    mkdir -p "$DATA/applications"
-    sed "s|^Exec=.*|Exec=\"$DATA/kubik/open.sh\"|" "./share/$APP_ID.desktop" > "$DATA/applications/$APP_ID.desktop"
+    if [ -x "$MANAGER" ]; then
+        mkdir -p "$DATA/applications"
+        sed "s|^Exec=.*|Exec=\"$MANAGER\"|" "./share/$APP_ID.desktop" > "$DATA/applications/$APP_ID.desktop"
+    else
+        rm -f "$DATA/applications/$APP_ID.desktop"
+    fi
     command -v kbuildsycoca6 >/dev/null && { kbuildsycoca6 >/dev/null 2>&1 || true; }
 fi
 
@@ -103,7 +109,9 @@ if [ -n "${TRAY_ID:-}" ]; then
     echo "Ícone na bandeja: clique para ligar/desligar e ajustar; botão direito › Configurar Kubik…"
     echo "  (Se ele não aparecer ou não atualizar: systemctl --user restart plasma-plasmashell)"
 fi
-echo "Menu: \"Kubik\" abre o gerenciador (atualizar, reparar, remover, configurações)."
+if [ -x "$MANAGER" ]; then
+    echo "Menu: \"Kubik\" abre o gerenciador (atualizar, reparar, remover, configurações)."
+fi
 echo "Teclado: Meta+setas focam, Meta+Shift+setas movem, Meta+Alt+setas redimensionam;"
 echo "  Meta+O gira a divisão, Meta+F flutua a janela, Meta+M monocle, Meta+Y liga/desliga."
 echo "  (O quick tile do KDE nessas teclas foi desligado; o uninstall.sh devolve.)"

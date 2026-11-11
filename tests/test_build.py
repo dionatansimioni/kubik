@@ -76,33 +76,36 @@ class AppAssetsTest(unittest.TestCase):
 
     def test_menu_entry_opens_the_manager(self):
         entry = (ROOT / "assets" / f"{self.APP_ID}.desktop").read_text()
-        # O gerenciador é um plasmoide oculto aberto pelo plasmawindowed (o
-        # install.sh troca pelo open.sh instalado, que reabre com segurança).
-        self.assertIn(f"Exec=plasmawindowed {self.APP_ID}.manager\n", entry)
+        # O install.sh troca pelo AppImage guardado em ~/.local/share/kubik.
+        self.assertIn("Exec=kubik-manager\n", entry)
         self.assertIn(f"Icon={self.APP_ID}\n", entry)
+        install = (ROOT / "scripts" / "install.sh").read_text()
+        self.assertIn('MANAGER=$DATA/kubik/Kubik.AppImage', install)
+        self.assertIn('s|^Exec=.*|Exec=\\"$MANAGER\\"|', install)
 
-    def test_manager_does_not_need_the_qml_tool(self):
-        # O `qml` vem no qt6-qtdeclarative-devel no Fedora (não num desktop
-        # comum): o 0.11.0 caía no kdialog, que só instala. O plasmawindowed
-        # vem em todo Plasma (plasma-workspace).
+    def test_manager_needs_nothing_from_the_system_qt_or_plasma(self):
+        # 0.11.0 dependia do `qml` (no Fedora, só no qt6-qtdeclarative-devel) e
+        # 0.11.1 do plasmawindowed: o app agora leva o próprio Qt e só usa
+        # QtQuick/QtQuick.Controls.
+        qml = (ROOT / "kubik" / "manager" / "Main.qml").read_text()
+        imports = sorted(set(re.findall(r"^import (\S+)", qml, re.M)))
+        self.assertEqual(imports, ['"logic.js"', "QtQuick", "QtQuick.Controls", "QtQuick.Layouts"])
         apprun = (ROOT / "scripts" / "appimage" / "AppRun").read_text()
         code = "\n".join(l for l in apprun.splitlines() if not l.lstrip().startswith("#"))
         self.assertNotRegex(code, r"\bqml6?\b")
-        self.assertIn('"$BUNDLE/open.sh" "$MANAGER_ID"', apprun)
-        self.assertFalse((ROOT / "scripts" / "manager.sh").exists())
+        self.assertIn('"$HERE/usr/bin/kubik-manager" --bundle "$BUNDLE"', code)
+        for gone in ("manager.sh", "open.sh"):
+            self.assertFalse((ROOT / "scripts" / gone).exists(), gone)
 
-    def test_manager_is_a_hidden_plasmoid(self):
-        meta = json.loads((ROOT / "kubik" / "manager" / "metadata.json").read_text())
-        self.assertEqual(meta["KPlugin"]["Id"], f"{self.APP_ID}.manager")
-        self.assertEqual(meta["KPackageStructure"], "Plasma/Applet")
-        self.assertTrue(meta["NoDisplay"])  # fora da lista de widgets
-        self.assertEqual(meta["KPlugin"]["Icon"], self.APP_ID)
-
-    def test_apprun_and_manager_agree_on_the_staged_bundle(self):
-        apprun = (ROOT / "scripts" / "appimage" / "AppRun").read_text()
-        logic = (ROOT / "kubik" / "src" / "manager" / "logic.ts").read_text()
-        stage = re.search(r'STAGE_DIR = "([^"]+)"', logic).group(1)
-        self.assertIn(f"STAGE={stage}\n", apprun)
+    def test_app_hides_the_system_qt_from_itself(self):
+        # Plugins do Qt do sistema (outra versão) não podem entrar no app.
+        cpp = (ROOT / "kubik" / "manager" / "main.cpp").read_text()
+        for var in ("QT_PLUGIN_PATH", "QML_IMPORT_PATH", "QML2_IMPORT_PATH", "QT_QPA_PLATFORMTHEME", "QT_STYLE_OVERRIDE"):
+            self.assertIn(f'"{var}"', cpp)
+        self.assertIn('setDesktopFileName(QStringLiteral("io.github.dionatansimioni.kubik"))', cpp)
+        # Nem as variáveis do AppImage nos comandos (o AppImage novo de uma
+        # atualização se confundia com este).
+        self.assertIn('{"APPIMAGE", "APPDIR", "ARGV0", "OWD"}', cpp)
 
     def test_every_component_uses_the_app_icon(self):
         for comp in ("package", "effect", "tray"):
@@ -146,7 +149,6 @@ class AppImageBuildTest(unittest.TestCase):
 
     def test_name_size_and_executable(self):
         self.assertEqual(self.appimage.name, f"Kubik-{KUBIK_VERSION}-x86_64.AppImage")
-        self.assertLess(self.appimage.stat().st_size, 3 * 1024 * 1024)
         self.assertTrue(self.appimage.stat().st_mode & 0o111)
         self.assertTrue(self.appimage.read_bytes()[:4] == b"\x7fELF")
 
@@ -154,7 +156,6 @@ class AppImageBuildTest(unittest.TestCase):
         ls = self.listing()
         for name in ("AppRun", ".DirIcon", "io.github.dionatansimioni.kubik.desktop",
                      "io.github.dionatansimioni.kubik.svg", f"kubik-{KUBIK_VERSION}/install.sh",
-                     f"kubik-{KUBIK_VERSION}/manager/contents/ui/main.qml",
                      f"kubik-{KUBIK_VERSION}/packages/kubik/metadata.json"):
             self.assertRegex(ls, rf"squashfs-root/{re.escape(name)}\n")
         self.assertRegex(ls, r"-rwxr-xr-x root/root .* squashfs-root/AppRun\n")
@@ -162,20 +163,21 @@ class AppImageBuildTest(unittest.TestCase):
     def test_reproducible(self):
         self.assertEqual(self.appimage.read_bytes(), self.again.read_bytes())
 
-    def test_tarball_has_the_manager(self):
-        top = f"kubik-{KUBIK_VERSION}"
-        with tarfile.open(self.tarball) as t:
-            members = {m.name: m for m in t.getmembers()}
-        self.assertTrue(members[f"{top}/open.sh"].mode & 0o111)
-        for name in ("manager/metadata.json", "manager/contents/ui/main.qml", "manager/contents/code/logic.js",
-                     "manager/contents/images/kubik.svg"):
-            self.assertIn(f"{top}/{name}", members)
-        with tarfile.open(self.tarball) as t:
-            js = t.extractfile(f"{top}/manager/contents/code/logic.js").read().decode()
-            meta = json.loads(t.extractfile(f"{top}/manager/metadata.json").read())
-        self.assertIn("var KubikManager = ", js)
-        # A versão do gerenciador é a do pacote (o AppRun compara com a instalada).
-        self.assertEqual(meta["KPlugin"]["Version"], KUBIK_VERSION)
+    def test_appimage_has_the_manager_and_its_qt(self):
+        ls = self.listing()
+        for name in ("usr/bin/kubik-manager", "usr/bin/qt.conf", "usr/lib/libQt6Core.so.6", "usr/lib/libQt6Quick.so.6",
+                     "usr/plugins/platforms/libqwayland-generic.so", "usr/plugins/platforms/libqxcb.so",
+                     "usr/plugins/wayland-shell-integration/libxdg-shell.so", "usr/plugins/iconengines/libqsvgicon.so",
+                     "usr/qml/QtQuick/Controls/Fusion/qmldir", "usr/qml/QtQuick/Layouts/qmldir"):
+            self.assertRegex(ls, rf"squashfs-root/{re.escape(name)}\n")
+        # O que tem que vir do sistema (glibc, drivers de vídeo, Wayland) fica de fora.
+        for name in ("libc.so.6", "libstdc++.so.6", "libGL.so.1", "libEGL.so.1", "libwayland-client.so.0", "libfontconfig.so.1"):
+            self.assertNotIn(f"squashfs-root/usr/lib/{name}\n", ls)
+
+    def test_size_with_qt_inside(self):
+        size = self.appimage.stat().st_size
+        self.assertGreater(size, 10 * 1024 * 1024)
+        self.assertLess(size, 60 * 1024 * 1024)
 
 
 @unittest.skipUnless(shutil.which("docker"), "docker indisponível (build do TypeScript)")
@@ -233,7 +235,8 @@ class KubikBuildTest(unittest.TestCase):
 
 class ShellScriptsTest(unittest.TestCase):
     SCRIPTS = [ROOT / "scripts" / n for n in ("install.sh", "uninstall.sh", "release.sh", "diagnose.sh", "shortcuts.sh",
-                                              "appimage.sh", "appimage/AppRun", "open.sh")]
+                                              "appimage.sh", "appimage/AppRun", "manager-app.sh",
+                                              "manager-app/collect.sh")]
 
     def test_bash_syntax(self):
         for s in self.SCRIPTS:

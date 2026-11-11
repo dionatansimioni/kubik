@@ -115,7 +115,8 @@ open_app() {
 
 # Servidor local com um "release" mais novo, para a bandeja achar e instalar:
 # fake_releases <versão>. Reempacota o .tar.gz do build com a versão trocada e
-# serve releases.json no formato da API do GitHub em 127.0.0.1:8765.
+# serve releases.json no formato da API do GitHub em 127.0.0.1:8765. Se o teste
+# deixou /out/fake/Kubik-<versão>-x86_64.AppImage, ele vai junto no release.
 fake_releases() {
     local v=$1 srv=/tmp/releases src
     rm -rf "$srv" && mkdir -p "$srv/build"
@@ -124,10 +125,15 @@ fake_releases() {
     sed -i "s/\"Version\": *\"[^\"]*\"/\"Version\": \"$v\"/" "$src"/packages/*/metadata.json
     mv "$src" "$srv/build/kubik-$v"
     tar czf "$srv/kubik-$v.tar.gz" -C "$srv/build" "kubik-$v"
+    local ai="" name="Kubik-$v-x86_64.AppImage"
+    if [ -f "/out/fake/$name" ]; then
+        cp "/out/fake/$name" "$srv/$name"
+        ai=", {\"name\": \"$name\", \"browser_download_url\": \"http://127.0.0.1:8765/$name\"}"
+    fi
     cat > "$srv/releases.json" <<JSON
 [{"tag_name": "kubik-v$v", "draft": false, "prerelease": true,
   "html_url": "http://127.0.0.1:8765/kubik-v$v",
-  "assets": [{"name": "kubik-$v.tar.gz", "browser_download_url": "http://127.0.0.1:8765/kubik-$v.tar.gz"}]},
+  "assets": [{"name": "kubik-$v.tar.gz", "browser_download_url": "http://127.0.0.1:8765/kubik-$v.tar.gz"}$ai]},
  {"tag_name": "kubik-v0.0.1", "draft": false, "prerelease": true, "html_url": "", "assets": []}]
 JSON
     (cd "$srv" && exec python3 -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1) &

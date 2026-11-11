@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Instalador do Kubik em AppImage: dois cliques instalam ou atualizam o script,
-# o efeito de animação, o ícone da bandeja, o ícone do app e a entrada "Kubik"
-# no menu (o mesmo install.sh do .tar.gz, que vem aqui dentro).
+# Kubik em AppImage: abre o gerenciador (usr/bin/kubik-manager, um app Qt com
+# o próprio Qt dentro), que instala, atualiza, repara ou remove o Kubik (o
+# mesmo install.sh do .tar.gz, que vem aqui dentro) e abre as configurações.
 #
-# Uso: Kubik-<versão>-x86_64.AppImage                (o gerenciador; sem ele, kdialog)
+# Uso: Kubik-<versão>-x86_64.AppImage                (o gerenciador; sem ele, menu do kdialog)
 #      Kubik-<versão>-x86_64.AppImage --install [--yes]   (terminal)
 #      Kubik-<versão>-x86_64.AppImage --uninstall [--yes]
 set -uo pipefail
@@ -12,6 +12,8 @@ HERE=$(dirname "$(readlink -f "$0")")
 BUNDLE=$(find "$HERE" -maxdepth 1 -type d -name 'kubik-*' | head -n1)
 APP_ID=io.github.dionatansimioni.kubik
 DATA=${XDG_DATA_HOME:-$HOME/.local/share}
+# O install.sh guarda o AppImage em ~/.local/share/kubik (a entrada do menu o abre).
+export KUBIK_APPIMAGE=${APPIMAGE:-}
 
 case "${LANGUAGE:-${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}}" in pt*) PT=1 ;; *) PT="" ;; esac
 # t "<inglês>" "<português>"
@@ -49,22 +51,12 @@ summary() {
     fi
 }
 
-MANAGER_ID=$APP_ID.manager
-MANAGER_DIR=$DATA/plasma/plasmoids/$MANAGER_ID
-# O gerenciador é um plasmoide oculto aberto pelo plasmawindowed (vem em todo
-# Plasma, no plasma-workspace). Não o `qml`: no Fedora ele só vem com o
-# qt6-qtdeclarative-devel.
-open_manager() {
-    [ -f "$MANAGER_DIR/metadata.json" ] && [ -x "$DATA/kubik/open.sh" ] || return 1
-    (setsid "$DATA/kubik/open.sh" >/dev/null 2>&1 </dev/null &)
-}
-
 YES=""
 for a in "$@"; do [ "$a" = --yes ] && YES=1; done
 
 case "${1:-}" in
     --help|-h)
-        sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
         exit 0 ;;
     --install)
         if [ -z "$YES" ]; then
@@ -82,29 +74,31 @@ case "${1:-}" in
         do_uninstall; exit $? ;;
 esac
 
-# ---- gerenciador (janela própria) ---------------------------------------------
-# A mesma janela da entrada "Kubik" do menu, oferecendo instalar a versão que
-# vem aqui dentro. O plasmawindowed é instância única (um segundo processo só
-# repassa o nome do plasmoide, sem argumentos nem ambiente) e o AppImage
-# desmonta ao sair: o pacote vai para um lugar fixo da sessão (STAGE_DIR em
-# src/manager/logic.ts) e o plasmoide para a pasta de plasmoides, de onde
-# qualquer plasmawindowed o acha. Sem plasmawindowed: kdialog.
-# KUBIK_KDIALOG=1 força o plano B (os testes do kdialog).
-STAGE=${XDG_RUNTIME_DIR:-/tmp}/kubik-appimage-$(id -u)
-if [ -z "${KUBIK_KDIALOG:-}" ] && command -v plasmawindowed >/dev/null; then
-    rm -rf "$STAGE" && mkdir -p "$STAGE" && cp -R "$BUNDLE/." "$STAGE/" || exit 1
-    # Só troca o gerenciador instalado se o deste AppImage não for mais velho.
-    if [ ! -f "$MANAGER_DIR/metadata.json" ] || ! newer "$(meta_version "$MANAGER_DIR")" "$NEW"; then
-        rm -rf "$MANAGER_DIR" && mkdir -p "$MANAGER_DIR" && cp -R "$BUNDLE/manager/." "$MANAGER_DIR/" || exit 1
-    fi
-    "$BUNDLE/open.sh" "$MANAGER_ID"
-    exit 0
+# ---- gerenciador ------------------------------------------------------------------
+# O app sai com 0 quando o usuário fecha a janela. Qualquer outra saída (3: a
+# janela não abriu; 127: faltou biblioteca; sinal: travou) cai no menu do
+# kdialog. O motivo fica em ~/.cache/kubik/appimage.log.
+# KUBIK_KDIALOG=1 força o menu (os testes dele).
+RUNLOG=${XDG_CACHE_HOME:-$HOME/.cache}/kubik/appimage.log
+mkdir -p "$(dirname "$RUNLOG")" 2>/dev/null
+[ -f "$RUNLOG" ] && tail -n 300 "$RUNLOG" > "$RUNLOG.tmp" 2>/dev/null && mv -f "$RUNLOG.tmp" "$RUNLOG"
+note() { echo "$(date '+%F %T') $*" >> "$RUNLOG" 2>/dev/null; }
+
+if [ -z "${KUBIK_KDIALOG:-}" ]; then
+    note "Kubik $NEW: abrindo o gerenciador (${XDG_SESSION_TYPE:-?}, ${XDG_CURRENT_DESKTOP:-?})"
+    "$HERE/usr/bin/kubik-manager" --bundle "$BUNDLE" 2> >(tee -a "$RUNLOG" >&2)
+    r=$?
+    [ $r -eq 0 ] && exit 0
+    note "o gerenciador saiu com $r: menu do kdialog"
+else
+    note "Kubik $NEW: KUBIK_KDIALOG, menu do kdialog"
 fi
 
-# ---- plano B: janelas do kdialog -------------------------------------------------
+# ---- reserva: menu do kdialog ---------------------------------------------------------
+# As mesmas ações do gerenciador, sem nada além do kdialog.
 
 if ! command -v kdialog >/dev/null; then
-    # Sem kdialog: o mesmo, num terminal.
+    note "sem kdialog: terminal"
     if [ -t 0 ]; then exec "$0" --install; fi
     for term in konsole xterm; do
         command -v "$term" >/dev/null && exec "$term" -e "${APPIMAGE:-$0}" --install
@@ -113,36 +107,44 @@ if ! command -v kdialog >/dev/null; then
     exit 1
 fi
 
-OLD=$(installed_version)
-TITLE=$(t "Kubik installer" "Instalador do Kubik")
-if [ -z "$OLD" ]; then
-    kdialog --title "$TITLE" --icon "$HERE/$APP_ID.svg" --yes-label "$(t Install Instalar)" --no-label "$(t Cancel Cancelar)" \
-        --yesno "$(t "Install Kubik $NEW?
+TITLE="Kubik"
+while :; do
+    OLD=$(installed_version)
+    items=()
+    if [ -z "$OLD" ]; then
+        text=$(t "Kubik is not installed.
 
-Pop!_Shell-style auto-tiling for KDE Plasma: the KWin script, the animations, the tray icon and a \"Kubik\" entry in the menu. Meta+arrows move the focus between windows (KDE's quick tile on those keys is turned off until you uninstall)." \
-"Instalar o Kubik $NEW?
+Pop!_Shell-style auto-tiling for KDE Plasma: the KWin script, the animations, the tray icon and a \"Kubik\" entry in the menu. Meta+arrows move the focus between windows (KDE's quick tile on those keys is turned off until you remove Kubik)." \
+"O Kubik não está instalado.
 
-Auto-tiling no estilo Pop!_Shell para o KDE Plasma: o script do KWin, as animações, o ícone na bandeja e uma entrada \"Kubik\" no menu. Meta+setas passam o foco entre as janelas (o quick tile do KDE nessas teclas fica desligado até desinstalar).")" || exit 0
-elif newer "$NEW" "$OLD"; then
-    kdialog --title "$TITLE" --yes-label "$(t Update Atualizar)" --no-label "$(t Cancel Cancelar)" \
-        --yesno "$(t "Update Kubik from $OLD to $NEW?" "Atualizar o Kubik de $OLD para $NEW?")" || exit 0
-else
-    kdialog --title "$TITLE" --yes-label "$(t "Open Kubik" "Abrir o Kubik")" --no-label "$(t Reinstall Reinstalar)" \
-        --cancel-label "$(t Close Fechar)" \
-        --yesnocancel "$(t "Kubik $OLD is already installed." "O Kubik $OLD já está instalado.")"
-    case $? in
-        0) open_manager; exit 0 ;;
-        1) ;;
-        *) exit 0 ;;
-    esac
-fi
-
-if ! do_install >/dev/null; then
-    kdialog --title "$TITLE" --error "$(t "Installation failed:" "A instalação falhou:")
+Auto-tiling no estilo Pop!_Shell para o KDE Plasma: o script do KWin, as animações, o ícone na bandeja e uma entrada \"Kubik\" no menu. Meta+setas passam o foco entre as janelas (o quick tile do KDE nessas teclas fica desligado até remover o Kubik).")
+        items+=(install "$(t "Install Kubik $NEW" "Instalar o Kubik $NEW")")
+    else
+        text=$(t "Kubik $OLD is installed." "O Kubik $OLD está instalado.")
+        newer "$NEW" "$OLD" && items+=(update "$(t "Update to $NEW" "Atualizar para $NEW")")
+        items+=(settings "$(t "Settings" "Configurações")")
+        items+=(repair "$(t "Reinstall $NEW" "Reinstalar o $NEW")")
+        items+=(remove "$(t "Remove Kubik" "Remover o Kubik")")
+    fi
+    choice=$(kdialog --title "$TITLE" --menu "$text" "${items[@]}") || exit 0
+    note "menu: $choice"
+    case "$choice" in
+        install|update|repair)
+            if ! do_install >/dev/null; then
+                kdialog --title "$TITLE" --error "$(t "Installation failed:" "A instalação falhou:")
 
 $(tail -n 15 "$LOG")"
-    exit 1
-fi
-kdialog --title "$TITLE" --yes-label "$(t "Open Kubik" "Abrir o Kubik")" --no-label "$(t Close Fechar)" \
-    --yesno "$(summary)" && open_manager
-exit 0
+                continue
+            fi
+            kdialog --title "$TITLE" --msgbox "$(summary)" ;;
+        settings)
+            (setsid plasmawindowed "$APP_ID" >/dev/null 2>&1 </dev/null &)
+            exit 0 ;;
+        remove)
+            kdialog --title "$TITLE" --yes-label "$(t Remove Remover)" --no-label "$(t Cancel Cancelar)" \
+                --warningyesno "$(t "Remove Kubik, its tray icon and its shortcuts?" "Remover o Kubik, o ícone da bandeja e os atalhos?")" || continue
+            do_uninstall >/dev/null 2>&1
+            kdialog --title "$TITLE" --msgbox "$(t "Kubik was removed." "O Kubik foi removido.")" ;;
+        *) exit 0 ;;
+    esac
+done

@@ -6,7 +6,7 @@ Auto-tiling de janelas no estilo Pop!_Shell para o KDE Plasma 6.
 
 Baixe a versão mais recente em **Releases** e escolha uma das formas:
 
-- **Instalador (mais fácil):** `Kubik-<versão>-x86_64.AppImage`. Marque como executável (botão direito › Propriedades › Permissões) e abra com dois cliques: abre o gerenciador (abaixo), que oferece instalar. Pelo terminal: `--install --yes` ou `--uninstall --yes`. Tem ~1 MB e não traz Qt: usa o `qml` e os módulos do próprio Plasma (sem eles, cai para janelas do `kdialog`).
+- **Instalador (mais fácil):** `Kubik-<versão>-x86_64.AppImage`. Marque como executável (botão direito › Propriedades › Permissões) e abra com dois cliques: abre o gerenciador (abaixo), que oferece instalar. Pelo terminal: `--install --yes` ou `--uninstall --yes`. Tem ~40 MB porque traz o próprio Qt (6.8 LTS): não depende do Qt nem dos módulos do Plasma da máquina.
 - **Pelo terminal:** `tar xzf kubik-<versão>.tar.gz && ./kubik-<versão>/install.sh`.
 - **Só o script, pela interface:** Configurações do Sistema › Scripts do KWin › *Instalar de arquivo…* › `kubik-<versão>.kwinscript`, e marque **Kubik** (sem animações, bandeja e menu).
 
@@ -24,9 +24,10 @@ Uma janela pequena, que abre pelo AppImage e pela entrada **Kubik** do menu. Mos
 | Falta algum componente | **Configurações**, **Remover…**, **Reparar** |
 
 - Avisa quando as animações só ligam depois de sair e entrar na sessão, e quando o script está parado.
-- **Configurações** abre o ícone da bandeja numa janela, no lugar da do gerenciador (o `plasmawindowed` mostra uma por vez; o "Kubik" do menu traz o gerenciador de volta).
+- **Configurações** abre o ícone da bandeja numa janela, ao lado do gerenciador.
 - **Remover…** pede confirmação e tira tudo: script, efeito, bandeja, ícone, menu e atalhos (devolve os do KDE).
-- O `install.sh` guarda o gerenciador e uma cópia do `uninstall.sh` em `~/.local/share/kubik/`, de onde a entrada do menu o abre.
+- É um app próprio, com o Qt dentro do AppImage: não depende do Qt nem dos módulos do Plasma da máquina, e segue as cores, a fonte e os ícones do Plasma. Se mesmo assim não abrir, o AppImage mostra um menu simples (kdialog) com as mesmas ações, e o motivo fica em `~/.cache/kubik/appimage.log`.
+- Ao instalar, o AppImage se guarda em `~/.local/share/kubik/Kubik.AppImage` (com uma cópia do `uninstall.sh`), e a entrada do menu o abre. Atualizar pelo GitHub baixa o AppImage novo.
 
 A bandeja também avisa de versão nova (ao iniciar e a cada 6 h; desliga em *Configurar… › Geral › Atualizações*) e tem o botão **Atualizar**.
 
@@ -88,7 +89,7 @@ python3 -m unittest discover -s tests # tudo, inclusive o KWin real do testenv
 - `src/effect/`: o efeito de animação. A decisão e o cálculo ficam em `morph.ts`, que é puro e testado; `main.ts` liga isso à API de efeitos. O resultado vai para `effect/`.
 - `src/kwin/settings.ts`: as preferências do `kwinrc`, com padrões e limites. O script e a bandeja usam o mesmo leitor.
 - `src/tray/logic.ts`: a lógica do ícone da bandeja (comandos, listas, validação, estado, releases do GitHub). O resultado vai para `tray/contents/code/logic.js`; o QML do plasmoide fica em `tray/contents/ui/`.
-- `src/manager/logic.ts` + `manager/` (plasmoide oculto): o gerenciador (estado → ações, comandos, textos em en/pt). Abre no `plasmawindowed` pelo `scripts/open.sh`. O resultado vai para `manager/contents/code/logic.js`.
+- `src/manager/logic.ts` + `manager/` (app Qt: `main.cpp`, `Main.qml`): o gerenciador (estado → ações, comandos, textos em en/pt). O `scripts/manager-app.sh` compila num container (Debian 13, Qt 6.8) e junta o Qt que vai dentro do AppImage. A lógica gerada vai para `manager/logic.js`.
 - `src/qml/Kubik.qml`: o modelo em que o build embute o bundle.
 - `package/`: o pacote do KWin. O `main.qml` é só um carregador.
 - `scripts/appimage.sh` + `scripts/appimage/AppRun`: o instalador AppImage, feito do `.tar.gz` (runtime oficial do AppImage em versão fixa, conferido por sha256, + squashfs).

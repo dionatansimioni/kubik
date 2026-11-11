@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionText, bundleCommand, installCommand, langOf, MANAGER_ID, missingText, parseBundled, plan, removeCommand,
-  settingsCommand, STAGE_DIR, tr,
+  actionText, installCommand, langOf, missingText, plan, removeCommand, settingsCommand, tr,
 } from "../src/manager/logic";
 import type { Status } from "../src/tray/logic";
 
@@ -55,35 +54,27 @@ describe("gerenciador: o que oferecer", () => {
 });
 
 describe("gerenciador: comandos", () => {
-  it("o pacote do AppImage fica num lugar fixo da sessão (o plasmawindowed não repassa argumentos)", () => {
-    expect(STAGE_DIR).toBe("${XDG_RUNTIME_DIR:-/tmp}/kubik-appimage-$(id -u)");
-    expect(MANAGER_ID).toBe("io.github.dionatansimioni.kubik.manager");
-  });
-
-  it("lê a versão do pacote deixado pelo AppImage", () => {
-    expect(bundleCommand()).toContain(`"${STAGE_DIR}/packages/kubik/metadata.json"`);
-    expect(parseBundled("0.12.0\n")).toBe("0.12.0");
-    expect(parseBundled("")).toBeNull();
-    expect(parseBundled("lixo")).toBeNull();
-  });
-
   it("instalar do pacote do AppImage ou do GitHub", () => {
-    expect(installCommand("bundle", null)).toBe(`bash "${STAGE_DIR}/install.sh"`);
-    expect(installCommand("github", rel("0.12.0"))).toContain("'https://github.com/x/kubik-0.12.0.tar.gz'");
-    expect(() => installCommand(null, null)).toThrow();
+    expect(installCommand("bundle", "/tmp/.mount_Kubik/kubik-0.12.0", null)).toBe("bash '/tmp/.mount_Kubik/kubik-0.12.0/install.sh'");
+    expect(installCommand("github", "", rel("0.13.0"))).toContain("'https://github.com/x/kubik-0.13.0.tar.gz'");
+    expect(() => installCommand(null, "", null)).toThrow();
+    expect(() => installCommand("bundle", "", null)).toThrow();
   });
 
-  it("remover usa a cópia guardada, ou a do pacote do AppImage", () => {
-    expect(removeCommand()).toBe(
+  it("remover usa a cópia guardada, ou a do pacote junto", () => {
+    expect(removeCommand("/b/kubik-0.12.0")).toBe(
       'if [ -f "${XDG_DATA_HOME:-$HOME/.local/share}/kubik/uninstall.sh" ]; then bash "${XDG_DATA_HOME:-$HOME/.local/share}/kubik/uninstall.sh"; ' +
-        `elif [ -f "${STAGE_DIR}/uninstall.sh" ]; then bash "${STAGE_DIR}/uninstall.sh"; else false; fi`,
+        "else bash '/b/kubik-0.12.0/uninstall.sh'; fi",
     );
+    expect(removeCommand("")).toMatch(/else false; fi$/);
+  });
+
+  it("caminho com aspas não escapa do shell", () => {
+    expect(installCommand("bundle", "/tmp/a'b", null)).toBe("bash '/tmp/a'\\''b/install.sh'");
   });
 
   it("configurações abre a bandeja numa janela, sem esperar", () => {
-    expect(settingsCommand()).toBe(
-      'setsid "${XDG_DATA_HOME:-$HOME/.local/share}/kubik/open.sh" io.github.dionatansimioni.kubik >/dev/null 2>&1 < /dev/null &',
-    );
+    expect(settingsCommand()).toBe("setsid plasmawindowed io.github.dionatansimioni.kubik >/dev/null 2>&1 < /dev/null &");
   });
 });
 

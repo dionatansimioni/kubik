@@ -144,9 +144,9 @@ class TrayUpdateTest(unittest.TestCase):
     def test_update_button_installs_the_new_release(self):
         self.assertIn("[kubik-tray] atualizado para 99.0.0", self.log)
         self.assertIn("estado: script 99.0.0 (ativo), efeito 99.0.0 (ativo), bandeja 99.0.0", self.log)
-        self.assertIn("=== FILES updated icon=yes desktop=yes uninstaller=yes script=yes tray=yes", self.log)
-        # A entrada do menu aponta para o gerenciador instalado.
-        self.assertIn('=== desktop exec: "/home/tester/.local/share/kubik/open.sh"', self.log)
+        # Pelo .tar.gz (o release falso não tem AppImage) não há gerenciador
+        # guardado, então nem entrada no menu; com o AppImage: test_kwin_manager.
+        self.assertIn("=== FILES updated icon=yes desktop=no uninstaller=yes script=yes tray=yes", self.log)
 
     def test_no_qml_errors(self):
         applet = [l for l in self.log.splitlines()

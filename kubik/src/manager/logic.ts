@@ -1,12 +1,10 @@
 /**
- * Lógica pura do gerenciador do Kubik (kubik/manager, um plasmoide oculto que
- * o `plasmawindowed` abre numa janela): a janela do AppImage e da entrada
- * "Kubik" do menu. Decide o que mostrar e que ações oferecer a partir do
- * estado no sistema (os mesmos comandos da bandeja: src/tray/logic.ts) e
- * monta os comandos de shell.
+ * Lógica pura do gerenciador do Kubik (kubik/manager: um app Qt próprio, com
+ * o Qt dentro do AppImage): a janela do AppImage e da entrada "Kubik" do menu.
+ * Decide o que mostrar e que ações oferecer a partir do estado no sistema (os
+ * mesmos comandos da bandeja: src/tray/logic.ts) e monta os comandos de shell.
  *
- * Os textos ficam aqui, em inglês e português (o plasmoide não tem catálogo
- * de tradução próprio).
+ * Os textos ficam aqui, em inglês e português (o app não usa o i18n do KDE).
  */
 import {
   type Release,
@@ -39,20 +37,8 @@ export interface Plan {
   missing: Array<"script" | "effect" | "tray">;
 }
 
-/** Id do plasmoide do gerenciador (plasmawindowed <id>). */
-export const MANAGER_ID = "io.github.dionatansimioni.kubik.manager";
-
 /**
- * Onde o AppImage deixa uma cópia do pacote que traz (install.sh, packages/…).
- * O plasmawindowed é instância única: aberto de novo, ele repassa só o nome do
- * plasmoide ao processo que já roda (sem argumentos nem ambiente), e o AppImage
- * desmonta ao sair. Então o pacote fica num lugar fixo, que dura a sessão.
- * Expressão de shell, para dentro de aspas duplas; igual à do AppRun.
- */
-export const STAGE_DIR = "${XDG_RUNTIME_DIR:-/tmp}/kubik-appimage-$(id -u)";
-
-/**
- * bundled: a versão deixada pelo AppImage (STAGE_DIR) ou null.
+ * bundled: a versão que vem no AppImage (o pacote junto) ou null.
  * release: o release mais novo do GitHub (ou null: sem rede, nada novo).
  */
 export function plan(status: Status | null, bundled: string | null, release: Release | null): Plan {
@@ -81,37 +67,28 @@ export function plan(status: Status | null, bundled: string | null, release: Rel
   return { installed, available, source, actions, warnings, missing };
 }
 
-/** Versão do pacote deixado pelo AppImage (vazio se não há). */
-export function bundleCommand(): string {
-  return `sed -n 's/.*"Version": *"\\([^"]*\\)".*/\\1/p' "${STAGE_DIR}/packages/kubik/metadata.json" 2>/dev/null | head -n1`;
+/** Aspas simples de shell. */
+function q(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
-export function parseBundled(stdout: string): string | null {
-  const v = String(stdout || "").trim();
-  return isVersion(v) ? v : null;
-}
-
-/** Instalar/atualizar/reparar: do pacote deixado pelo AppImage ou do release do GitHub. */
-export function installCommand(source: Plan["source"], release: Release | null): string {
+/** Instalar/atualizar/reparar: do pacote que vem no AppImage ou do release do GitHub. */
+export function installCommand(source: Plan["source"], bundleDir: string, release: Release | null): string {
   if (source === "github" && release) return updateCommand(release);
-  if (source === "bundle") return `bash "${STAGE_DIR}/install.sh"`;
+  if (source === "bundle" && bundleDir) return `bash ${q(`${bundleDir}/install.sh`)}`;
   throw new Error("nada para instalar");
 }
 
-/** Remover: a cópia guardada pelo install.sh ou, sem ela, a do pacote do AppImage. */
-export function removeCommand(): string {
+/** Remover: a cópia guardada pelo install.sh ou, sem ela, a do pacote junto. */
+export function removeCommand(bundleDir: string): string {
   const stored = `"${DATA_DIR}/uninstall.sh"`;
-  const staged = `"${STAGE_DIR}/uninstall.sh"`;
-  return `if [ -f ${stored} ]; then bash ${stored}; elif [ -f ${staged} ]; then bash ${staged}; else false; fi`;
+  const fallback = bundleDir ? `bash ${q(`${bundleDir}/uninstall.sh`)}` : "false";
+  return `if [ -f ${stored} ]; then bash ${stored}; else ${fallback}; fi`;
 }
 
-/**
- * Configurações: a bandeja numa janela (plasmawindowed), no lugar da do
- * gerenciador (o plasmawindowed mostra um plasmoide por vez). Pelo open.sh,
- * para o gerenciador abrir de novo depois (ver scripts/open.sh).
- */
+/** Configurações: a bandeja numa janela (plasmawindowed), ao lado do gerenciador. */
 export function settingsCommand(): string {
-  return `setsid "${DATA_DIR}/open.sh" io.github.dionatansimioni.kubik >/dev/null 2>&1 < /dev/null &`;
+  return "setsid plasmawindowed io.github.dionatansimioni.kubik >/dev/null 2>&1 < /dev/null &";
 }
 
 // ---- textos ------------------------------------------------------------------

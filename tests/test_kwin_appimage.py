@@ -1,8 +1,10 @@
-"""Integração: o instalador AppImage num KWin 6 real (Arch e Fedora).
+"""Integração: o AppImage sem o gerenciador em Qt, num KWin 6 real (Arch e Fedora).
 
-O AppImage é gerado do .tar.gz do release (scripts/appimage.sh) e roda no
-container com APPIMAGE_EXTRACT_AND_RUN (sem FUSE). As janelas do kdialog são
-de um kdialog falso que registra o texto no log. Ver tests/scenarios/appimage.sh.
+O menu de reserva do kdialog (forçado, ou porque o app não abriu) e as opções
+de terminal. O AppImage é gerado do .tar.gz do release (scripts/appimage.sh) e
+roda no container com APPIMAGE_EXTRACT_AND_RUN (sem FUSE). As janelas são de
+um kdialog falso que registra o texto no log. Ver tests/scenarios/appimage.sh.
+O gerenciador em Qt: test_kwin_manager.py.
 """
 import os
 import re
@@ -13,16 +15,38 @@ import unittest
 from pathlib import Path
 
 from test_kwin_overlay import ROOT, kwin_env_available
-from test_kwin_tray import plasma_available
 
 
-def build_appimage(dest: Path) -> Path:
+def _with_version(tarball: Path, version: str, dest: Path) -> Path:
+    """O mesmo .tar.gz, com outra versão (para um "release" falso mais novo)."""
+    import io
+    import re as _re
+    import tarfile
+    out = dest / f"kubik-{version}.tar.gz"
+    with tarfile.open(tarball) as src, tarfile.open(out, "w:gz") as dst:
+        for m in src.getmembers():
+            data = src.extractfile(m).read() if m.isfile() else None
+            parts = m.name.split("/", 1)
+            # Entrada nova (nomes longos vão num cabeçalho PAX, que mudar
+            # m.name não alteraria).
+            info = tarfile.TarInfo(f"kubik-{version}" + ("/" + parts[1] if len(parts) > 1 else ""))
+            info.type, info.mode, info.mtime = m.type, m.mode, m.mtime
+            if data is not None and info.name.endswith("metadata.json") and "/packages/" in info.name:
+                data = _re.sub(rb'"Version": *"[^"]*"', f'"Version": "{version}"'.encode(), data)
+            info.size = len(data) if data is not None else 0
+            dst.addfile(info, io.BytesIO(data) if data is not None else None)
+    return out
+
+
+def build_appimage(dest: Path, version: str = "") -> Path:
     dist = Path(tempfile.mkdtemp(prefix="kubik-ai-dist-"))
     try:
         out = subprocess.run(["python3", str(ROOT / "scripts" / "build.py")], cwd=ROOT, check=True,
                              capture_output=True, text=True, env=dict(os.environ, KUBIK_DIST=str(dist))).stdout
-        tarball = next(l for l in out.splitlines() if l.endswith(".tar.gz"))
-        path = subprocess.run([str(ROOT / "scripts" / "appimage.sh"), tarball, str(dest)],
+        tarball = Path(next(l for l in out.splitlines() if l.endswith(".tar.gz")))
+        if version:
+            tarball = _with_version(tarball, version, dist)
+        path = subprocess.run([str(ROOT / "scripts" / "appimage.sh"), str(tarball), str(dest)],
                               check=True, capture_output=True, text=True).stdout.strip()
         return Path(path)
     finally:
@@ -55,47 +79,49 @@ class AppImageInstallTest(unittest.TestCase):
     def dialogs(self, name):
         return re.findall(r"^KDIALOG (.*)$", self.phase(name), re.M)
 
-    def test_small_without_qt(self):
-        self.assertLess(self.appimage.stat().st_size, 3 * 1024 * 1024)
+    def test_name(self):
         self.assertRegex(self.appimage.name, r"^Kubik-\d+\.\d+\.\d+-x86_64\.AppImage$")
 
-    def test_two_clicks_install_everything_in_portuguese(self):
+    def test_menu_installs_everything_in_portuguese(self):
         d = self.dialogs("gui_first")
-        self.assertEqual(len(d), 2, d)
-        self.assertIn("[--yesno] [Instalar o Kubik", d[0])
-        self.assertIn("[--yes-label] [Instalar]", d[0])
+        self.assertIn("[--menu] [O Kubik não está instalado.", d[0])
+        self.assertIn("[install] [Instalar o Kubik", d[0])
         # Efeito novo: o KWin só o carrega no próximo login, e o resumo avisa.
+        self.assertIn("[--msgbox]", d[1])
         self.assertIn("Saia e entre na sessão uma vez", d[1])
-        self.assertIn("[--yes-label] [Abrir o Kubik]", d[1])
-        self.assertIn("=== STATE gui_first script=true tray=yes icon=yes menu=yes", self.log)
+        # De volta ao menu, agora instalado (Cancelar sai).
+        self.assertRegex(d[2], r"\[--menu\] \[O Kubik \d+\.\d+\.\d+ está instalado\.\]")
+        self.assertEqual(len(d), 3, d)
+        self.assertIn("=== exit 0", self.phase("gui_first"))
+        self.assertIn("=== STATE gui_first script=true tray=yes icon=yes menu=yes manager=yes", self.log)
 
-    @unittest.skipUnless(plasma_available(), "sem os módulos do Plasma (gerenciador) na imagem")
-    def test_open_kubik_shows_the_installed_manager(self):
-        self.assertIn("[kubik-manager] aberto", self.phase("gui_first"))
-        m = re.search(r"=== MANAGER (\S+) (\d+)x(\d+)", self.log)
-        self.assertTrue(m, "janela do gerenciador não apareceu")
-        self.assertLess(int(m.group(2)), 900)  # janela pequena, fora do tiling
+    def test_installed_appimage_is_the_menu_entry(self):
+        self.assertIn('=== desktop exec: "/home/tester/.local/share/kubik/Kubik.AppImage"', self.log)
 
-    @unittest.skipIf(plasma_available(), "a imagem do Arch tem o Plasma (plasmawindowed)")
-    def test_without_plasmawindowed_falls_back_to_kdialog(self):
-        d = self.dialogs("no_plasmawindowed")
-        self.assertEqual(len(d), 1, self.phase("no_plasmawindowed"))
-        self.assertIn("is already installed", d[0])
-
-    def test_second_run_knows_it_is_installed(self):
+    def test_menu_offers_settings_reinstall_and_remove_when_installed(self):
         d = self.dialogs("gui_again")
-        # Falhou uma vez no Fedora com a máquina carregada (nenhuma janela):
-        # a mensagem traz a fase inteira para diagnosticar.
-        phase = "\n".join(l for l in self.phase("gui_again").splitlines() if "kwin_core" not in l)
-        self.assertEqual(len(d), 1, phase)
-        self.assertRegex(d[0], r"\[--yesnocancel\] \[Kubik \d+\.\d+\.\d+ is already installed\.\]")
-        self.assertIn("=== exit 0", self.phase("gui_again"))
+        first = d[0]
+        for tag in ("[settings] [Settings]", "[repair] [Reinstall", "[remove] [Remove Kubik]"):
+            self.assertIn(tag, first)
+        self.assertNotIn("[update]", first)  # o mesmo do AppImage: nada a atualizar
+        self.assertIn("[--warningyesno] [Remove Kubik, its tray icon and its shortcuts?]", d[1])
+        self.assertIn("[--msgbox] [Kubik was removed.]", d[2])
+        self.assertIn("[install] [Install Kubik", d[3])
+        self.assertIn("=== STATE gui_again script=false tray=no icon=no menu=no manager=no", self.log)
 
-    def test_terminal_uninstall_and_install(self):
-        self.assertIn("=== STATE cli_uninstall script=false tray=no icon=no menu=no", self.log)
-        self.assertIn("=== STATE cli_install script=true tray=yes icon=yes menu=yes", self.log)
+    def test_terminal_install_and_uninstall(self):
+        self.assertIn("=== STATE cli_install script=true tray=yes icon=yes menu=yes manager=yes", self.log)
+        self.assertIn("=== STATE cli_uninstall script=false tray=no icon=no menu=no manager=no", self.log)
         self.assertIn("Kubik removido.", self.phase("cli_uninstall"))
 
+    def test_broken_manager_falls_back_to_the_menu_and_says_why(self):
+        phase = self.phase("broken_manager")
+        self.assertEqual(len(self.dialogs("broken_manager")), 1, phase)
+        self.assertIn("[--menu]", self.dialogs("broken_manager")[0])
+        runlog = phase.split("=== RUNLOG")[1]
+        self.assertRegex(runlog, r"abrindo o gerenciador")
+        self.assertRegex(runlog, r"o gerenciador saiu com \d+: menu do kdialog")
+        self.assertIn("nenhuma", runlog)  # a mensagem do Qt sobre a plataforma
 
 if __name__ == "__main__":
     unittest.main()

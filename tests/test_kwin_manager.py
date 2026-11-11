@@ -1,10 +1,11 @@
 """Integração: o gerenciador do Kubik (kubik/manager) num KWin 6 real.
 
-A janela que abre pelo AppImage e pela entrada "Kubik" do menu (um plasmoide
-oculto no plasmawindowed): com nada instalado oferece Instalar; instalado,
-oferece Configurações e Remover, e Atualizar quando há versão nova (do
-AppImage ou de um "GitHub" local).
-Só no Arch: a janela usa os módulos do Plasma, que a imagem do Fedora não tem.
+A janela que abre pelo AppImage e pela entrada "Kubik" do menu: um app Qt
+com o próprio Qt (6.8, do Debian 13) dentro do AppImage. Com nada instalado
+oferece Instalar; instalado, oferece Configurações e Remover, e Atualizar
+quando há versão nova (do AppImage ou de um "GitHub" local, que traz um
+AppImage 99.0.0). Roda no Arch e no Fedora (o app não usa nada do Plasma; as
+configurações abrem no plasmawindowed, que só a imagem do Arch tem).
 Ver tests/scenarios/manager.sh.
 """
 import os
@@ -20,15 +21,16 @@ from test_kwin_overlay import ROOT, kwin_env_available
 from test_kwin_tray import plasma_available
 
 
-@unittest.skipUnless(kwin_env_available() and plasma_available(), "testenv com Plasma indisponível")
+@unittest.skipUnless(kwin_env_available(), "testenv indisponível (docker/vgem)")
 class ManagerWindowTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.out = Path(tempfile.mkdtemp(prefix="kubik-manager-"))
         build_appimage(cls.out / "appimage")
+        build_appimage(cls.out / "fake", version="99.0.0")
         subprocess.run(
             [str(ROOT / "testenv" / "run.sh"), "kubik/package", "tests/scenarios/manager.sh", str(cls.out)],
-            cwd=ROOT, check=True, capture_output=True, timeout=500,
+            cwd=ROOT, check=True, capture_output=True, timeout=600,
             env=dict(os.environ, KUBIK_EXTRA_PKGS=""),
         )
         cls.log = (cls.out / "kwin.log").read_text(errors="replace")
@@ -44,57 +46,49 @@ class ManagerWindowTest(unittest.TestCase):
 
     def test_everything_happened(self):
         self.assertNotIn("TIMEOUT", self.log)
-        self.assertNotIn("plasmawindowed não saiu", self.log)
+        self.assertNotIn("kubik-manager não saiu", self.log)
 
     def test_fresh_system_offers_only_install(self):
-        self.assertIn("[kubik-manager] aberto", self.appimage)
-        self.assertRegex(self.appimage, r"estado: instalado null, disponível \d+\.\d+\.\d+ \(bundle\), ações install")
-        # O pacote do AppImage fica num lugar fixo da sessão.
-        self.assertRegex(self.appimage, r"=== STAGE .*install\.sh .*packages")
+        self.assertRegex(self.appimage, r"\[kubik-manager\] aberto \(Qt 6\.8\.\d+\), pacote \d+\.\d+\.\d+")
         first = re.search(r"\[kubik-manager\] botões(.*)", self.appimage).group(1)
         self.assertEqual(re.findall(r" (\w+)=", first), ["install"])
         self.assertIn("=== FILES clean script=no tray=no menu=no manager=no", self.appimage)
 
+    def test_uses_its_own_qt(self):
+        # O Qt de dentro do AppImage (6.8), não o do sistema (Arch e Fedora: mais novo).
+        for qt in re.findall(r"\[kubik-manager\] aberto \(Qt ([\d.]+)\)", self.log):
+            self.assertTrue(qt.startswith("6.8."), qt)
+
+    def test_window_has_the_menu_entry_app_id(self):
+        # Mesmo nome da entrada do menu: a barra de tarefas mostra o ícone do Kubik.
+        self.assertIn("=== APPID io.github.dionatansimioni.kubik io.github.dionatansimioni.kubik", self.log)
+
     def test_install_from_the_appimage(self):
         self.assertRegex(self.appimage, r"ação: install \d+\.\d+\.\d+ \(bundle\)")
         self.assertIn("[kubik-manager] concluído: install", self.appimage)
+        # O AppImage se guarda em ~/.local/share/kubik, e o menu o abre.
         self.assertIn("=== FILES installed script=yes tray=yes menu=yes manager=yes", self.appimage)
-        # Depois: configurações e remover (em dia com o AppImage).
         last = re.findall(r"\[kubik-manager\] botões(.*)", self.appimage)[-1]
         self.assertEqual(re.findall(r" (\w+)=", last), ["settings", "remove"])
 
     def test_menu_entry_opens_the_installed_manager(self):
-        self.assertIn('=== EXEC "/home/tester/.local/share/kubik/open.sh"', self.menu)
+        self.assertIn('=== EXEC "/home/tester/.local/share/kubik/Kubik.AppImage"', self.menu)
         self.assertIn("[kubik-manager] aberto", self.menu)
 
-    def test_opens_when_plasmawindowed_is_already_running(self):
-        # As configurações já estavam abertas: o gerenciador fica no lugar delas.
-        self.assertRegex(self.menu, r"=== WINDOWS before \d+x\d+\n")
-        self.assertRegex(self.menu, r"=== WINDOWS manager \d+x\d+\n")
-        self.assertIn("=== PROCESSES 1", self.menu)
+    @unittest.skipUnless(plasma_available(), "sem plasmawindowed na imagem")
+    def test_settings_open_beside_the_manager(self):
+        self.assertIn("[kubik-manager] configurações", self.menu)
+        self.assertIn("=== WINDOWS io.github.dionatansimioni.kubik org.kde.plasmawindowed", self.menu)
 
     def test_offers_and_installs_the_github_update(self):
         self.assertIn("[kubik-manager] GitHub: 99.0.0", self.menu)
         offered = [l for l in re.findall(r"\[kubik-manager\] botões(.*)", self.menu) if " update=" in l][0]
         self.assertEqual(re.findall(r" (\w+)=", offered), ["settings", "remove", "update"])
         self.assertIn("ação: update 99.0.0 (github)", self.menu)
+        # Pelo AppImage do release, que também troca o gerenciador guardado.
+        self.assertIn("=== MANAGER is 99.0.0", self.menu)
         self.assertIn("[kubik-manager] concluído: update", self.menu)
         self.assertIn("estado: instalado 99.0.0", self.menu)
-
-    def test_settings_opens_the_tray_in_a_window(self):
-        self.assertIn("[kubik-manager] configurações", self.menu)
-        # Uma janela só: a da bandeja (o plasmawindowed mostra um plasmoide por vez).
-        after = self.menu.split("[kubik-manager] configurações", 1)[1].split("=== WINDOWS settings", 1)
-        self.assertNotIn("[kubik-manager] aberto", after[0])
-        self.assertRegex(after[1], r"^ \d+x\d+\n")
-
-    def test_menu_reopens_the_manager_after_settings(self):
-        # O plasmawindowed ignora um plasmoide que já passou pelo processo; o
-        # open.sh começa outro processo.
-        self.assertEqual(self.menu.count("[kubik-manager] aberto"), 2)
-        after = self.menu.split("=== WINDOWS settings", 1)[1]
-        self.assertIn("[kubik-manager] aberto", after.split("=== WINDOWS reopened")[0])
-        self.assertRegex(after, r"=== WINDOWS reopened \d+x\d+\n")
 
     def test_remove_asks_first_then_removes_everything(self):
         confirm = [l for l in re.findall(r"\[kubik-manager\] botões(.*)", self.menu) if " confirm=" in l][0]
@@ -106,17 +100,15 @@ class ManagerWindowTest(unittest.TestCase):
         self.assertEqual(re.findall(r" (\w+)=", last), ["install"])
 
     def test_window_is_small_and_floating(self):
-        # Do tamanho do conteúdo (o plasmawindowed abriria com 500×536).
         for w, h in re.findall(r"=== MGRGEOM \d+ \d+ (\d+)x(\d+)", self.log):
-            self.assertLess(int(w), 500)
-            self.assertLess(int(h), 400)
-        self.assertRegex(self.log, r"flutuante 'Kubik': classe flutuante \(org\.kde\.plasmawindowed\)")
+            self.assertLess(int(w), 700)
+            self.assertLess(int(h), 500)
+        self.assertRegex(self.log, r"flutuante 'Kubik': não redimensionável")
 
     def test_no_qml_errors(self):
         bad = [l for l in self.log.splitlines()
-               if "kubik.manager/contents" in l or ("kubik-manager" in l and re.search(r"Error|undefined|is not", l))]
+               if "qrc:/Main.qml" in l or ("kubik-manager" in l and re.search(r"Error|undefined|is not", l))]
         self.assertEqual(bad, [])
-
 
 if __name__ == "__main__":
     unittest.main()
