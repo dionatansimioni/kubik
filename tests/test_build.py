@@ -259,6 +259,16 @@ class ShellScriptsTest(unittest.TestCase):
         self.assertEqual(field("KPackageStructure"), "KWin/Script")
         self.assertEqual(field("KPackageStructure", ROOT / "kubik" / "effect"), "KWin/Effect")
 
+    def test_kpackagetool_output_is_read_in_english(self):
+        # Em pt-BR o kpackagetool6 escreve "Caminho" no lugar de "Path" (0.12.0:
+        # o gerenciador nunca via o Kubik instalado). Quem lê a saída usa LC_ALL=C.
+        import re
+        for f in ["scripts/appimage/AppRun", "scripts/diagnose.sh", "kubik/src/tray/logic.ts"]:
+            for line in (ROOT / f).read_text().splitlines():
+                code = line.split("#")[0] if not line.lstrip().startswith(("*", "//")) else ""
+                if "kpackagetool6" in code and "Path" in code:
+                    self.assertRegex(line, r"LC_ALL=C [^|]*kpackagetool6", f"{f}: {line.strip()}")
+
     def test_scripts_do_not_require_qdbus(self):
         # qdbus6 não existe em várias distros (ex.: Plasma 6.8 do usuário); use dbus-send.
         for name in ("install.sh", "uninstall.sh", "diagnose.sh"):

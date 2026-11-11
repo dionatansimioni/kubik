@@ -54,6 +54,10 @@ class ManagerWindowTest(unittest.TestCase):
         self.assertEqual(re.findall(r" (\w+)=", first), ["install"])
         self.assertIn("=== FILES clean script=no tray=no menu=no manager=no", self.appimage)
 
+    def test_reads_the_newer_kdeglobals_font_format(self):
+        self.assertIn("fonte DejaVu Sans 10", self.appimage)
+        self.assertNotIn("QFont::fromString", self.log)
+
     def test_uses_its_own_qt(self):
         # O Qt de dentro do AppImage (6.8), não o do sistema (Arch e Fedora: mais novo).
         for qt in re.findall(r"\[kubik-manager\] aberto \(Qt ([\d.]+)\)", self.log):
@@ -68,6 +72,9 @@ class ManagerWindowTest(unittest.TestCase):
         self.assertIn("[kubik-manager] concluído: install", self.appimage)
         # O AppImage se guarda em ~/.local/share/kubik, e o menu o abre.
         self.assertIn("=== FILES installed script=yes tray=yes menu=yes manager=yes", self.appimage)
+        # Depois de instalar, o estado mostra a versão (em pt-BR o kpackagetool6
+        # escreve "Caminho"; 0.12.0 ficava em "instalado null").
+        self.assertRegex(self.appimage, r"concluído: install[\s\S]*estado: instalado \d+\.\d+\.\d+")
         last = re.findall(r"\[kubik-manager\] botões(.*)", self.appimage)[-1]
         self.assertEqual(re.findall(r" (\w+)=", last), ["settings", "remove"])
 

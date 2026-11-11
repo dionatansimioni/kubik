@@ -221,13 +221,14 @@ export interface Status {
 
 /**
  * Comando que imprime "chave=valor" do estado: a versão de cada componente
- * (do metadata.json no Path que o kpackagetool6 mostra) e se o script e o
+ * (do metadata.json no Path que o kpackagetool6 mostra; LC_ALL=C porque em
+ * pt-BR o rótulo vira "Caminho") e se o script e o
  * efeito estão carregados no KWin agora.
  */
 export function statusCommand(): string {
   const version = COMPONENTS.map(
     (c) =>
-      `p=$(kpackagetool6 --type=${c.type} --show ${c.id} 2>/dev/null | sed -n 's/^ *Path *: *//p'); ` +
+      `p=$(LC_ALL=C LANGUAGE= kpackagetool6 --type=${c.type} --show ${c.id} 2>/dev/null | sed -n 's/^ *Path *: *//p'); ` +
       `v=""; [ -n "$p" ] && v=$(sed -n 's/.*"Version": *"\\([^"]*\\)".*/\\1/p' "\${p%/}/metadata.json" 2>/dev/null | head -n1); ` +
       `echo "${c.key}=$v"`,
   );

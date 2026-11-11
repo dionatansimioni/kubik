@@ -188,4 +188,11 @@ describe("gerenciador", () => {
       expect(cmd).toContain(`--type=${id}`);
     expect(cmd).toContain("isEffectLoaded string:kubikanimations");
   });
+
+  it("estado: lê a saída do kpackagetool6 em inglês (em pt-BR o rótulo vira \"Caminho\")", () => {
+    const calls = statusCommand().split("kpackagetool6").slice(1);
+    expect(calls).toHaveLength(3);
+    for (const before of statusCommand().split("kpackagetool6").slice(0, -1))
+      expect(before.endsWith("LC_ALL=C LANGUAGE= ")).toBe(true);
+  });
 });

@@ -23,7 +23,8 @@ meta_version() { sed -n 's/.*"Version": *"\([^"]*\)".*/\1/p' "$1/metadata.json" 
 NEW=$(meta_version "$BUNDLE/packages/kubik")
 installed_version() {
     local p
-    p=$(kpackagetool6 --type=KWin/Script --show kubik 2>/dev/null | sed -n 's/^ *Path *: *//p')
+    # LC_ALL=C: em pt-BR o kpackagetool6 escreve "Caminho" no lugar de "Path".
+    p=$(LC_ALL=C LANGUAGE= kpackagetool6 --type=KWin/Script --show kubik 2>/dev/null | sed -n 's/^ *Path *: *//p')
     [ -n "$p" ] && meta_version "${p%/}"
 }
 loaded() {  # loaded /Scripting org.kde.kwin.Scripting.isScriptLoaded kubik

@@ -87,6 +87,24 @@ QColor kdeColor(QSettings &s, const QString &group, const QString &key) {
     return QColor(parts[0].trimmed().toInt(), parts[1].trimmed().toInt(), parts[2].trimmed().toInt());
 }
 
+// A fonte do kdeglobals. Um Plasma com Qt mais novo grava campos a mais
+// ("Noto Sans,12,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,,0,0": 19) que o QFont do Qt
+// 6.8 recusa; então os 17 que ele conhece e, em último caso, família e tamanho.
+QFont kdeFont(const QString &spec) {
+    QFont font;
+    const QStringList parts = spec.split(QLatin1Char(','));
+    if (parts.size() <= 17 && font.fromString(spec))
+        return font;
+    if (parts.size() > 17 && font.fromString(parts.mid(0, 17).join(QLatin1Char(','))))
+        return font;
+    font = QFont(parts.value(0).trimmed());
+    bool ok = false;
+    const double size = parts.value(1).toDouble(&ok);
+    if (ok && size > 0)
+        font.setPointSizeF(size);
+    return font;
+}
+
 // Cores, fonte e ícones do usuário; devolve as cores de aviso para o QML.
 QVariantMap applyKdeTheme() {
     QVariantMap theme{
@@ -99,12 +117,12 @@ QVariantMap applyKdeTheme() {
     QSettings s(kdeglobalsPath(), QSettings::IniFormat);
     QIcon::setThemeName(s.value(QStringLiteral("Icons/Theme"), QStringLiteral("breeze")).toString());
 
-    const QVariant fontValue = s.value(QStringLiteral("General/font"));
+    // O QSettings trata o [General] do INI como a raiz: a chave é "font".
+    const QVariant fontValue = s.value(QStringLiteral("font"));
     const QString fontSpec = fontValue.typeId() == QMetaType::QStringList ? fontValue.toStringList().join(QLatin1Char(','))
                                                                            : fontValue.toString();
-    QFont font;
-    if (!fontSpec.isEmpty() && font.fromString(fontSpec))
-        QGuiApplication::setFont(font);
+    if (!fontSpec.isEmpty())
+        QGuiApplication::setFont(kdeFont(fontSpec));
 
     const QColor window = kdeColor(s, QStringLiteral("Colors:Window"), QStringLiteral("BackgroundNormal"));
     if (!window.isValid())

@@ -179,7 +179,7 @@ ApplicationWindow {
 
     Component.onCompleted: {
         showTimer.start();
-        log("aberto (Qt " + qtVersion + ")" + (bundled ? ", pacote " + bundled : ", sem pacote"));
+        log("aberto (Qt " + qtVersion + ")" + (bundled ? ", pacote " + bundled : ", sem pacote") + ", fonte " + Qt.application.font.family + " " + Qt.application.font.pointSize);
         refresh();
         checkReleases();
     }

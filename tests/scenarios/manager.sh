@@ -16,6 +16,11 @@ dbus-send --session --print-reply --dest=org.kde.KWin /Scripting org.kde.kwin.Sc
 kpackagetool6 -t KWin/Script -r kubik >/dev/null
 kwriteconfig6 --file kwinrc --group Plugins --key kubikEnabled false
 
+# O sistema do usuário: em pt-BR (o kpackagetool6 traduz a saída) e com a fonte
+# no formato de 19 campos de um Plasma com Qt mais novo que o 6.8 do app.
+export LANG=pt_BR.UTF-8 LANGUAGE=pt_BR
+kwriteconfig6 --file kdeglobals --group General --key font "DejaVu Sans,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,,0,0"
+
 files() {
     echo "=== FILES $1 script=$(kpackagetool6 -t KWin/Script --show kubik >/dev/null 2>&1 && echo yes || echo no) tray=$(kpackagetool6 -t Plasma/Applet --show $APP >/dev/null 2>&1 && echo yes || echo no) menu=$(test -f "$DATA/applications/$APP.desktop" && echo yes || echo no) manager=$(test -x "$DATA/kubik/Kubik.AppImage" && echo yes || echo no)" >&2
 }
