@@ -164,11 +164,34 @@ class ShortcutTableTest(unittest.TestCase):
             [str(ROOT / "scripts" / "node.sh"), "kubik", "npx", "--yes", "esbuild", "src/kwin/keys.ts",
              "--bundle", "--format=cjs", "--log-level=error"],
             capture_output=True, text=True, check=True).stdout
-        js = out + "\nconsole.log(JSON.stringify(module.exports.KEY_BINDINGS.map(b => [b.name, b.sequence])));"
+        js = out + "\nconsole.log(JSON.stringify(module.exports.keyBindings('en').map(b => [b.name, b.sequence])));"
         res = subprocess.run([str(ROOT / "scripts" / "node.sh"), "kubik", "node", "-e", js],
                              capture_output=True, text=True, check=True).stdout
         bindings = json.loads(res.strip().splitlines()[-1])
         self.assertEqual({n: str(self.qt_key(seq)) for n, seq in bindings}, table)
+
+
+class TrayTranslationTest(unittest.TestCase):
+    """Todo texto do ícone da bandeja (i18n no QML, rótulos de curva) tem tradução em pt_BR."""
+
+    def msgids(self):
+        tray = ROOT / "kubik" / "tray"
+        ids = set()
+        for f in (tray / "contents").rglob("*.qml"):
+            ids |= set(re.findall(r'i18n\("((?:[^"\\]|\\.)*)"', f.read_text()))
+        logic = (ROOT / "kubik" / "src" / "tray" / "logic.ts").read_text()
+        ids |= set(re.findall(r'label: "([^"]+)"', logic))
+        return ids
+
+    def test_every_string_is_translated(self):
+        po = (ROOT / "kubik" / "tray" / "po" / "pt_BR.po").read_text()
+        entries = dict(re.findall(r'^msgid "(.*)"\nmsgstr "(.*)"$', po, re.M))
+        missing = sorted(i for i in self.msgids() if not entries.get(i))
+        self.assertEqual(missing, [])
+
+    def test_sources_are_english(self):
+        accents = sorted(i for i in self.msgids() if re.search(r"[ãõçáéíóúâêô]", i))
+        self.assertEqual(accents, [])
 
 
 if __name__ == "__main__":

@@ -65,7 +65,7 @@ KCM.ScrollViewKCM {
         QQC2.Label {
             Layout.fillWidth: true
             wrapMode: Text.Wrap
-            text: i18n("Marque os apps que devem ficar sempre flutuando, fora do tiling.")
+            text: i18n("Check the apps that should always float, outside the tiling.")
         }
         RowLayout {
             Layout.fillWidth: true
@@ -75,14 +75,14 @@ KCM.ScrollViewKCM {
 
                 objectName: "manualException"
                 Layout.fillWidth: true
-                placeholderText: i18n("Classe de um app que não está aberto (ex.: steam)")
+                placeholderText: i18n("Class of an app that is not open (e.g. steam)")
                 onAccepted: addButton.clicked()
             }
             QQC2.Button {
                 id: addButton
 
                 icon.name: "list-add"
-                text: i18n("Adicionar")
+                text: i18n("Add")
                 enabled: page.logic.isValidName(manual.text.trim())
                 onClicked: {
                     page.setException(manual.text, true);
@@ -137,7 +137,7 @@ KCM.ScrollViewKCM {
                     }
                     QQC2.Label {
                         Layout.fillWidth: true
-                        text: row.open ? row.appId : i18n("não está aberto")
+                        text: row.open ? row.appId : i18n("not open")
                         opacity: 0.6
                         font: Kirigami.Theme.smallFont
                         elide: Text.ElideRight
@@ -150,7 +150,7 @@ KCM.ScrollViewKCM {
     footer: QQC2.Label {
         wrapMode: Text.Wrap
         opacity: 0.6
-        text: i18n("Sempre flutuam (embutidas): %1. Diálogos, janelas de tamanho fixo e de vários desktops também.",
+        text: i18n("Always floating (built-in): %1. Also dialogs, fixed-size windows and windows on some desktops.",
                    page.logic.DEFAULT_FLOATING_CLASSES.join(", "))
     }
 }

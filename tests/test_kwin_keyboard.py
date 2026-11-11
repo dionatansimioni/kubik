@@ -66,6 +66,11 @@ class KeyboardInKWinTest(unittest.TestCase):
         self.assertEqual(len(self.w["back"]), 3)
         self.assertNotEqual(self.w["back"]["Alpha"], (4, 4, 1272, 792))
 
+    def test_shortcut_texts_follow_the_system_language(self):
+        # O testenv roda em C.UTF-8: inglês. (Português: kubik/test/keys.test.ts.)
+        self.assertIn("=== SHORTCUT TEXT Kubik: Focus Left = Kubik: focus the window to the left", self.log)
+        self.assertIn("=== SHORTCUT TEXT Kubik: Toggle tiling = Kubik: toggle tiling", self.log)
+
     def test_no_script_errors(self):
         for bad in ("TypeError", "ReferenceError", "is not defined", "Cannot read", "used before its declaration"):
             self.assertNotIn(bad, self.log)

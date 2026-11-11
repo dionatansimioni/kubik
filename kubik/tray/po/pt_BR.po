@@ -1,0 +1,116 @@
+# Tradução do ícone da bandeja do Kubik para o português do Brasil.
+# Os textos-fonte (msgid) estão em inglês, no QML (i18n) e em
+# src/tray/logic.ts (CURVE_CHOICES). Compilado no build por tools/msgfmt.mjs.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: pt_BR\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "General"
+msgstr "Geral"
+
+msgid "Exceptions"
+msgstr "Exceções"
+
+msgid "Animation"
+msgstr "Animação"
+
+msgid "Check the apps that should always float, outside the tiling."
+msgstr "Marque os apps que devem ficar sempre flutuando, fora do tiling."
+
+msgid "Class of an app that is not open (e.g. steam)"
+msgstr "Classe de um app que não está aberto (ex.: steam)"
+
+msgid "Add"
+msgstr "Adicionar"
+
+msgid "not open"
+msgstr "não está aberto"
+
+msgid "Always floating (built-in): %1. Also dialogs, fixed-size windows and windows on some desktops."
+msgstr "Sempre flutuam (embutidas): %1. Diálogos, janelas de tamanho fixo e de vários desktops também."
+
+msgid "Tiling on"
+msgstr "Tiling ligado"
+
+msgid "Tiling"
+msgstr "Tiling"
+
+msgid "Gaps"
+msgstr "Gaps"
+
+msgid "px"
+msgstr "px"
+
+msgid "Border"
+msgstr "Borda"
+
+msgid "Tile windows that are on all desktops"
+msgstr "Janelas em todos os desktops entram no tiling"
+
+msgid "Configure…"
+msgstr "Configurar…"
+
+msgid "Duration:"
+msgstr "Duração:"
+
+msgid "no animation"
+msgstr "sem animação"
+
+msgid "%1 ms"
+msgstr "%1 ms"
+
+msgid "Curve:"
+msgstr "Curva:"
+
+msgid "Preview:"
+msgstr "Prévia:"
+
+msgid "Applies to windows being rearranged and to the fades of the border, the drop preview and the tabs. Plasma's global animation speed also applies."
+msgstr "Vale para as janelas se reorganizando e para os fades da borda, da prévia e das abas. A velocidade de animação global do Plasma também se aplica."
+
+msgid "Tiling:"
+msgstr "Tiling:"
+
+msgid "On (shortcut: Meta+Y)"
+msgstr "Ligado (atalho: Meta+Y)"
+
+msgid "Gaps between windows:"
+msgstr "Gaps entre janelas:"
+
+msgid "%1 px"
+msgstr "%1 px"
+
+msgid "Gaps at the screen edges:"
+msgstr "Gaps nas bordas da tela:"
+
+msgid "Highlight border:"
+msgstr "Borda de destaque:"
+
+msgid "Around the focused window (system accent color)"
+msgstr "Na janela em foco (cor de destaque do sistema)"
+
+msgid "Border width:"
+msgstr "Espessura da borda:"
+
+msgid "Smooth"
+msgstr "Suave"
+
+msgid "Linear"
+msgstr "Linear"
+
+msgid "Strong ease-out"
+msgstr "Desacelerar forte"
+
+msgid "Bounce"
+msgstr "Com rebote"
+
+msgid "Tiling off (Meta+Y turns it on)"
+msgstr "Tiling desligado (Meta+Y liga)"
+
+msgid "Tiling on · gaps %1 px · border %2"
+msgstr "Tiling ligado · gaps %1 px · borda %2"
+
+msgid "off"
+msgstr "desligada"

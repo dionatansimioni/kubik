@@ -33,7 +33,14 @@ PlasmoidItem {
     Plasmoid.icon: Qt.resolvedUrl("../icons/kubik.svg")
     Plasmoid.status: PlasmaCore.Types.ActiveStatus
     toolTipMainText: "Kubik"
-    toolTipSubText: logic.statusText(trayConfig())
+    toolTipSubText: tooltip()
+
+    function tooltip() {
+        const s = logic.toSettings(trayConfig());
+        if (!s.enabled)
+            return i18n("Tiling off (Meta+Y turns it on)");
+        return i18n("Tiling on · gaps %1 px · border %2", s.gaps.inner, s.border.enabled ? i18n("%1 px", s.border.width) : i18n("off"));
+    }
 
     function trayConfig() {
         return {
@@ -89,6 +96,7 @@ PlasmoidItem {
             syncing = false;
             loaded = true;
             log("configuração lida do kwinrc: " + logic.statusText(c));
+            log("tooltip: " + tooltip()); // no idioma do sistema (o teste confere a tradução)
         });
     }
 
@@ -142,7 +150,7 @@ PlasmoidItem {
 
     Plasmoid.contextualActions: [
         PlasmaCore.Action {
-            text: i18n("Tiling ligado")
+            text: i18n("Tiling on")
             icon.name: "view-grid"
             checkable: true
             checked: root.cfg.enabled
@@ -245,7 +253,7 @@ PlasmoidItem {
                     id: borderCheck
 
                     objectName: "borderCheck"
-                    text: i18n("Borda")
+                    text: i18n("Border")
                     checked: root.cfg.borderEnabled
                     onToggled: root.cfg.borderEnabled = checked
                 }
@@ -267,7 +275,7 @@ PlasmoidItem {
             Kirigami.Heading {
                 Layout.topMargin: Kirigami.Units.largeSpacing
                 level: 4
-                text: i18n("Janelas em todos os desktops entram no tiling")
+                text: i18n("Tile windows that are on all desktops")
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
             }
@@ -290,7 +298,7 @@ PlasmoidItem {
                 Layout.topMargin: Kirigami.Units.largeSpacing
                 Layout.alignment: Qt.AlignRight
                 icon.name: "configure"
-                text: i18n("Configurar…")
+                text: i18n("Configure…")
                 onClicked: Plasmoid.internalAction("configure").trigger()
             }
         }

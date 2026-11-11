@@ -18,7 +18,7 @@ KCM.SimpleKCM {
 
     Kirigami.FormLayout {
         RowLayout {
-            Kirigami.FormData.label: i18n("Duração:")
+            Kirigami.FormData.label: i18n("Duration:")
 
             QQC2.Slider {
                 id: durationSlider
@@ -31,19 +31,22 @@ KCM.SimpleKCM {
                 snapMode: QQC2.Slider.SnapAlways
             }
             QQC2.Label {
-                text: durationSlider.value === 0 ? i18n("sem animação") : i18n("%1 ms", durationSlider.value)
+                text: durationSlider.value === 0 ? i18n("no animation") : i18n("%1 ms", durationSlider.value)
             }
         }
 
         QQC2.ComboBox {
             id: curve
 
-            Kirigami.FormData.label: i18n("Curva:")
+            Kirigami.FormData.label: i18n("Curve:")
             enabled: durationSlider.value > 0
             textRole: "label"
             valueRole: "value"
-            model: logic.CURVE_CHOICES
-            // Uma curva fora da lista (editada à mão no kwinrc) aparece como "Suave".
+            model: logic.CURVE_CHOICES.map(c => ({
+                    value: c.value,
+                    label: i18n(c.label)
+                }))
+            // Uma curva fora da lista (editada à mão no kwinrc) aparece como a primeira.
             currentIndex: Math.max(0, indexOfValue(page.cfg_animCurve))
             onActivated: page.cfg_animCurve = currentValue
         }
@@ -52,7 +55,7 @@ KCM.SimpleKCM {
         Rectangle {
             id: track
 
-            Kirigami.FormData.label: i18n("Prévia:")
+            Kirigami.FormData.label: i18n("Preview:")
             implicitWidth: Kirigami.Units.gridUnit * 16
             implicitHeight: Kirigami.Units.gridUnit * 2.5
             radius: Kirigami.Units.cornerRadius
@@ -100,7 +103,7 @@ KCM.SimpleKCM {
             Layout.maximumWidth: Kirigami.Units.gridUnit * 22
             wrapMode: Text.Wrap
             opacity: 0.7
-            text: i18n("Vale para as janelas se reorganizando e para os fades da borda, da prévia e das abas. A velocidade de animação global do Plasma também se aplica.")
+            text: i18n("Applies to windows being rearranged and to the fades of the border, the drop preview and the tabs. Plasma's global animation speed also applies.")
         }
     }
 }

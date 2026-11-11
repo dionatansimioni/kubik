@@ -32,12 +32,15 @@ export const KEYS = [
   "AnimCurve",
 ] as const;
 
-/** Curvas oferecidas na bandeja, com nome amigável (outras continuam aceitas no kwinrc). */
+/**
+ * Curvas oferecidas na bandeja, com nome amigável (outras continuam aceitas
+ * no kwinrc). O nome é o texto-fonte em inglês: o QML passa por i18n().
+ */
 export const CURVE_CHOICES: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "OutCubic", label: "Suave" },
+  { value: "OutCubic", label: "Smooth" },
   { value: "Linear", label: "Linear" },
-  { value: "OutQuint", label: "Desacelerar forte" },
-  { value: "OutBack", label: "Com rebote" },
+  { value: "OutQuint", label: "Strong ease-out" },
+  { value: "OutBack", label: "Bounce" },
 ];
 
 /** A configuração da bandeja (contents/config/main.xml): uma entrada por campo. */
@@ -185,7 +188,7 @@ export function otherExceptions(exceptions: ArrayLike<string>, open: ReadonlyArr
   return Array.from(exceptions).filter((e) => !open.some((a) => a.id === e.toLowerCase()));
 }
 
-/** Texto do tooltip do ícone. */
+/** Resumo do estado para o log da bandeja (o tooltip é montado no QML, traduzido). */
 export function statusText(c: Partial<TrayConfig>): string {
   const s = toSettings(c);
   if (!s.enabled) return "Tiling desligado (Meta+Y liga)";

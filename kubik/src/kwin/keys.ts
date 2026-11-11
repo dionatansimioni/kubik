@@ -4,6 +4,9 @@
  * por padrão (quick tile, mandar para outra tela, trocar de janela por
  * direção) e as atribui a estas ações. A tabela do install.sh tem que bater
  * com esta (tests/test_build.py confere).
+ *
+ * O texto (o que aparece em Configurações › Atalhos) segue o idioma do
+ * sistema: português ou inglês. O `name` nunca é traduzido: é a chave.
  */
 import type { Direction } from "../core/direction";
 
@@ -19,31 +22,71 @@ export interface KeyBinding {
   action: KeyAction;
 }
 
-const ARROW: Record<Direction, string> = { left: "Left", right: "Right", up: "Up", down: "Down" };
-const WORD: Record<Direction, string> = { left: "à esquerda", right: "à direita", up: "acima", down: "abaixo" };
-const DIRS: Direction[] = ["left", "right", "up", "down"];
-const cap = (d: Direction) => ARROW[d];
+export type Lang = "en" | "pt";
 
-export const KEY_BINDINGS: KeyBinding[] = [
-  ...DIRS.map((dir) => ({
-    name: `Kubik: Focus ${cap(dir)}`,
-    text: `Kubik: focar a janela ${WORD[dir]}`,
-    sequence: `Meta+${ARROW[dir]}`,
-    action: { kind: "focus" as const, dir },
-  })),
-  ...DIRS.map((dir) => ({
-    name: `Kubik: Move ${cap(dir)}`,
-    text: `Kubik: mover a janela para ${dir === "up" ? "cima" : dir === "down" ? "baixo" : WORD[dir].replace("à ", "a ")}`,
-    sequence: `Meta+Shift+${ARROW[dir]}`,
-    action: { kind: "move" as const, dir },
-  })),
-  ...DIRS.map((dir) => ({
-    name: `Kubik: Resize ${cap(dir)}`,
-    text: `Kubik: mover a divisa da janela para ${dir === "up" ? "cima" : dir === "down" ? "baixo" : WORD[dir].replace("à ", "a ")}`,
-    sequence: `Meta+Alt+${ARROW[dir]}`,
-    action: { kind: "resize" as const, dir },
-  })),
-  { name: "Kubik: Rotate split", text: "Kubik: girar a divisão (lado a lado ↔ um sobre o outro)", sequence: "Meta+O", action: { kind: "rotate" } },
-  { name: "Kubik: Toggle floating", text: "Kubik: flutuar/voltar ao tiling (janela em foco)", sequence: "Meta+F", action: { kind: "float" } },
-  { name: "Kubik: Toggle monocle", text: "Kubik: monocle (janelas em tela inteira)", sequence: "Meta+M", action: { kind: "monocle" } },
-];
+/** "pt_BR", "pt-BR", "pt" → português; o resto, inglês. */
+export function langOf(locale: string | null | undefined): Lang {
+  return /^pt([_-]|$)/i.test(String(locale ?? "")) ? "pt" : "en";
+}
+
+const ARROW: Record<Direction, string> = { left: "Left", right: "Right", up: "Up", down: "Down" };
+const DIRS: Direction[] = ["left", "right", "up", "down"];
+
+const TEXT: Record<Lang, Record<string, (d?: Direction) => string>> = {
+  en: {
+    focus: (d) => `Kubik: focus the window ${{ left: "to the left", right: "to the right", up: "above", down: "below" }[d!]}`,
+    move: (d) => `Kubik: move the window ${{ left: "left", right: "right", up: "up", down: "down" }[d!]}`,
+    resize: (d) => `Kubik: move the window's border ${{ left: "left", right: "right", up: "up", down: "down" }[d!]}`,
+    rotate: () => "Kubik: rotate the split (side by side ↔ stacked)",
+    float: () => "Kubik: float / tile the focused window",
+    monocle: () => "Kubik: monocle (windows fill the screen)",
+    toggle: () => "Kubik: toggle tiling",
+    nextTab: () => "Kubik: next tab in the stack",
+    prevTab: () => "Kubik: previous tab in the stack",
+    logState: () => "Kubik: log the state (diagnostics)",
+  },
+  pt: {
+    focus: (d) => `Kubik: focar a janela ${{ left: "à esquerda", right: "à direita", up: "acima", down: "abaixo" }[d!]}`,
+    move: (d) => `Kubik: mover a janela para ${{ left: "a esquerda", right: "a direita", up: "cima", down: "baixo" }[d!]}`,
+    resize: (d) => `Kubik: mover a divisa da janela para ${{ left: "a esquerda", right: "a direita", up: "cima", down: "baixo" }[d!]}`,
+    rotate: () => "Kubik: girar a divisão (lado a lado ↔ um sobre o outro)",
+    float: () => "Kubik: flutuar/voltar ao tiling (janela em foco)",
+    monocle: () => "Kubik: monocle (janelas em tela inteira)",
+    toggle: () => "Kubik: liga/desliga o tiling",
+    nextTab: () => "Kubik: próxima aba da pilha",
+    prevTab: () => "Kubik: aba anterior da pilha",
+    logState: () => "Kubik: registra o estado no log (diagnóstico)",
+  },
+};
+
+/** Texto de um atalho fixo do Kubik.qml (toggle, abas, log) no idioma dado. */
+export function shortcutText(lang: Lang, key: "toggle" | "nextTab" | "prevTab" | "logState"): string {
+  return TEXT[lang][key]();
+}
+
+export function keyBindings(lang: Lang = "en"): KeyBinding[] {
+  const t = TEXT[lang];
+  return [
+    ...DIRS.map((dir) => ({
+      name: `Kubik: Focus ${ARROW[dir]}`,
+      text: t.focus(dir),
+      sequence: `Meta+${ARROW[dir]}`,
+      action: { kind: "focus" as const, dir },
+    })),
+    ...DIRS.map((dir) => ({
+      name: `Kubik: Move ${ARROW[dir]}`,
+      text: t.move(dir),
+      sequence: `Meta+Shift+${ARROW[dir]}`,
+      action: { kind: "move" as const, dir },
+    })),
+    ...DIRS.map((dir) => ({
+      name: `Kubik: Resize ${ARROW[dir]}`,
+      text: t.resize(dir),
+      sequence: `Meta+Alt+${ARROW[dir]}`,
+      action: { kind: "resize" as const, dir },
+    })),
+    { name: "Kubik: Rotate split", text: t.rotate(), sequence: "Meta+O", action: { kind: "rotate" } },
+    { name: "Kubik: Toggle floating", text: t.float(), sequence: "Meta+F", action: { kind: "float" } },
+    { name: "Kubik: Toggle monocle", text: t.monocle(), sequence: "Meta+M", action: { kind: "monocle" } },
+  ];
+}

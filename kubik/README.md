@@ -24,9 +24,11 @@ O `install.sh` instala também o ícone do Kubik, que aparece sozinho na bandeja
   - *Exceções:* apps que sempre flutuam. Os apps abertos aparecem para marcar com um clique; um campo aceita a classe de um app fechado.
   - *Animação:* duração (0 a 600 ms; 0 desliga) e curva (Suave, Linear, Desacelerar forte, Com rebote), com uma prévia animada. Vale para as janelas e para os fades da borda, da prévia e das abas.
 
+A interface (bandeja e nomes dos atalhos) segue o idioma do sistema: português ou inglês.
+
 Tudo vale na hora e fica gravado no `kwinrc` (grupos `[Script-kubik]` e `[Effect-kubikanimations]`), inclusive o liga/desliga, que é lembrado depois de reiniciar a sessão. O Meta+Y continua funcionando, e o ícone acompanha.
 
-## O que já funciona (0.8.0)
+## O que já funciona (0.9.0)
 
 - Janelas novas são organizadas em árvore BSP: a janela nova divide ao meio, pelo lado mais longo, a **maior** janela (no empate, a focada). Assim, 1 janela fica cheia, 2 ficam lado a lado, 3 ficam com metade + 2 quadrantes e 4 ficam em quadrantes. Minimizadas liberam o espaço.
 - Janelas **em todos os desktops** entram no tiling do desktop visível e acompanham a troca de desktop. Com o plugin "Virtual desktops only on primary", isso inclui todas as janelas da tela secundária. Dá para desligar isso por tela, na bandeja.
@@ -67,7 +69,7 @@ Tudo vale na hora e fica gravado no `kwinrc` (grupos `[Script-kubik]` e `[Effect
 
 ## Ainda não
 
-Tradução para inglês; layout guardado entre sessões. Ver `docs/DESIGN.md`.
+Layout guardado entre sessões; README e página da loja em inglês. Ver `docs/DESIGN.md`.
 
 ## Desenvolvimento
 

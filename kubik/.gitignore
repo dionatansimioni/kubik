@@ -3,3 +3,4 @@ node_modules/
 package/contents/ui/Kubik.qml
 effect/contents/code/main.js
 tray/contents/code/logic.js
+tray/contents/locale/

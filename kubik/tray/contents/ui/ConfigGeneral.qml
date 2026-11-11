@@ -20,7 +20,7 @@ KCM.SimpleKCM {
             id: enabledCheck
 
             Kirigami.FormData.label: i18n("Tiling:")
-            text: i18n("Ligado (atalho: Meta+Y)")
+            text: i18n("On (shortcut: Meta+Y)")
         }
 
         Item {
@@ -30,7 +30,7 @@ KCM.SimpleKCM {
         QQC2.SpinBox {
             id: gapsInner
 
-            Kirigami.FormData.label: i18n("Gaps entre janelas:")
+            Kirigami.FormData.label: i18n("Gaps between windows:")
             from: logic.LIMITS.gaps.min
             to: logic.LIMITS.gaps.max
             textFromValue: (v, locale) => i18n("%1 px", v)
@@ -39,7 +39,7 @@ KCM.SimpleKCM {
         QQC2.SpinBox {
             id: gapsOuter
 
-            Kirigami.FormData.label: i18n("Gaps nas bordas da tela:")
+            Kirigami.FormData.label: i18n("Gaps at the screen edges:")
             from: logic.LIMITS.gaps.min
             to: logic.LIMITS.gaps.max
             textFromValue: (v, locale) => i18n("%1 px", v)
@@ -53,13 +53,13 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: borderCheck
 
-            Kirigami.FormData.label: i18n("Borda de destaque:")
-            text: i18n("Na janela em foco (cor de destaque do sistema)")
+            Kirigami.FormData.label: i18n("Highlight border:")
+            text: i18n("Around the focused window (system accent color)")
         }
         QQC2.SpinBox {
             id: borderWidth
 
-            Kirigami.FormData.label: i18n("Espessura da borda:")
+            Kirigami.FormData.label: i18n("Border width:")
             enabled: borderCheck.checked
             from: logic.LIMITS.borderWidth.min
             to: logic.LIMITS.borderWidth.max

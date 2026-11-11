@@ -10,6 +10,10 @@ RUN pacman -Syu --noconfirm --needed \
     && pacman -Scc --noconfirm \
     && setcap -r /usr/bin/kwin_wayland  # cap_sys_nice não existe no container
 
+# Um locale de verdade (a imagem só tem C): sem ele o gettext do glibc ignora
+# LANGUAGE=pt_BR e nenhuma tradução aparece (teste da bandeja em português).
+RUN localedef -i en_US -f UTF-8 en_US.UTF-8
+
 ENV XDG_RUNTIME_DIR=/tmp/xdg \
     QT_QPA_PLATFORM=wayland \
     KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1 \

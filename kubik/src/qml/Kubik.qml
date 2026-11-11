@@ -20,7 +20,11 @@ Item {
     id: root
 
     property var controller: null
-    property var core: null
+    // Carregado já na criação: os atalhos (filhos) precisam do texto traduzido
+    // antes de se registrarem no kglobalaccel.
+    property var core: loadCore()
+    // Idioma dos textos dos atalhos (Configurações › Atalhos): "pt" ou "en".
+    readonly property string lang: core ? core.langOf(Qt.locale().uiLanguages[0] || Qt.locale().name) : "en"
     // Animação escolhida na bandeja (a mesma do efeito): os fades dos overlays
     // duram 60% dela (250 ms → 150 ms) e usam a mesma curva.
     property int fadeMs: 150
@@ -448,7 +452,7 @@ Item {
 
     KWinQml.ShortcutHandler {
         name: "Kubik: Toggle tiling"
-        text: "Kubik: liga/desliga o tiling"
+        text: root.core ? root.core.shortcutText(root.lang, "toggle") : ""
         sequence: "Meta+Y"
         onActivated: {
             if (root.controller)
@@ -458,7 +462,7 @@ Item {
 
     KWinQml.ShortcutHandler {
         name: "Kubik: Next tab"
-        text: "Kubik: próxima aba da pilha"
+        text: root.core ? root.core.shortcutText(root.lang, "nextTab") : ""
         sequence: "Meta+Ctrl+Tab"
         onActivated: {
             if (root.controller)
@@ -468,7 +472,7 @@ Item {
 
     KWinQml.ShortcutHandler {
         name: "Kubik: Previous tab"
-        text: "Kubik: aba anterior da pilha"
+        text: root.core ? root.core.shortcutText(root.lang, "prevTab") : ""
         sequence: "Meta+Ctrl+Shift+Tab"
         onActivated: {
             if (root.controller)
@@ -479,7 +483,7 @@ Item {
     // Teclado no estilo Pop!_Shell (focar, mover, redimensionar, girar,
     // flutuar, monocle): a lista fica em src/kwin/keys.ts.
     Instantiator {
-        model: root.core ? root.core.keyBindings() : []
+        model: root.core ? root.core.keyBindings(root.lang) : []
 
         delegate: KWinQml.ShortcutHandler {
             required property var modelData
@@ -497,7 +501,7 @@ Item {
     // Sem tecla padrão: usado pelo scripts/diagnose.sh (kglobalaccel invokeShortcut).
     KWinQml.ShortcutHandler {
         name: "Kubik: Log state"
-        text: "Kubik: registra o estado no log (diagnóstico)"
+        text: root.core ? root.core.shortcutText(root.lang, "logState") : ""
         sequence: ""
         onActivated: {
             if (root.controller)
@@ -511,7 +515,6 @@ Item {
             ghost: true
         });
         borderWin = borderComponent.createObject(null);
-        core = loadCore();
         const settings = readSettings();
         log("configuração: " + core.describeSettings(settings));
         const maximizeArea = KWinQml.Workspace.MaximizeArea !== undefined ? KWinQml.Workspace.MaximizeArea : 2;

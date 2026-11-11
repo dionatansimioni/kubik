@@ -6,17 +6,13 @@ import type { Host } from "./kwin/api";
 import { Controller, DEFAULT_CONFIG } from "./kwin/controller";
 import { type Settings, describeSettings, parseSettings } from "./kwin/settings";
 
-import { KEY_BINDINGS, type KeyBinding } from "./kwin/keys";
+import { type KeyBinding, type Lang, keyBindings as bindings, langOf, shortcutText } from "./kwin/keys";
 
-export { describeSettings, parseSettings };
+export { describeSettings, langOf, parseSettings, shortcutText };
 
-/**
- * Os atalhos de teclado (keys.ts). Uma função, não a constante: o esbuild
- * registra os exports no começo do bundle, e uma constante exportada faria o
- * QML avisar "used before its declaration" (funções são içadas).
- */
-export function keyBindings(): KeyBinding[] {
-  return KEY_BINDINGS;
+/** Os atalhos de teclado (keys.ts) no idioma do sistema. */
+export function keyBindings(lang: Lang): KeyBinding[] {
+  return bindings(lang);
 }
 
 export function start(host: Host, settings?: Settings): Controller {

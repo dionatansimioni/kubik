@@ -35,3 +35,12 @@ shortcut "Kubik: Focus Right"
 active monocle_next
 shortcut "Kubik: Toggle monocle" 1
 dump_windows back
+
+# Texto dos atalhos em Configurações › Atalhos: idioma do sistema (aqui, inglês).
+python3 - >&2 <<'PY'
+import dbus
+o = dbus.SessionBus().get_object("org.kde.kglobalaccel", "/component/kwin")
+for i in o.allShortcutInfos(dbus_interface="org.kde.kglobalaccel.Component"):
+    if str(i[0]) in ("Kubik: Focus Left", "Kubik: Toggle tiling"):
+        print("=== SHORTCUT TEXT", str(i[0]), "=", str(i[1]))
+PY

@@ -88,5 +88,34 @@ class TrayInPlasmaTest(unittest.TestCase):
         self.assertNotIn("comando falhou", self.log)
 
 
+@unittest.skipUnless(kwin_env_available() and plasma_available(), "testenv com Plasma indisponível")
+class TrayLanguageTest(unittest.TestCase):
+    """Textos em inglês por padrão; em português com o sistema em pt_BR."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.out = Path(tempfile.mkdtemp(prefix="kubik-tray-i18n-"))
+        subprocess.run(
+            [str(ROOT / "testenv" / "run.sh"), "kubik/package", "tests/scenarios/tray-i18n.sh", str(cls.out)],
+            cwd=ROOT, check=True, capture_output=True, timeout=300,
+            env=dict(os.environ, KUBIK_EXTRA_PKGS="kubik/tray"),
+        )
+        cls.log = (cls.out / "kwin.log").read_text(errors="replace")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.out, ignore_errors=True)
+
+    def tooltip(self, phase):
+        part = self.log.split(f"=== MARK viewer {phase} ===")[1]
+        return re.search(r"\[kubik-tray\] tooltip: (.*)", part).group(1)
+
+    def test_english_by_default(self):
+        self.assertEqual(self.tooltip("default"), "Tiling on · gaps 4 px · border 3 px")
+
+    def test_portuguese_with_pt_br(self):
+        self.assertEqual(self.tooltip("pt_BR"), "Tiling ligado · gaps 4 px · borda 3 px")
+
+
 if __name__ == "__main__":
     unittest.main()
