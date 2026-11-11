@@ -93,6 +93,13 @@ export interface Workspace {
   /** Desktop visível; janelas "em todos os desktops" entram na árvore dele. */
   readonly currentDesktop: VirtualDesktop;
   readonly currentDesktopChanged: Signal;
+  /** Telas conectadas (Meta+Shift+seta para uma tela sem janelas). */
+  readonly screens?: readonly Output[];
+  /** Quick tile do KWin, para janelas flutuantes (Meta+Shift+setas). */
+  slotWindowQuickTileLeft?(): void;
+  slotWindowQuickTileRight?(): void;
+  slotWindowQuickTileTop?(): void;
+  slotWindowQuickTileBottom?(): void;
 }
 
 /** Barra de abas de uma pilha, para o QML desenhar. */

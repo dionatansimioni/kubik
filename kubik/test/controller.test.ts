@@ -707,6 +707,151 @@ describe("Controller", () => {
     });
   });
 
+  describe("teclado", () => {
+    // a | (b / c): a metade esquerda; b e c quadrantes à direita.
+    function three() {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      const c = ws.open(win("c"));
+      return { a, b, c };
+    }
+
+    it("Meta+setas: foca a vizinha; no empate, volta para a de onde veio", () => {
+      const { a, b, c } = three();
+      ws.activate(c);
+      ctl.focusDirection("up");
+      expect(ws.activeWindow).toBe(b);
+      ctl.focusDirection("left");
+      expect(ws.activeWindow).toBe(a);
+      ctl.focusDirection("right"); // b e c empatam: b foi a última focada
+      expect(ws.activeWindow).toBe(b);
+      ctl.focusDirection("right"); // nada à direita: fica
+      expect(ws.activeWindow).toBe(b);
+    });
+
+    it("o foco atravessa telas e inclui janelas flutuantes", () => {
+      const a = ws.open(win("a"));
+      const d = ws.open(win("d", SCREEN_B));
+      ws.activate(a);
+      ctl.focusDirection("right");
+      expect(ws.activeWindow).toBe(d);
+      const f = new FakeWindow("fixa", SCREEN_A, DESK_1, rect(300, 600, 200, 100));
+      f.resizeable = false;
+      ws.open(f);
+      ws.activate(a);
+      ctl.focusDirection("down"); // a (cheia) → a flutuante, mais abaixo
+      expect(ws.activeWindow).toBe(f);
+    });
+
+    it("Meta+Shift+setas: troca de lugar com a vizinha", () => {
+      const { a, b, c } = three();
+      ws.activate(c);
+      ctl.moveDirection("left");
+      expect(c.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      expect(a.frameGeometry).toEqual(rect(642, 402, 634, 394));
+      expect(b.frameGeometry).toEqual(rect(642, 4, 634, 394));
+      expect(ws.activeWindow).toBe(c);
+      expect(logs).toContain("trocou 'c' com 'a' (teclado)");
+    });
+
+    it("Meta+Shift+seta para uma tela sem janelas: a janela vai para lá", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      ws.activate(b);
+      ctl.moveDirection("right");
+      expect(b.frameGeometry).toEqual(rect(1284, 4, 992, 992));
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(logs).toContain("moveu 'b' para a tela HDMI-1 (teclado)");
+    });
+
+    it("Meta+Shift+seta para outra tela com janela: entra ao lado dela", () => {
+      const a = ws.open(win("a"));
+      const d = ws.open(win("d", SCREEN_B));
+      ws.activate(a);
+      ctl.moveDirection("right");
+      expect(a.frameGeometry).toEqual(rect(1284, 4, 494, 992));
+      expect(d.frameGeometry).toEqual(rect(1782, 4, 494, 992));
+    });
+
+    it("flutuante: Meta+Shift+setas é o quick tile do KWin", () => {
+      const f = new FakeWindow("fixa", SCREEN_A, DESK_1, rect(300, 300, 200, 100));
+      f.resizeable = false;
+      ws.open(f);
+      ws.activate(f);
+      ctl.moveDirection("left");
+      expect(ws.quickTiles).toEqual([["fixa", "left"]]);
+    });
+
+    it("Meta+Alt+setas: a divisa anda na direção da seta (5% da tela)", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      ws.activate(a);
+      ctl.resizeDirection("right"); // 5% de 1280 = 64
+      expect(a.frameGeometry).toEqual(rect(4, 4, 698, 792));
+      expect(b.frameGeometry).toEqual(rect(706, 4, 570, 792));
+      ws.activate(b);
+      ctl.resizeDirection("right"); // b não tem divisa à direita: a da esquerda anda
+      expect(b.frameGeometry).toEqual(rect(770, 4, 506, 792));
+    });
+
+    it("Meta+O: gira a divisão", () => {
+      const { a, b, c } = three();
+      ws.activate(c);
+      ctl.rotateSplit();
+      expect(b.frameGeometry).toEqual(rect(642, 4, 315, 792));
+      expect(c.frameGeometry).toEqual(rect(961, 4, 315, 792));
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+    });
+
+    it("Meta+F: tira do tiling (volta ao tamanho de antes) e devolve", () => {
+      const a = ws.open(win("a"));
+      const b = new FakeWindow("b", SCREEN_A, DESK_1, rect(200, 150, 500, 400));
+      ws.open(b);
+      ws.activate(b);
+      ctl.toggleFloat();
+      expect(b.frameGeometry).toEqual(rect(200, 150, 500, 400));
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(logs).toContain("flutuante 'b': flutuando por escolha (Meta+F)");
+      ctl.toggleFloat();
+      expect(b.frameGeometry).toEqual(rect(642, 4, 634, 792));
+    });
+
+    it("Meta+F numa janela que já flutua por regra: só explica no log", () => {
+      const f = new FakeWindow("fixa", SCREEN_A, DESK_1, rect(300, 300, 200, 100));
+      f.resizeable = false;
+      ws.open(f);
+      ws.activate(f);
+      ctl.toggleFloat();
+      expect(logs).toContain("'fixa' já flutua: não redimensionável");
+    });
+
+    it("Meta+M: monocle — todas ocupam a tela; ←/→ passam por elas; sem abas; desliga de volta", () => {
+      const { a, b, c } = three();
+      ws.activate(a);
+      ctl.toggleMonocle();
+      for (const w of [a, b, c]) expect(w.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      ctl.focusDirection("right");
+      expect(ws.activeWindow).toBe(b);
+      ctl.focusDirection("left");
+      expect(ws.activeWindow).toBe(a);
+      expect(tabs[tabs.length - 1] ?? []).toEqual([]);
+      ctl.toggleMonocle();
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      expect(c.frameGeometry).toEqual(rect(642, 402, 634, 394));
+    });
+
+    it("com o tiling desligado, o foco por direção continua funcionando", () => {
+      const a = new FakeWindow("a", SCREEN_A, DESK_1, rect(0, 0, 300, 300));
+      const b = new FakeWindow("b", SCREEN_A, DESK_1, rect(600, 0, 300, 300));
+      ctl.toggle();
+      ws.open(a);
+      ws.open(b);
+      ws.activate(a);
+      ctl.focusDirection("right");
+      expect(ws.activeWindow).toBe(b);
+    });
+  });
+
   describe("borda de destaque na janela em foco", () => {
     /** A borda fica 3 px para fora da moldura. */
     const around = (r: import("../src/core/rect").Rect) => rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6);

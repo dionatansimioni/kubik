@@ -39,6 +39,12 @@ class FirstInstallTest(unittest.TestCase):
     def test_script_is_active(self):
         self.assertIn("=== script loaded: true", self.log)
 
+    def test_keyboard_takes_meta_arrows_and_uninstall_gives_them_back(self):
+        # Meta+← = 0x11000012; Meta+Alt+← = 0x19000012; Meta+M = 0x1000004D.
+        self.assertIn("=== keys quicktile=[] switchwin=[] focus=[285212690] resize=[419430418] monocle=[268435533]", self.log)
+        self.assertIn("=== active after Meta+Left: Alpha", self.log)
+        self.assertIn("=== after uninstall quicktile=[285212690] switchwin=[419430418] backup=no", self.log)
+
     def test_tray_icon_is_installed(self):
         self.assertIn("=== tray installed: true", self.log)
         self.assertIn("Ícone na bandeja", self.log)

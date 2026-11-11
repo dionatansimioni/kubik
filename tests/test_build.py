@@ -1,5 +1,6 @@
 """Testes do empacotamento (scripts/build.py) e dos scripts de instalação."""
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -54,7 +55,7 @@ class BuildTest(unittest.TestCase):
         top = f"{ID}-{VERSION}"
         with tarfile.open(self.tarball) as t:
             members = {m.name: m for m in t.getmembers()}
-        for name in ("install.sh", "uninstall.sh", "diagnose.sh", f"packages/{ID}/metadata.json",
+        for name in ("install.sh", "uninstall.sh", "diagnose.sh", "shortcuts.sh", f"packages/{ID}/metadata.json",
                      f"packages/{ID}/contents/" + META["X-Plasma-MainScript"]):
             self.assertIn(f"{top}/{name}", members)
         for script in ("install.sh", "diagnose.sh"):
@@ -115,7 +116,7 @@ class KubikBuildTest(unittest.TestCase):
 
 
 class ShellScriptsTest(unittest.TestCase):
-    SCRIPTS = [ROOT / "scripts" / n for n in ("install.sh", "uninstall.sh", "release.sh", "diagnose.sh")]
+    SCRIPTS = [ROOT / "scripts" / n for n in ("install.sh", "uninstall.sh", "release.sh", "diagnose.sh", "shortcuts.sh")]
 
     def test_bash_syntax(self):
         for s in self.SCRIPTS:
@@ -145,6 +146,29 @@ class ShellScriptsTest(unittest.TestCase):
                 src = (ROOT / "scripts" / name).read_text(encoding="utf-8")
                 self.assertNotIn("qdbus", src)
                 self.assertIn("dbus-send", src)
+
+
+class ShortcutTableTest(unittest.TestCase):
+    """A tabela de teclas do install.sh (scripts/shortcuts.sh) bate com kubik/src/kwin/keys.ts."""
+
+    QT = {"Meta": 0x10000000, "Shift": 0x02000000, "Alt": 0x08000000, "Ctrl": 0x04000000,
+          "Left": 0x01000012, "Up": 0x01000013, "Right": 0x01000014, "Down": 0x01000015}
+
+    def qt_key(self, seq):
+        return sum(self.QT[p] if p in self.QT else ord(p) for p in seq.split("+"))
+
+    def test_install_table_matches_keys_ts(self):
+        sh = (ROOT / "scripts" / "shortcuts.sh").read_text()
+        table = dict(re.findall(r'"(Kubik: [^"=]+)=(\d+)"', sh))
+        out = subprocess.run(
+            [str(ROOT / "scripts" / "node.sh"), "kubik", "npx", "--yes", "esbuild", "src/kwin/keys.ts",
+             "--bundle", "--format=cjs", "--log-level=error"],
+            capture_output=True, text=True, check=True).stdout
+        js = out + "\nconsole.log(JSON.stringify(module.exports.KEY_BINDINGS.map(b => [b.name, b.sequence])));"
+        res = subprocess.run([str(ROOT / "scripts" / "node.sh"), "kubik", "node", "-e", js],
+                             capture_output=True, text=True, check=True).stdout
+        bindings = json.loads(res.strip().splitlines()[-1])
+        self.assertEqual({n: str(self.qt_key(seq)) for n, seq in bindings}, table)
 
 
 if __name__ == "__main__":

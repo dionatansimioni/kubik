@@ -26,7 +26,7 @@ O `install.sh` instala também o ícone do Kubik, que aparece sozinho na bandeja
 
 Tudo vale na hora e fica gravado no `kwinrc` (grupos `[Script-kubik]` e `[Effect-kubikanimations]`), inclusive o liga/desliga, que é lembrado depois de reiniciar a sessão. O Meta+Y continua funcionando, e o ícone acompanha.
 
-## O que já funciona (0.7.0)
+## O que já funciona (0.8.0)
 
 - Janelas novas são organizadas em árvore BSP: a janela nova divide ao meio, pelo lado mais longo, a **maior** janela (no empate, a focada). Assim, 1 janela fica cheia, 2 ficam lado a lado, 3 ficam com metade + 2 quadrantes e 4 ficam em quadrantes. Minimizadas liberam o espaço.
 - Janelas **em todos os desktops** entram no tiling do desktop visível e acompanham a troca de desktop. Com o plugin "Virtual desktops only on primary", isso inclui todas as janelas da tela secundária. Dá para desligar isso por tela, na bandeja.
@@ -51,11 +51,23 @@ Tudo vale na hora e fica gravado no `kwinrc` (grupos `[Script-kubik]` e `[Effect
 - **Borda de destaque:** um contorno de 3 px, na cor de destaque do sistema, envolve a janela em foco, seja ela do tiling ou uma janela flutuante comum. Ela nunca persegue a janela: enquanto a janela se move (arrasto com o mouse ou animação de layout), a borda some e é redesenhada com a janela já no lugar. Ao trocar o foco, muda na hora. Não aparece em diálogos, em tela cheia nem em janelas maximizadas.
 - **Animações** (efeito *Kubik: animações*, instalado junto): as janelas deslizam e redimensionam suavemente quando o layout muda. Ficam de fora o arrasto com o mouse, a tela cheia e o maximizar, que têm animação própria do KWin. A velocidade global de animação do Plasma também vale.
 - **Apps que mudam a própria geometria** (Chrome e apps Electron como o Podman Desktop, em X11, ao restaurar o tamanho da sessão anterior) voltam ao tile. Se o app insistir, ele fica flutuante e as outras janelas se reorganizam.
+- **Teclado** (estilo Pop!_Shell):
+
+  | Tecla | O quê |
+  |---|---|
+  | Meta+setas | foca a janela vizinha naquela direção (tiling ou flutuante, em qualquer tela; no empate, a usada por último) |
+  | Meta+Shift+setas | troca a janela de lugar com a vizinha; em outra tela, entra ao lado dela; sem vizinha, vai para a tela daquele lado. Janela flutuante: quick tile do KDE |
+  | Meta+Alt+setas | a divisa da janela anda na direção da seta (5% da tela): a da direita (ou de baixo); na borda, a do outro lado |
+  | Meta+O | gira a divisão da janela (lado a lado ↔ um sobre o outro) |
+  | Meta+F | flutua a janela em foco (volta ao tamanho de antes); de novo, ela volta ao tiling |
+  | Meta+M | monocle: todas as janelas da tela ocupam a tela inteira; Meta+←/→ passam por elas |
+
+  Essas teclas são, no KDE, do quick tile, de "mandar para outra tela" e de "trocar de janela por direção". O `install.sh` guarda os atalhos do KDE, libera essas teclas e as dá ao Kubik; o `uninstall.sh` devolve tudo. Dá para trocar qualquer uma em Configurações do Sistema › Atalhos › KWin (as ações começam com "Kubik:").
 - **Meta+Y** liga e desliga o tiling. Ao religar, a árvore é reconstruída equilibrada. Ao desligar, as janelas voltam à posição e ao tamanho de antes.
 
 ## Ainda não
 
-Navegação e movimento por teclado, tradução para inglês. Ver `docs/DESIGN.md`.
+Tradução para inglês; layout guardado entre sessões. Ver `docs/DESIGN.md`.
 
 ## Desenvolvimento
 

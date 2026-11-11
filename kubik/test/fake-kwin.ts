@@ -189,6 +189,21 @@ export class FakeWindow implements KWinWindow {
 export class FakeWorkspace implements Workspace {
   stackingOrder: FakeWindow[] = [];
   private _active: FakeWindow | null = null;
+  readonly screens = [SCREEN_A, SCREEN_B];
+  /** Quick tiles pedidos ao KWin (janela, direção). */
+  readonly quickTiles: Array<[string, string]> = [];
+  slotWindowQuickTileLeft(): void {
+    this.quickTiles.push([this.activeWindow?.caption ?? "", "left"]);
+  }
+  slotWindowQuickTileRight(): void {
+    this.quickTiles.push([this.activeWindow?.caption ?? "", "right"]);
+  }
+  slotWindowQuickTileTop(): void {
+    this.quickTiles.push([this.activeWindow?.caption ?? "", "up"]);
+  }
+  slotWindowQuickTileBottom(): void {
+    this.quickTiles.push([this.activeWindow?.caption ?? "", "down"]);
+  }
   /** Janelas que o controlador mandou para a frente (raiseWindow). */
   readonly raised: FakeWindow[] = [];
   /** Como no KWin: escrever ativa a janela (e emite windowActivated). */

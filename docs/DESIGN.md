@@ -113,6 +113,7 @@ Validadas no `testenv/`:
 25. **Configuração ao vivo:** `reconfigure` (D-Bus `/KWin`) faz o KWin reler o kwinrc e emitir `Options.configChanged`, que o script pode ouvir; o `readConfig` já devolve o valor novo. Os efeitos em JavaScript **não** recebem esse reconfigure, só `org.kde.kwin.Effects.reconfigureEffect <id>`.
 26. **Palavras reservadas no bundle.** Funções chamadas `int` ou `bool` passam no TypeScript, mas o QML não as compila. Os nomes ficam `toInt`/`toBool`.
 27. **Bandeja que aparece sozinha:** o applet precisa de `X-Plasma-NotificationAreaCategory` e `EnabledByDefault: true`. A bandeja adiciona automaticamente plugins novos (que ainda não estão em `knownItems`); se o usuário tirar, ele não volta sozinho.
+28. **Atalho padrão ocupado fica sem tecla para sempre.** Um `ShortcutHandler` cuja tecla padrão já é de outra ação (Meta+← do quick tile) é registrado SEM tecla, e isso fica gravado. O `install.sh` (scripts/shortcuts.sh) libera as teclas do KDE com `setForeignShortcut` (D-Bus do kglobalaccel, dentro do KWin) antes de recarregar o script e, depois, dá a tecla às ações do kubik que ficaram vazias. As teclas vão como inteiro do Qt (Meta 0x10000000 + tecla; ← = 0x01000012); um teste confere a tabela contra `keys.ts`.
 
 ## Riscos
 

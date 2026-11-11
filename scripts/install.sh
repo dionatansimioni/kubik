@@ -15,6 +15,11 @@ TRAY_ID=""
 
 meta() { sed -n "s/.*\"$2\": *\"\([^\"]*\)\".*/\1/p" "$1/metadata.json" | head -n1; }
 kwin() { dbus-send --session --print-reply --dest=org.kde.KWin "$@" >/dev/null 2>&1; }
+# shellcheck source=shortcuts.sh
+source ./shortcuts.sh
+
+# Teclado: libera Meta+setas & cia. do KDE antes de o script (re)carregar.
+sc_free_kde || true
 
 for PKG in ./packages/*/; do
     PKG=${PKG%/}
@@ -51,7 +56,13 @@ for PKG in ./packages/*/; do
 done
 
 kwin /KWin org.kde.KWin.reconfigure || true
-if ! kwin /Scripting org.kde.kwin.Scripting.start; then
+SCRIPT_STARTED=1
+kwin /Scripting org.kde.kwin.Scripting.start || SCRIPT_STARTED=""
+if [ -n "$SCRIPT_STARTED" ]; then
+    sleep 1
+    sc_assign_kubik || true
+fi
+if [ -z "$SCRIPT_STARTED" ]; then
     echo "Instalado. Não consegui recarregar o KWin: ative em Configurações do Sistema › Scripts do KWin / Efeitos."
 elif [ -n "$NEEDS_RELOGIN" ]; then
     echo
@@ -64,4 +75,7 @@ if [ -n "${TRAY_ID:-}" ]; then
     echo "Ícone na bandeja: clique para ligar/desligar e ajustar; botão direito › Configurar Kubik…"
     echo "  (Se ele não aparecer ou não atualizar: systemctl --user restart plasma-plasmashell)"
 fi
+echo "Teclado: Meta+setas focam, Meta+Shift+setas movem, Meta+Alt+setas redimensionam;"
+echo "  Meta+O gira a divisão, Meta+F flutua a janela, Meta+M monocle, Meta+Y liga/desliga."
+echo "  (O quick tile do KDE nessas teclas foi desligado; o uninstall.sh devolve.)"
 echo "Logs: journalctl --user -f | grep kubik"

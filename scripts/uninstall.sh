@@ -3,6 +3,10 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
+# shellcheck source=shortcuts.sh
+source ./shortcuts.sh
+sc_restore_kde || true
+
 meta() { sed -n "s/.*\"$2\": *\"\([^\"]*\)\".*/\1/p" "$1/metadata.json" | head -n1; }
 
 for PKG in ./packages/*/; do

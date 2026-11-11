@@ -8,6 +8,8 @@ const MAX_FIGHTS = 3;
 const FIGHT_MEMORY_MS = 5000;
 import { Tree } from "../core/tree";
 import { type Side, type Zone, dropZone } from "../core/zones";
+import { type Candidate, type Direction, OPPOSITE, neighbor } from "../core/direction";
+import type { KeyAction } from "./keys";
 import type { Host, KWinWindow, Output, TabBar, VirtualDesktop } from "./api";
 
 /** Janela sendo arrastada com o mouse. */
@@ -75,6 +77,8 @@ interface Tracked {
   noFit: boolean;
   /** Tirada do tiling porque o app insiste em outra geometria (idem). */
   rebel: boolean;
+  /** O usuário a deixou flutuando (Meta+F); vale até ele voltar com Meta+F. */
+  userFloat: boolean;
   /** Última geometria que o kubik aplicou (o tile). */
   target: Rect | null;
   /** Vezes recentes em que o app saiu do tile sozinho. */
@@ -130,6 +134,8 @@ export class Controller {
   private borderOwner: string | null = null;
   /** Geração do timer de "assentou" (só o último vale). */
   private borderGen = 0;
+  /** Árvores em modo monocle (Meta+M): toda janela ocupa a tela inteira. */
+  private readonly monocle = new Set<string>();
   /** Últimas barras de abas enviadas ao QML (JSON, para não repetir). */
   private lastTabs = "[]";
 
@@ -195,6 +201,7 @@ export class Controller {
         t.saved = null;
       }
       this.trees.clear();
+      this.monocle.clear();
       this.host.log("tiling desligado");
     } else {
       for (const t of this.tracked.values()) t.noFit = t.rebel = false;
@@ -242,6 +249,192 @@ export class Controller {
   private exceptionOf(w: KWinWindow): string | null {
     const names = [w.resourceClass, w.desktopFileName ?? ""].map((n) => (n || "").toLowerCase()).filter(Boolean);
     return this.config.exceptions.find((e) => names.includes(e)) ?? null;
+  }
+
+  // ---- teclado ----------------------------------------------------------------
+
+  /** A janela em foco, se o kubik a conhece. */
+  private focused(): Tracked | null {
+    const w = this.host.workspace.activeWindow;
+    return w ? (this.tracked.get(idOf(w)) ?? null) : null;
+  }
+
+  /** Visível no desktop atual (as abas escondidas e as janelas atrás no monocle, não). */
+  private visibleNow(t: Tracked): boolean {
+    const w = t.window;
+    if (w.minimized || !w.normalWindow || !w.resourceClass) return false;
+    if (w.skipTaskbar && w.skipSwitcher) return false;
+    if (!w.onAllDesktops && !w.desktops.some((d) => d.id === this.host.workspace.currentDesktop.id)) return false;
+    if (t.key === null) return true;
+    const tree = this.trees.get(t.key)!;
+    // Monocle: só a de cima, a usada mais recentemente.
+    if (this.monocle.has(t.key)) return this.byRecency(tree.ids())[0] === idOf(w);
+    return tree.activeOf(idOf(w)) === idOf(w);
+  }
+
+  /** Ids em ordem de foco recente (as nunca focadas por último, na ordem dada). */
+  private byRecency(ids: string[]): string[] {
+    const rank = (id: string) => {
+      const i = this.focusHistory.indexOf(id);
+      return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    return [...ids].sort((a, b) => rank(a) - rank(b));
+  }
+
+  /** Candidatas para a navegação, em ordem de foco recente (o desempate do neighbor). */
+  private candidates(filter: (t: Tracked) => boolean): Candidate[] {
+    const visible = [...this.tracked.values()].filter((t) => this.visibleNow(t) && filter(t));
+    return this.byRecency(visible.map((t) => idOf(t.window))).map((id) => ({
+      id,
+      rect: this.tracked.get(id)!.window.frameGeometry,
+    }));
+  }
+
+  private activate(id: string): void {
+    const t = this.tracked.get(id);
+    if (t) this.host.workspace.activeWindow = t.window;
+  }
+
+  /** Executa uma ação de teclado (KEY_BINDINGS, em keys.ts). */
+  runKey(a: KeyAction): void {
+    if (a.kind === "focus") this.focusDirection(a.dir);
+    else if (a.kind === "move") this.moveDirection(a.dir);
+    else if (a.kind === "resize") this.resizeDirection(a.dir);
+    else if (a.kind === "rotate") this.rotateSplit();
+    else if (a.kind === "float") this.toggleFloat();
+    else this.toggleMonocle();
+  }
+
+  /** Meta+setas: foca a janela vizinha naquela direção (tiling ou flutuante, em qualquer tela). */
+  focusDirection(dir: Direction): void {
+    const t = this.focused();
+    if (!t) {
+      const any = this.candidates(() => true)[0];
+      if (any) this.activate(any.id);
+      return;
+    }
+    const id = idOf(t.window);
+    // Monocle: ←/→ passam pelas janelas da árvore, em ordem.
+    if (t.key !== null && this.monocle.has(t.key) && (dir === "left" || dir === "right")) {
+      const ids = this.trees.get(t.key)!.ids();
+      if (ids.length > 1) {
+        const i = ids.indexOf(id);
+        this.activate(ids[(i + (dir === "right" ? 1 : -1) + ids.length) % ids.length]);
+        return;
+      }
+    }
+    const next = neighbor(t.window.frameGeometry, this.candidates((c) => c !== t), dir);
+    if (next) this.activate(next);
+  }
+
+  /**
+   * Meta+Shift+setas: troca a janela de lugar com a vizinha (na mesma tela)
+   * ou a leva para o lado da vizinha (em outra tela, ou saindo de uma pilha).
+   * Sem vizinha, vai para a tela daquele lado. Flutuante: quick tile do KWin.
+   */
+  moveDirection(dir: Direction): void {
+    const t = this.focused();
+    if (!t) return;
+    const w = t.window;
+    if (!this.enabled || t.key === null) {
+      const ws = this.host.workspace;
+      const quick = { left: ws.slotWindowQuickTileLeft, right: ws.slotWindowQuickTileRight, up: ws.slotWindowQuickTileTop, down: ws.slotWindowQuickTileBottom }[dir];
+      quick?.call(ws);
+      return;
+    }
+    const id = idOf(w);
+    const key = t.key;
+    const tree = this.trees.get(key)!;
+    const own = new Set(tree.stackOf(id));
+    const next = neighbor(
+      tree.tileRect(id, this.area(key), this.config.gaps, this.minsOf(tree)) ?? w.frameGeometry,
+      this.candidates((c) => c.key !== null && !own.has(idOf(c.window)) && !(c.key === key && this.monocle.has(key))),
+      dir,
+    );
+    if (next) {
+      const other = this.tracked.get(next)!;
+      if (other.key === key && own.size === 1) {
+        tree.swap(id, next);
+        this.retile(key);
+        this.host.log(`trocou '${w.caption}' com '${other.window.caption}' (teclado)`);
+      } else {
+        const place = this.places.get(other.key!)!;
+        this.removeFromTree(t);
+        this.insertInto(t, place, next, OPPOSITE[dir]);
+        this.host.log(`moveu '${w.caption}' para ${SIDE_NAMES[OPPOSITE[dir]]} '${other.window.caption}' (teclado)`);
+      }
+      this.activate(id);
+      return;
+    }
+    // Nenhuma janela naquela direção: uma tela vazia daquele lado?
+    const screen = this.screenToward(w.output, dir);
+    if (!screen) return;
+    const place: Place = { output: screen, desktop: this.places.get(key)!.desktop };
+    this.removeFromTree(t);
+    this.insertInto(t, place, null);
+    this.activate(id);
+    this.host.log(`moveu '${w.caption}' para a tela ${screen.name} (teclado)`);
+  }
+
+  /** A tela vizinha de `from` naquela direção (pela área útil), ou null. */
+  private screenToward(from: Output, dir: Direction): Output | null {
+    const desk = this.host.workspace.currentDesktop;
+    const screens = (this.host.workspace.screens ?? []).filter((o) => o.name !== from.name);
+    const id = neighbor(
+      this.host.clientArea(from, desk),
+      screens.map((o) => ({ id: o.name, rect: this.host.clientArea(o, desk) })),
+      dir,
+    );
+    return screens.find((o) => o.name === id) ?? null;
+  }
+
+  /** Meta+Alt+setas: a divisa da janela anda na direção da seta (passo de 5% da tela). */
+  resizeDirection(dir: Direction): void {
+    const t = this.focused();
+    if (!t || !this.enabled || t.key === null || this.monocle.has(t.key)) return;
+    const area = this.area(t.key);
+    const horizontal = dir === "left" || dir === "right";
+    const step = Math.round((horizontal ? area.width : area.height) * 0.05);
+    const delta = dir === "right" || dir === "down" ? step : -step;
+    if (this.trees.get(t.key)!.nudge(idOf(t.window), horizontal ? "horizontal" : "vertical", delta, area, this.config.gaps))
+      this.retile(t.key);
+  }
+
+  /** Meta+O: gira a divisão da janela em foco (lado a lado ↔ um sobre o outro). */
+  rotateSplit(): void {
+    const t = this.focused();
+    if (!t || !this.enabled || t.key === null) return;
+    if (this.trees.get(t.key)!.rotate(idOf(t.window))) this.retile(t.key);
+  }
+
+  /** Meta+F: tira a janela em foco do tiling (volta ao tamanho de antes) ou a devolve. */
+  toggleFloat(): void {
+    const t = this.focused();
+    if (!t || !this.enabled) return;
+    if (!t.userFloat && t.key === null) {
+      this.host.log(`'${t.window.caption}' já flutua: ${this.floatReasonOf(t) ?? "?"}`);
+      return;
+    }
+    t.userFloat = !t.userFloat;
+    const wasTiled = t.key !== null;
+    this.refresh(t);
+    if (wasTiled && t.key === null && t.saved) {
+      t.window.frameGeometry = copy(t.saved);
+      t.saved = null;
+    }
+    this.updateBorder();
+  }
+
+  /** Meta+M: monocle na tela da janela em foco (todas ocupam a tela inteira; liga/desliga). */
+  toggleMonocle(): void {
+    const t = this.focused();
+    if (!t || !this.enabled || t.key === null) return;
+    const key = t.key;
+    if (this.monocle.has(key)) this.monocle.delete(key);
+    else this.monocle.add(key);
+    this.retile(key);
+    this.host.workspace.raiseWindow?.(t.window);
+    this.host.log(`monocle ${this.monocle.has(key) ? "ligado" : "desligado"} em ${key}`);
   }
 
   // ---- abas (pilhas) ---------------------------------------------------------
@@ -296,7 +489,7 @@ export class Controller {
     if (this.enabled) {
       const current = this.host.workspace.currentDesktop.id;
       for (const [key, tree] of this.trees) {
-        if (tree.size < 2 || this.places.get(key)!.desktop.id !== current) continue;
+        if (tree.size < 2 || this.monocle.has(key) || this.places.get(key)!.desktop.id !== current) continue;
         for (const st of tree.stacks(this.area(key), this.config.gaps, this.minsOf(tree)))
           bars.push({
             rect: st.bar,
@@ -340,7 +533,7 @@ export class Controller {
     }
     let g = w.frameGeometry;
     // Numa pilha, a borda envolve o tile inteiro (barra de abas + janela).
-    if (t.key !== null) {
+    if (t.key !== null && !this.monocle.has(t.key)) {
       const tree = this.trees.get(t.key)!;
       if (tree.stackOf(id).length > 1)
         g = tree.tileRect(id, this.area(t.key), this.config.gaps, this.minsOf(tree)) ?? g;
@@ -470,6 +663,7 @@ export class Controller {
       seq: 0,
       noFit: false,
       rebel: false,
+      userFloat: false,
       target: null,
       fights: 0,
       checkPending: false,
@@ -531,6 +725,7 @@ export class Controller {
     if (!this.enabled) return "tiling desligado";
     if (t.noFit) return "não cabe";
     if (t.rebel) return "o app não aceita o tile";
+    if (t.userFloat) return "flutuando por escolha (Meta+F)";
     const rule = floatReason(t.window, this.config.floatingClasses);
     if (rule !== null) return rule;
     const exception = this.exceptionOf(t.window);
@@ -883,7 +1078,9 @@ export class Controller {
   private retileOnly(key: string, except?: string): void {
     const tree = this.trees.get(key);
     if (!tree || tree.size === 0) return;
-    const layout = tree.layout(this.area(key), this.config.gaps, this.minsOf(tree));
+    const layout = this.monocle.has(key)
+      ? new Map(tree.ids().map((id) => [id, inset(this.area(key), this.config.gaps.outer)] as const))
+      : tree.layout(this.area(key), this.config.gaps, this.minsOf(tree));
     for (const [id, r] of layout) {
       const t = this.tracked.get(id);
       if (!t) continue;

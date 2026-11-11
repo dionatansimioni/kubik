@@ -7,6 +7,7 @@
 // antigo. Este arquivo é carregado pelo main.qml com uma URL única por carga.
 pragma ComponentBehavior: Bound
 
+import QtQml
 import QtQuick
 import QtQuick.Window
 // Namespace obrigatório: org.kde.kwin exporta um tipo 'Window' que esconderia
@@ -472,6 +473,24 @@ Item {
         onActivated: {
             if (root.controller)
                 root.controller.cycleTab(-1);
+        }
+    }
+
+    // Teclado no estilo Pop!_Shell (focar, mover, redimensionar, girar,
+    // flutuar, monocle): a lista fica em src/kwin/keys.ts.
+    Instantiator {
+        model: root.core ? root.core.keyBindings() : []
+
+        delegate: KWinQml.ShortcutHandler {
+            required property var modelData
+
+            name: modelData.name
+            text: modelData.text
+            sequence: modelData.sequence
+            onActivated: {
+                if (root.controller)
+                    root.controller.runKey(modelData.action);
+            }
         }
     }
 

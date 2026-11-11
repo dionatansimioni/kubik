@@ -302,6 +302,34 @@ export class Tree {
     }
   }
 
+  /** Meta+O: a divisão que contém a janela passa de lado a lado para um sobre o outro (e vice-versa). */
+  rotate(id: string): boolean {
+    const split = this.leaves.get(id)?.parent;
+    if (!split) return false;
+    split.orientation = split.orientation === "horizontal" ? "vertical" : "horizontal";
+    return true;
+  }
+
+  /**
+   * Teclado (Meta+Alt+setas): move uma divisa da janela `id` em `delta` px
+   * (positivo = para a direita/para baixo). No eixo horizontal, a divisa é a
+   * da DIREITA da janela, ou a da esquerda se ela estiver na borda direita;
+   * no vertical, a de BAIXO, ou a de cima. Assim a seta sempre diz para onde
+   * a divisa anda. Devolve false se não há divisa naquele eixo.
+   */
+  nudge(id: string, axis: Orientation, delta: number, area: Rect, gaps: Gaps): boolean {
+    const leaf = this.leaves.get(id);
+    if (!leaf) return false;
+    const split = this.ancestorAt(leaf, axis, "first") ?? this.ancestorAt(leaf, axis, "second");
+    if (!split) return false;
+    const sr = this.nodeRects(area, gaps).get(split)!;
+    const usable = (axis === "horizontal" ? sr.width : sr.height) - gaps.inner;
+    if (usable <= 2 * MIN_SIDE) return false;
+    const first = Math.min(usable - MIN_SIDE, Math.max(MIN_SIDE, split.ratio * usable + delta));
+    split.ratio = first / usable;
+    return true;
+  }
+
   shape(): TreeShape | null {
     const s = (n: Node): TreeShape =>
       n.kind === "leaf"

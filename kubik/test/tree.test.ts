@@ -299,3 +299,31 @@ describe("Tree: tamanhos mínimos", () => {
     });
   });
 });
+
+describe("Tree: teclado", () => {
+  it("rotate: a divisão da janela passa a ser na outra direção", () => {
+    const t = tree("a", "b", "c"); // a | (b / c)
+    expect(t.rotate("c")).toBe(true);
+    const l = t.layout(AREA, GAPS);
+    expect(l.get("b")).toEqual(rect(642, 4, 315, 792));
+    expect(l.get("c")).toEqual(rect(961, 4, 315, 792));
+    expect(t.rotate("a")).toBe(true); // a raiz: a | resto → a / resto
+    expect(t.layout(AREA, GAPS).get("a")).toEqual(rect(4, 4, 1272, 394));
+    expect(tree("só").rotate("só")).toBe(false);
+  });
+
+  it("nudge: a divisa da direita anda; na borda direita, anda a da esquerda", () => {
+    const t = tree("a", "b"); // a | b, usável 1268
+    expect(t.nudge("a", "horizontal", 64, AREA, GAPS)).toBe(true);
+    expect(t.layout(AREA, GAPS).get("a")).toEqual(rect(4, 4, 698, 792));
+    expect(t.nudge("b", "horizontal", -128, AREA, GAPS)).toBe(true); // b não tem divisa à direita: usa a da esquerda
+    expect(t.layout(AREA, GAPS).get("a")).toEqual(rect(4, 4, 570, 792));
+    expect(t.nudge("a", "vertical", 50, AREA, GAPS)).toBe(false); // sem divisa horizontal
+  });
+
+  it("nudge respeita o mínimo de cada lado", () => {
+    const t = tree("a", "b");
+    t.nudge("a", "horizontal", 5000, AREA, GAPS);
+    expect(t.layout(AREA, GAPS).get("b")!.width).toBe(60);
+  });
+});

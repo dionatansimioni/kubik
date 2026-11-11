@@ -96,6 +96,7 @@ def build_tarball(pkgs, plugin_id: str, version: str, out: Path):
                 add(tar, f.read_bytes(), f"packages/{pid}/" + f.relative_to(pkg).as_posix(), 0o644)
         for script in ("install.sh", "uninstall.sh", "diagnose.sh"):
             add(tar, (SCRIPTS / script).read_bytes(), script, 0o755)
+        add(tar, (SCRIPTS / "shortcuts.sh").read_bytes(), "shortcuts.sh", 0o644)
         main = pkgs[0]
         readme = next((p for p in (main / "README.md", main.parent / "README.md") if p.is_file()), None)
         if readme:
