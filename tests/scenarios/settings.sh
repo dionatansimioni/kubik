@@ -24,12 +24,14 @@ reconfigure
 dump_windows gaps
 
 mark exception
-open_app kcalc
+kcalc >/dev/null 2>&1 &
+KCALC=$!  # pelo PID: a imagem do Fedora não tem pkill
+sleep 2.5
 dump_windows with_kcalc
 set_kubik Exceptions "org.kde.kcalc"
 reconfigure
 dump_windows kcalc_exception
-pkill kcalc
+kill "$KCALC"
 sleep 1
 
 mark border
