@@ -1,7 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
-  <!-- Três tiles (metade + dois quadrantes): o layout do Kubik. Monocromático
-       (Kirigami.Icon com isMask pinta na cor do tema). -->
-  <rect x="2" y="3" width="8" height="16" rx="1.5" fill="#000"/>
-  <rect x="12" y="3" width="8" height="7" rx="1.5" fill="#000"/>
-  <rect x="12" y="12" width="8" height="7" rx="1.5" fill="#000"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 256 256">
+  <!-- O cubo do ícone do Kubik, monocromático (Kirigami.Icon com isMask pinta
+       na cor do tema); o topo mais claro dá o volume. Vãos largos para ler
+       bem em 22 px. -->
+  <g stroke-linejoin="round" stroke-width="14" fill="#000" stroke="#000">
+    <path d="M128 22 L218 74 L128 126 L38 74 Z" opacity="0.55"/>
+    <path d="M30 100 L114 149 L114 236 L30 187 Z"/>
+    <path d="M142 149 L226 100 L226 136 L142 185 Z"/>
+    <path d="M142 207 L226 158 L226 187 L142 236 Z"/>
+  </g>
 </svg>

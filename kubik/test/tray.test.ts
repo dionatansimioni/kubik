@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS } from "../src/kwin/settings";
 import {
   KEYS, RELEASES_URL, compareVersions, inList, installedVersion, isValidName, kwinrcValues, newerRelease,
   openApps, otherExceptions, parseRead, parseStatus, readCommand, releasesCommand, statusCommand, statusText,
-  toSettings, toTrayConfig, toggleInList, uninstallCommand, updateCommand, writeCommand,
+  toSettings, toTrayConfig, toggleInList, updateCommand, writeCommand,
 } from "../src/tray/logic";
 
 describe("bandeja: ida e volta pelo kwinrc", () => {
@@ -173,9 +173,5 @@ describe("gerenciador", () => {
     for (const id of ["KWin/Script --show kubik ", "KWin/Effect --show kubikanimations ", "Plasma/Applet --show io.github.dionatansimioni.kubik "])
       expect(cmd).toContain(`--type=${id}`);
     expect(cmd).toContain("isEffectLoaded string:kubikanimations");
-  });
-
-  it("desinstalar usa a cópia do uninstall.sh guardada pelo install.sh", () => {
-    expect(uninstallCommand()).toBe('bash "${XDG_DATA_HOME:-$HOME/.local/share}/kubik/uninstall.sh"');
   });
 });

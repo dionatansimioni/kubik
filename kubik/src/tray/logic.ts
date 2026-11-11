@@ -335,9 +335,5 @@ export function updateCommand(r: Release): string {
   );
 }
 
-/** Onde o install.sh guarda uma cópia do uninstall.sh (para desinstalar sem o pacote). */
+/** Onde o install.sh guarda o gerenciador e uma cópia do uninstall.sh. */
 export const DATA_DIR = "${XDG_DATA_HOME:-$HOME/.local/share}/kubik";
-
-export function uninstallCommand(): string {
-  return `bash "${DATA_DIR}/uninstall.sh"`;
-}

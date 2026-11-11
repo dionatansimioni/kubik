@@ -34,10 +34,10 @@ NOTES=$(cat <<EOF
 Versão de teste **$VERSION** de \`$ID\` (commit $(git rev-parse --short HEAD)).
 
 **Instalar (escolha um):**
-- **Mais fácil:** baixe \`Kubik-$VERSION-x86_64.AppImage\`, marque como executável (botão direito › Propriedades › Permissões) e abra com dois cliques.
+- **Mais fácil:** baixe \`Kubik-$VERSION-x86_64.AppImage\`, marque como executável (botão direito › Propriedades › Permissões) e abra com dois cliques: o gerenciador oferece instalar, atualizar, reparar ou remover, conforme o que já está no sistema.
 - Terminal: \`tar xzf $ID-$VERSION.tar.gz && ./$ID-$VERSION/install.sh\`
 
-Depois, o **Kubik** no menu abre o gerenciador: estado, versão nova (com o botão Atualizar) e Desinstalar.
+Depois, o **Kubik** no menu abre o mesmo gerenciador.
 Pelo terminal: \`./$ID-$VERSION/uninstall.sh\`
 EOF
 )

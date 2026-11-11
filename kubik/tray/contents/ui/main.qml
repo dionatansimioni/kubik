@@ -30,13 +30,13 @@ PlasmoidItem {
     // novo não é gravado (cada gravação faz o KWin reler a configuração).
     property string lastWritten: ""
 
-    // ---- gerenciador (estado, versão nova, atualizar, desinstalar) ----------
-    // No menu, "Kubik" abre esta mesma bandeja numa janela (plasmawindowed):
-    // lá ela é Planar e mostra também o botão Desinstalar.
+    // ---- estado e versão nova (o gerenciador completo é kubik/manager) -------
+    // "Configurações" do gerenciador abre esta bandeja numa janela
+    // (plasmawindowed, formFactor Planar): lá ela sempre procura versão nova.
     readonly property bool windowed: Plasmoid.formFactor === PlasmaCore.Types.Planar
     property var status: null       // logic.Status
     property var update: null       // logic.Release mais novo que o instalado
-    // "", "checking", "updating", "updated", "failed", "confirm", "uninstalling", "removed"
+    // "", "updating", "updated", "failed"
     property string managerState: ""
     property string updatedTo: ""
 
@@ -171,7 +171,7 @@ PlasmoidItem {
     }
 
     function checkUpdates() {
-        if (managerState === "updating" || managerState === "uninstalling" || managerState === "removed")
+        if (managerState === "updating")
             return;
         exec.run(logic.releasesCommand(), (code, stdout) => {
             const current = logic.installedVersion(status);
@@ -201,15 +201,6 @@ PlasmoidItem {
                     log("atualização falhou (" + code + ")");
                 }
             });
-        });
-    }
-
-    function runUninstall() {
-        managerState = "uninstalling";
-        log("desinstalando");
-        exec.run(logic.uninstallCommand(), (code, stdout) => {
-            managerState = code === 0 ? "removed" : "failed";
-            log(code === 0 ? "desinstalado" : "desinstalação falhou (" + code + ")");
         });
     }
 
@@ -396,14 +387,14 @@ PlasmoidItem {
                 objectName: "effectWarning"
                 Layout.fillWidth: true
                 type: Kirigami.MessageType.Warning
-                visible: !!root.status && !!root.status.effect && !root.status.effectLoaded && root.managerState !== "removed"
+                visible: !!root.status && !!root.status.effect && !root.status.effectLoaded
                 text: i18n("Animations start after you log out and back in.")
             }
             Kirigami.InlineMessage {
                 objectName: "scriptWarning"
                 Layout.fillWidth: true
                 type: Kirigami.MessageType.Warning
-                visible: !!root.status && !!root.status.script && !root.status.scriptLoaded && root.managerState !== "removed"
+                visible: !!root.status && !!root.status.script && !root.status.scriptLoaded
                 text: i18n("The tiling script is not running. Turn it on in System Settings › Window Management › KWin Scripts.")
             }
 
@@ -426,10 +417,6 @@ PlasmoidItem {
                             return i18n("Updated to %1.", root.updatedTo);
                         case "failed":
                             return i18n("Something went wrong. Check your internet connection and try again.");
-                        case "uninstalling":
-                            return i18n("Removing Kubik…");
-                        case "removed":
-                            return i18n("Kubik was removed. You can close this window.");
                         }
                         if (root.update)
                             return i18n("New version %1 available", root.update.version);
@@ -439,51 +426,15 @@ PlasmoidItem {
                 PlasmaComponents3.BusyIndicator {
                     Layout.preferredHeight: Kirigami.Units.iconSizes.small
                     Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                    visible: root.managerState === "updating" || root.managerState === "uninstalling"
+                    visible: root.managerState === "updating"
                     running: visible
                 }
                 PlasmaComponents3.Button {
                     objectName: "updateButton"
-                    visible: !!root.update && root.managerState !== "updating" && root.managerState !== "removed"
+                    visible: !!root.update && root.managerState !== "updating"
                     icon.name: "update-none"
                     text: i18n("Update")
                     onClicked: root.runUpdate()
-                }
-            }
-
-            // Desinstalar: só na janela do gerenciador, com confirmação.
-            RowLayout {
-                Layout.fillWidth: true
-                visible: root.windowed && root.managerState !== "removed" && root.managerState !== "uninstalling"
-
-                PlasmaComponents3.Label {
-                    Layout.fillWidth: true
-                    wrapMode: Text.Wrap
-                    visible: root.managerState === "confirm"
-                    text: i18n("Remove Kubik, its tray icon and its shortcuts?")
-                }
-                Item {
-                    Layout.fillWidth: true
-                    visible: root.managerState !== "confirm"
-                }
-                PlasmaComponents3.Button {
-                    objectName: "uninstallButton"
-                    visible: root.managerState !== "confirm"
-                    icon.name: "edit-delete"
-                    text: i18n("Uninstall…")
-                    onClicked: root.managerState = "confirm"
-                }
-                PlasmaComponents3.Button {
-                    objectName: "confirmUninstall"
-                    visible: root.managerState === "confirm"
-                    icon.name: "edit-delete"
-                    text: i18n("Remove")
-                    onClicked: root.runUninstall()
-                }
-                PlasmaComponents3.Button {
-                    visible: root.managerState === "confirm"
-                    text: i18n("Cancel")
-                    onClicked: root.managerState = ""
                 }
             }
         }

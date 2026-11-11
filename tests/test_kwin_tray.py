@@ -117,5 +117,43 @@ class TrayLanguageTest(unittest.TestCase):
         self.assertEqual(self.tooltip("pt_BR"), "Tiling ligado · gaps 4 px · borda 3 px")
 
 
+@unittest.skipUnless(kwin_env_available() and plasma_available(), "testenv com Plasma indisponível")
+class TrayUpdateTest(unittest.TestCase):
+    """O popup acha a versão nova num "GitHub" local e o botão Atualizar instala."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.out = Path(tempfile.mkdtemp(prefix="kubik-tray-update-"))
+        subprocess.run(
+            [str(ROOT / "testenv" / "run.sh"), "kubik/package", "tests/scenarios/tray-update.sh", str(cls.out)],
+            cwd=ROOT, check=True, capture_output=True, timeout=400,
+            env=dict(os.environ, KUBIK_EXTRA_PKGS="kubik/effect kubik/tray",
+                     KUBIK_KWINRC="Script-kubik/Exceptions=org.kde.plasmoidviewer,plasmoidviewer"),
+        )
+        cls.log = (cls.out / "kwin.log").read_text(errors="replace")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.out, ignore_errors=True)
+
+    def test_shows_status_and_finds_the_new_version(self):
+        self.assertRegex(self.log, r"\[kubik-tray\] estado: script (\d+\.\d+\.\d+) \(ativo\), efeito \1 \(ativo\), bandeja \1")
+        self.assertRegex(self.log, r"\[kubik-tray\] nova versão: 99\.0\.0 \(instalada: \d+\.\d+\.\d+\)")
+        self.assertNotIn("TIMEOUT", self.log)
+
+    def test_update_button_installs_the_new_release(self):
+        self.assertIn("[kubik-tray] atualizado para 99.0.0", self.log)
+        self.assertIn("estado: script 99.0.0 (ativo), efeito 99.0.0 (ativo), bandeja 99.0.0", self.log)
+        self.assertIn("=== FILES updated icon=yes desktop=yes uninstaller=yes script=yes tray=yes", self.log)
+        # A entrada do menu aponta para o gerenciador instalado.
+        self.assertIn('=== desktop exec: "/home/tester/.local/share/kubik/manager.sh"', self.log)
+
+    def test_no_qml_errors(self):
+        applet = [l for l in self.log.splitlines()
+                  if "io.github.dionatansimioni.kubik" in l and re.search(r"Error|error|is not|undefined", l)]
+        self.assertEqual(applet, [])
+        self.assertNotIn("comando falhou", self.log)
+
+
 if __name__ == "__main__":
     unittest.main()

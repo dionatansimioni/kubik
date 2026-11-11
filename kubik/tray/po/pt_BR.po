@@ -139,11 +139,7 @@ msgstr "Atualizado para %1."
 msgid "Something went wrong. Check your internet connection and try again."
 msgstr "Algo deu errado. Confira sua conexão com a internet e tente de novo."
 
-msgid "Removing Kubik…"
-msgstr "Removendo o Kubik…"
 
-msgid "Kubik was removed. You can close this window."
-msgstr "O Kubik foi removido. Pode fechar esta janela."
 
 msgid "Version %1"
 msgstr "Versão %1"
@@ -151,14 +147,6 @@ msgstr "Versão %1"
 msgid "Update"
 msgstr "Atualizar"
 
-msgid "Remove Kubik, its tray icon and its shortcuts?"
-msgstr "Remover o Kubik, o ícone da bandeja e os atalhos?"
 
-msgid "Uninstall…"
-msgstr "Desinstalar…"
 
-msgid "Remove"
-msgstr "Remover"
 
-msgid "Cancel"
-msgstr "Cancelar"

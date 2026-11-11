@@ -92,6 +92,7 @@ def build_tarball(pkgs, plugin_id: str, version: str, out: Path):
         info.size, info.mode, info.mtime = len(data), mode, 0
         tar.addfile(info, io.BytesIO(data))
 
+    main = pkgs[0]
     with tarfile.open(out, "w:gz") as tar:
         for pkg in pkgs:
             pid, _ = read_metadata(pkg)
@@ -100,10 +101,16 @@ def build_tarball(pkgs, plugin_id: str, version: str, out: Path):
         for script in ("install.sh", "uninstall.sh", "diagnose.sh"):
             add(tar, (SCRIPTS / script).read_bytes(), script, 0o755)
         add(tar, (SCRIPTS / "shortcuts.sh").read_bytes(), "shortcuts.sh", 0o644)
+        # O gerenciador (janela do AppImage e da entrada "Kubik" do menu).
+        manager = main.parent / "manager"
+        if (manager / "Main.qml").is_file():
+            add(tar, (SCRIPTS / "manager.sh").read_bytes(), "manager.sh", 0o755)
+            for f in ("Main.qml", "logic.js"):
+                add(tar, (manager / f).read_bytes(), f"manager/{f}", 0o644)
+            add(tar, (ASSETS / "kubik.svg").read_bytes(), "manager/kubik.svg", 0o644)
         # Ícone do app e entrada do menu (o install.sh põe em ~/.local/share).
         add(tar, (ASSETS / "kubik.svg").read_bytes(), f"share/{APP_ID}.svg", 0o644)
         add(tar, (ASSETS / f"{APP_ID}.desktop").read_bytes(), f"share/{APP_ID}.desktop", 0o644)
-        main = pkgs[0]
         readme = next((p for p in (main / "README.md", main.parent / "README.md") if p.is_file()), None)
         if readme:
             add(tar, readme.read_bytes(), "README.md", 0o644)

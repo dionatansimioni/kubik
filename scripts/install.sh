@@ -59,19 +59,24 @@ for PKG in ./packages/*/; do
     esac
 done
 
-# Ícone do app (menu, Scripts do KWin, bandeja) e a entrada "Kubik" no menu,
-# que abre o gerenciador (a bandeja numa janela, via plasmawindowed).
-if [ -d ./share ]; then
-    install -Dm644 "./share/$APP_ID.svg" "$DATA/icons/hicolor/scalable/apps/$APP_ID.svg"
-    install -Dm644 "./share/$APP_ID.desktop" "$DATA/applications/$APP_ID.desktop"
-    command -v kbuildsycoca6 >/dev/null && { kbuildsycoca6 >/dev/null 2>&1 || true; }
-fi
-# Para desinstalar sem o pacote (botão "Desinstalar" do gerenciador): uma cópia
-# do uninstall.sh e a lista do que foi instalado.
+# O gerenciador (a mesma janela do AppImage) e, para ele desinstalar sem o
+# pacote, uma cópia do uninstall.sh e a lista do que foi instalado.
 mkdir -p "$DATA/kubik"
 install -m755 ./uninstall.sh "$DATA/kubik/uninstall.sh"
 install -m644 ./shortcuts.sh "$DATA/kubik/shortcuts.sh"
 printf '%s' "$INSTALLED" > "$DATA/kubik/installed.list"
+if [ -d ./manager ]; then
+    install -m755 ./manager.sh "$DATA/kubik/manager.sh"
+    install -Dm644 -t "$DATA/kubik/manager" ./manager/*
+fi
+# Ícone do app (menu, Scripts do KWin) e a entrada "Kubik" no menu, que abre o
+# gerenciador (o Exec aponta para a cópia instalada acima).
+if [ -d ./share ]; then
+    install -Dm644 "./share/$APP_ID.svg" "$DATA/icons/hicolor/scalable/apps/$APP_ID.svg"
+    mkdir -p "$DATA/applications"
+    sed "s|^Exec=.*|Exec=\"$DATA/kubik/manager.sh\"|" "./share/$APP_ID.desktop" > "$DATA/applications/$APP_ID.desktop"
+    command -v kbuildsycoca6 >/dev/null && { kbuildsycoca6 >/dev/null 2>&1 || true; }
+fi
 
 kwin /KWin org.kde.KWin.reconfigure || true
 SCRIPT_STARTED=1
@@ -93,7 +98,7 @@ if [ -n "${TRAY_ID:-}" ]; then
     echo "Ícone na bandeja: clique para ligar/desligar e ajustar; botão direito › Configurar Kubik…"
     echo "  (Se ele não aparecer ou não atualizar: systemctl --user restart plasma-plasmashell)"
 fi
-echo "Menu: \"Kubik\" abre o gerenciador (estado, atualizações e o botão Desinstalar)."
+echo "Menu: \"Kubik\" abre o gerenciador (atualizar, reparar, remover, configurações)."
 echo "Teclado: Meta+setas focam, Meta+Shift+setas movem, Meta+Alt+setas redimensionam;"
 echo "  Meta+O gira a divisão, Meta+F flutua a janela, Meta+M monocle, Meta+Y liga/desliga."
 echo "  (O quick tile do KDE nessas teclas foi desligado; o uninstall.sh devolve.)"

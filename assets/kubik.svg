@@ -1,19 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <!-- Ícone do Kubik: o layout de 3 tiles (metade + 2 quadrantes) em branco,
-       sobre um quadrado arredondado em gradiente azul (o azul do Breeze). -->
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#3daee9"/>
-      <stop offset="1" stop-color="#1d6fa8"/>
-    </linearGradient>
-    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.18"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
-  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)"/>
-  <rect x="8" y="8" width="112" height="56" rx="24" fill="url(#shine)"/>
-  <rect x="26" y="28" width="34" height="72" rx="7" fill="#fff"/>
-  <rect x="68" y="28" width="34" height="32" rx="7" fill="#fff" fill-opacity="0.92"/>
-  <rect x="68" y="68" width="34" height="32" rx="7" fill="#fff" fill-opacity="0.85"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Kubik ("cubinho"): um cubo em que uma das faces está dividida em dois
+       tiles. Cantos arredondados pelo traço da mesma cor. -->
+  <g stroke-linejoin="round" stroke-width="10">
+    <path d="M128 26 L214 76 L128 126 L42 76 Z" fill="#7fd8f5" stroke="#7fd8f5"/>
+    <path d="M36 94 L120 143 L120 232 L36 183 Z" fill="#3daee9" stroke="#3daee9"/>
+    <path d="M136 141 L220 92 L220 133 L136 182 Z" fill="#1d6fa8" stroke="#1d6fa8"/>
+    <path d="M136 198 L220 149 L220 185 L136 234 Z" fill="#f39c3d" stroke="#f39c3d"/>
+  </g>
 </svg>

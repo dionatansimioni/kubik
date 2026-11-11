@@ -1,8 +1,10 @@
-"""Integração: o gerenciador (a bandeja numa janela, entrada "Kubik" do menu).
+"""Integração: o gerenciador do Kubik (kubik/manager) num KWin 6 real.
 
-Num KWin real com o Plasma do Arch: o applet acha uma versão nova num
-"GitHub" local (testenv/lib.sh › fake_releases), atualiza pelo botão e
-desinstala pelo botão, com confirmação. Ver tests/scenarios/manager.sh.
+A janela que abre pelo AppImage e pela entrada "Kubik" do menu: com nada
+instalado oferece Instalar; instalado, oferece Configurações e Remover, e
+Atualizar quando há versão nova (do AppImage ou de um "GitHub" local).
+Só no Arch: a janela usa os módulos do Plasma, que a imagem do Fedora não tem.
+Ver tests/scenarios/manager.sh.
 """
 import os
 import re
@@ -12,62 +14,87 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, Ppm, kwin_env_available
+from test_kwin_appimage import build_appimage
+from test_kwin_overlay import ROOT, kwin_env_available
 from test_kwin_tray import plasma_available
 
 
 @unittest.skipUnless(kwin_env_available() and plasma_available(), "testenv com Plasma indisponível")
-class ManagerTest(unittest.TestCase):
+class ManagerWindowTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.out = Path(tempfile.mkdtemp(prefix="kubik-manager-"))
+        build_appimage(cls.out / "appimage")
         subprocess.run(
             [str(ROOT / "testenv" / "run.sh"), "kubik/package", "tests/scenarios/manager.sh", str(cls.out)],
-            cwd=ROOT, check=True, capture_output=True, timeout=400,
-            env=dict(os.environ, KUBIK_EXTRA_PKGS="kubik/effect kubik/tray",
-                     KUBIK_KWINRC="Script-kubik/Exceptions=org.kde.plasmoidviewer,plasmoidviewer"),
+            cwd=ROOT, check=True, capture_output=True, timeout=500,
+            env=dict(os.environ, KUBIK_EXTRA_PKGS=""),
         )
         cls.log = (cls.out / "kwin.log").read_text(errors="replace")
+        cls.appimage = cls.log.split("=== MARK appimage ===")[1].split("=== MARK menu ===")[0]
+        cls.menu = cls.log.split("=== MARK menu ===")[1]
 
     @classmethod
     def tearDownClass(cls):
+        if os.environ.get("KUBIK_KEEP_OUT"):
+            print(cls.out)
+            return
         shutil.rmtree(cls.out, ignore_errors=True)
 
-    def test_shows_status_and_finds_the_new_version(self):
-        self.assertRegex(self.log, r"\[kubik-tray\] estado: script (\d+\.\d+\.\d+) \(ativo\), efeito \1 \(ativo\), bandeja \1")
-        self.assertRegex(self.log, r"\[kubik-tray\] nova versão: 99\.0\.0 \(instalada: \d+\.\d+\.\d+\)")
+    def test_everything_happened(self):
         self.assertNotIn("TIMEOUT", self.log)
 
-    def test_update_button_installs_the_new_release(self):
-        self.assertIn("[kubik-tray] atualizado para 99.0.0", self.log)
-        self.assertIn("estado: script 99.0.0 (ativo), efeito 99.0.0 (ativo), bandeja 99.0.0", self.log)
-        self.assertIn("=== FILES updated icon=yes desktop=yes uninstaller=yes script=yes tray=yes", self.log)
-        self.assertIn("=== desktop exec: plasmawindowed io.github.dionatansimioni.kubik", self.log)
+    def test_fresh_system_offers_only_install(self):
+        self.assertRegex(self.appimage, r"\[kubik-manager\] aberto pelo instalador \d+\.\d+\.\d+")
+        first = re.search(r"\[kubik-manager\] botões(.*)", self.appimage).group(1)
+        self.assertEqual(re.findall(r" (\w+)=", first), ["install"])
+        self.assertIn("=== FILES clean script=no tray=no menu=no manager=no", self.appimage)
 
-    def test_uninstall_asks_first_then_removes_everything(self):
-        # Antes de confirmar, nada removido; o botão Remover aparece no lugar.
-        before = self.log.split("=== MARK uninstall ===")[1]
-        self.assertIn("[kubik-tray] desinstalando", before)
-        self.assertIn("[kubik-tray] desinstalado", before)
-        self.assertIn("=== FILES removed icon=no desktop=no uninstaller=no script=no tray=no", self.log)
-        # Meta+← volta para o quick tile do KDE.
-        self.assertIn("=== keys after uninstall quicktile=[285212690]", self.log)
+    def test_install_from_the_appimage(self):
+        self.assertRegex(self.appimage, r"ação: install \d+\.\d+\.\d+ \(bundle\)")
+        self.assertIn("[kubik-manager] concluído: install", self.appimage)
+        self.assertIn("=== FILES installed script=yes tray=yes menu=yes manager=yes", self.appimage)
+        # Depois: configurações e remover (em dia com o AppImage).
+        last = re.findall(r"\[kubik-manager\] botões(.*)", self.appimage)[-1]
+        self.assertEqual(re.findall(r" (\w+)=", last), ["settings", "remove"])
 
-    def test_confirmation_row_is_shown(self):
-        # O botão "Remover" (ícone vermelho de lixeira) só aparece depois do "Desinstalar…".
-        confirm = Ppm(self.out / "confirm.ppm")
-        removed = Ppm(self.out / "removed.ppm")
-        def reds(img):
-            return sum(1 for x in range(1020, 1240) for y in range(330, 360)
-                       if (lambda p: p[0] > 180 and p[1] < 110 and p[2] < 110)(img.getpixel((x, y))[:3]))
-        self.assertGreater(reds(confirm), 5)
-        self.assertEqual(reds(removed), 0)
+    def test_menu_entry_opens_the_installed_manager(self):
+        self.assertIn('=== EXEC "/home/tester/.local/share/kubik/manager.sh"', self.menu)
+        self.assertIn("[kubik-manager] aberto pelo menu", self.menu)
+
+    def test_offers_and_installs_the_github_update(self):
+        self.assertIn("[kubik-manager] GitHub: 99.0.0", self.menu)
+        offered = [l for l in re.findall(r"\[kubik-manager\] botões(.*)", self.menu) if " update=" in l][0]
+        self.assertEqual(re.findall(r" (\w+)=", offered), ["settings", "remove", "update"])
+        self.assertIn("ação: update 99.0.0 (github)", self.menu)
+        self.assertIn("[kubik-manager] concluído: update", self.menu)
+        self.assertIn("estado: instalado 99.0.0", self.menu)
+
+    def test_settings_opens_the_tray_in_a_window(self):
+        self.assertIn("=== SETTINGS Kubik", self.menu)
+
+    def test_remove_asks_first_then_removes_everything(self):
+        confirm = [l for l in re.findall(r"\[kubik-manager\] botões(.*)", self.menu) if " confirm=" in l][0]
+        self.assertEqual(re.findall(r" (\w+)=", confirm), ["confirm", "cancel"])
+        self.assertIn("[kubik-manager] concluído: remove", self.menu)
+        self.assertIn("=== FILES removed script=no tray=no menu=no manager=no", self.menu)
+        # Sem nada instalado, de novo só Instalar (agora a versão do GitHub).
+        last = re.findall(r"\[kubik-manager\] botões(.*)", self.menu)[-1]
+        self.assertEqual(re.findall(r" (\w+)=", last), ["install"])
+
+    def test_window_has_the_menu_entry_app_id(self):
+        # Mesmo nome da entrada do menu: a barra de tarefas mostra o ícone do Kubik.
+        self.assertIn("=== APPID io.github.dionatansimioni.kubik io.github.dionatansimioni.kubik", self.log)
+
+    def test_window_is_small_and_floating(self):
+        m = re.search(r"=== MGRGEOM \d+ \d+ (\d+)x(\d+)", self.log)
+        self.assertLess(int(m.group(1)), 700)
+        self.assertRegex(self.log, r"flutuante 'Kubik': não redimensionável")
 
     def test_no_qml_errors(self):
-        applet = [l for l in self.log.splitlines()
-                  if "io.github.dionatansimioni.kubik" in l and re.search(r"Error|error|is not|undefined", l)]
-        self.assertEqual(applet, [])
-        self.assertNotIn("comando falhou", self.log)
+        bad = [l for l in self.log.splitlines()
+               if "manager/Main.qml" in l or ("kubik-manager" in l and re.search(r"Error|undefined|is not", l))]
+        self.assertEqual(bad, [])
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
 # o efeito de animação, o ícone da bandeja, o ícone do app e a entrada "Kubik"
 # no menu (o mesmo install.sh do .tar.gz, que vem aqui dentro).
 #
-# Uso: Kubik-<versão>-x86_64.AppImage                (janelas do kdialog)
+# Uso: Kubik-<versão>-x86_64.AppImage                (o gerenciador; sem ele, kdialog)
 #      Kubik-<versão>-x86_64.AppImage --install [--yes]   (terminal)
 #      Kubik-<versão>-x86_64.AppImage --uninstall [--yes]
 set -uo pipefail
@@ -49,7 +49,7 @@ summary() {
     fi
 }
 
-open_manager() { command -v plasmawindowed >/dev/null && (setsid plasmawindowed "$APP_ID" >/dev/null &); }
+open_manager() { [ -x "$DATA/kubik/manager.sh" ] && (setsid "$DATA/kubik/manager.sh" >/dev/null &); }
 
 YES=""
 for a in "$@"; do [ "$a" = --yes ] && YES=1; done
@@ -74,7 +74,16 @@ case "${1:-}" in
         do_uninstall; exit $? ;;
 esac
 
-# ---- janelas (kdialog) ---------------------------------------------------------
+# ---- gerenciador (janela própria) ---------------------------------------------
+# A mesma janela da entrada "Kubik" do menu, oferecendo instalar a versão que
+# vem aqui dentro. Sem o qml ou os módulos do Plasma (sai com 3): kdialog.
+# KUBIK_KDIALOG=1 força o plano B (os testes do kdialog).
+if [ -z "${KUBIK_KDIALOG:-}" ]; then
+    "$BUNDLE/manager.sh" --bundle "$BUNDLE"
+    [ $? -eq 3 ] || exit 0
+fi
+
+# ---- plano B: janelas do kdialog -------------------------------------------------
 
 if ! command -v kdialog >/dev/null; then
     # Sem kdialog: o mesmo, num terminal.

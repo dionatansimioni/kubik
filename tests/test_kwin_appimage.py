@@ -69,13 +69,16 @@ class AppImageInstallTest(unittest.TestCase):
         self.assertIn("[--yes-label] [Abrir o Kubik]", d[1])
         self.assertIn("=== STATE gui_first script=true tray=yes icon=yes menu=yes", self.log)
 
-    @unittest.skipUnless(plasma_available(), "sem Plasma (plasmawindowed) na imagem")
-    def test_open_kubik_shows_the_manager_window(self):
-        m = re.search(r"=== WINDOWED Kubik (\d+)x(\d+)", self.log)
+    @unittest.skipUnless(plasma_available(), "sem os módulos do Plasma (gerenciador) na imagem")
+    def test_open_kubik_shows_the_installed_manager(self):
+        self.assertIn("[kubik-manager] aberto pelo menu", self.phase("gui_first"))
+        m = re.search(r"=== MANAGER (\S+) (\d+)x(\d+)", self.log)
         self.assertTrue(m, "janela do gerenciador não apareceu")
-        # Flutua (classe plasmawindowed), no tamanho do applet, em vez de ocupar a tela.
-        self.assertLess(int(m.group(1)), 900)
-        self.assertIn("[kubik-tray] estado: script", self.phase("gui_first"))
+        self.assertLess(int(m.group(2)), 900)  # janela pequena, fora do tiling
+
+    @unittest.skipIf(plasma_available(), "a imagem do Arch tem os módulos do Plasma")
+    def test_manager_without_plasma_falls_back(self):
+        self.assertIn("=== manager without plasma exit 3", self.log)
 
     def test_second_run_knows_it_is_installed(self):
         d = self.dialogs("gui_again")

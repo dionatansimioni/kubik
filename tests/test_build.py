@@ -76,7 +76,8 @@ class AppAssetsTest(unittest.TestCase):
 
     def test_menu_entry_opens_the_manager(self):
         entry = (ROOT / "assets" / f"{self.APP_ID}.desktop").read_text()
-        self.assertIn(f"Exec=plasmawindowed {self.APP_ID}\n", entry)
+        # O install.sh troca pelo caminho do gerenciador instalado (manager.sh).
+        self.assertIn("Exec=kubik-manager\n", entry)
         self.assertIn(f"Icon={self.APP_ID}\n", entry)
 
     def test_every_component_uses_the_app_icon(self):
@@ -129,12 +130,24 @@ class AppImageBuildTest(unittest.TestCase):
         ls = self.listing()
         for name in ("AppRun", ".DirIcon", "io.github.dionatansimioni.kubik.desktop",
                      "io.github.dionatansimioni.kubik.svg", f"kubik-{KUBIK_VERSION}/install.sh",
+                     f"kubik-{KUBIK_VERSION}/manager/Main.qml",
                      f"kubik-{KUBIK_VERSION}/packages/kubik/metadata.json"):
             self.assertRegex(ls, rf"squashfs-root/{re.escape(name)}\n")
         self.assertRegex(ls, r"-rwxr-xr-x root/root .* squashfs-root/AppRun\n")
 
     def test_reproducible(self):
         self.assertEqual(self.appimage.read_bytes(), self.again.read_bytes())
+
+    def test_tarball_has_the_manager(self):
+        top = f"kubik-{KUBIK_VERSION}"
+        with tarfile.open(self.tarball) as t:
+            members = {m.name: m for m in t.getmembers()}
+        for name in ("manager.sh", "manager/Main.qml", "manager/logic.js", "manager/kubik.svg"):
+            self.assertIn(f"{top}/{name}", members)
+        self.assertTrue(members[f"{top}/manager.sh"].mode & 0o111)
+        with tarfile.open(self.tarball) as t:
+            js = t.extractfile(f"{top}/manager/logic.js").read().decode()
+        self.assertIn("var KubikManager = ", js)
 
 
 @unittest.skipUnless(shutil.which("docker"), "docker indisponível (build do TypeScript)")
@@ -192,7 +205,7 @@ class KubikBuildTest(unittest.TestCase):
 
 class ShellScriptsTest(unittest.TestCase):
     SCRIPTS = [ROOT / "scripts" / n for n in ("install.sh", "uninstall.sh", "release.sh", "diagnose.sh", "shortcuts.sh",
-                                              "appimage.sh", "appimage/AppRun")]
+                                              "appimage.sh", "appimage/AppRun", "manager.sh")]
 
     def test_bash_syntax(self):
         for s in self.SCRIPTS:

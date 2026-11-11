@@ -12,7 +12,9 @@ for a in "$@"; do [ "$a" = --yesnocancel ] && exit 2; done
 exit 0
 SHIM
 chmod +x /tmp/shim/kdialog
-export PATH=/tmp/shim:$PATH APPIMAGE_EXTRACT_AND_RUN=1
+# As janelas do kdialog são o plano B (sem os módulos do Plasma para o
+# gerenciador); aqui forçadas, para testar esse caminho também no Arch.
+export PATH=/tmp/shim:$PATH APPIMAGE_EXTRACT_AND_RUN=1 KUBIK_KDIALOG=1
 AI=$(ls /out/appimage/Kubik-*.AppImage)
 
 DATA=$HOME/.local/share
@@ -29,12 +31,11 @@ state clean
 mark gui_first
 LANG=pt_BR.UTF-8 LANGUAGE=pt_BR "$AI" >&2
 state gui_first
-# "Abrir o Kubik" abre o gerenciador (plasmawindowed, se existir).
-if command -v plasmawindowed >/dev/null; then
-    wait_log "[kubik-tray] estado:" 20
-    sleep 2
-    screenshot windowed
-    kwin_eval "workspace.stackingOrder.forEach(w => { if (w.resourceClass.indexOf('plasmawindowed') >= 0) console.warn('=== WINDOWED ' + w.caption + ' ' + w.width + 'x' + w.height); })"
+# "Abrir o Kubik" abre o gerenciador instalado (se o sistema tem o Plasma).
+if [ -d /usr/lib/qt6/qml/org/kde/plasma/plasma5support ] || [ -d /usr/lib64/qt6/qml/org/kde/plasma/plasma5support ]; then
+    wait_log "[kubik-manager] aberto pelo menu" 20
+    sleep 1
+    kwin_eval "workspace.stackingOrder.forEach(w => { if (w.caption === 'Kubik') { console.warn('=== MANAGER ' + w.resourceClass + ' ' + w.width + 'x' + w.height); w.closeWindow(); } })"
 fi
 
 mark gui_again
@@ -48,3 +49,10 @@ state cli_uninstall
 mark cli_install
 "$AI" --install --yes >&2
 state cli_install
+
+# Sem os módulos do Plasma (imagem do Fedora), o gerenciador não abre e sai
+# com 3, para o AppImage cair nas janelas do kdialog.
+if [ ! -d /usr/lib/qt6/qml/org/kde/plasma/plasma5support ] && [ ! -d /usr/lib64/qt6/qml/org/kde/plasma/plasma5support ]; then
+    timeout 20 "$DATA/kubik/manager.sh"
+    echo "=== manager without plasma exit $?" >&2
+fi
