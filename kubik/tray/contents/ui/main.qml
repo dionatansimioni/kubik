@@ -30,6 +30,16 @@ PlasmoidItem {
     // novo não é gravado (cada gravação faz o KWin reler a configuração).
     property string lastWritten: ""
 
+    // ---- gerenciador (estado, versão nova, atualizar, desinstalar) ----------
+    // No menu, "Kubik" abre esta mesma bandeja numa janela (plasmawindowed):
+    // lá ela é Planar e mostra também o botão Desinstalar.
+    readonly property bool windowed: Plasmoid.formFactor === PlasmaCore.Types.Planar
+    property var status: null       // logic.Status
+    property var update: null       // logic.Release mais novo que o instalado
+    // "", "checking", "updating", "updated", "failed", "confirm", "uninstalling", "removed"
+    property string managerState: ""
+    property string updatedTo: ""
+
     Plasmoid.icon: Qt.resolvedUrl("../icons/kubik.svg")
     Plasmoid.status: PlasmaCore.Types.ActiveStatus
     toolTipMainText: "Kubik"
@@ -37,9 +47,8 @@ PlasmoidItem {
 
     function tooltip() {
         const s = logic.toSettings(trayConfig());
-        if (!s.enabled)
-            return i18n("Tiling off (Meta+Y turns it on)");
-        return i18n("Tiling on · gaps %1 px · border %2", s.gaps.inner, s.border.enabled ? i18n("%1 px", s.border.width) : i18n("off"));
+        const text = s.enabled ? i18n("Tiling on · gaps %1 px · border %2", s.gaps.inner, s.border.enabled ? i18n("%1 px", s.border.width) : i18n("off")) : i18n("Tiling off (Meta+Y turns it on)");
+        return update ? text + "\n" + i18n("New version %1 available", update.version) : text;
     }
 
     function trayConfig() {
@@ -67,8 +76,12 @@ PlasmoidItem {
 
         property var callbacks: ({})
 
-        function run(cmd, cb) {
+        property var quiet: ({})
+
+        // quiet: falha esperada (sem rede, etc.), não vai ao log como erro.
+        function run(cmd, cb, isQuiet) {
             callbacks[cmd] = cb;
+            quiet[cmd] = !!isQuiet;
             connectSource(cmd);
         }
 
@@ -76,9 +89,11 @@ PlasmoidItem {
         connectedSources: []
         onNewData: (source, data) => {
             const cb = callbacks[source];
+            const isQuiet = quiet[source];
             delete callbacks[source];
+            delete quiet[source];
             disconnectSource(source);
-            if (data["exit code"] !== 0)
+            if (data["exit code"] !== 0 && !isQuiet)
                 root.log("comando falhou (" + data["exit code"] + "): " + data.stderr);
             if (cb)
                 cb(data["exit code"], data.stdout);
@@ -146,7 +161,76 @@ PlasmoidItem {
         cfg.enabled = !cfg.enabled;
     }
 
-    Component.onCompleted: load()
+    function refreshStatus(then) {
+        exec.run(logic.statusCommand(), (code, stdout) => {
+            status = logic.parseStatus(stdout);
+            log("estado: script " + status.script + (status.scriptLoaded ? " (ativo)" : " (parado)") + ", efeito " + status.effect + (status.effectLoaded ? " (ativo)" : " (parado)") + ", bandeja " + status.tray);
+            if (then)
+                then();
+        });
+    }
+
+    function checkUpdates() {
+        if (managerState === "updating" || managerState === "uninstalling" || managerState === "removed")
+            return;
+        exec.run(logic.releasesCommand(), (code, stdout) => {
+            const current = logic.installedVersion(status);
+            update = logic.newerRelease(stdout, current);
+            if (update)
+                log("nova versão: " + update.version + " (instalada: " + current + ")");
+            else
+                log(String(stdout).trim() ? "versão em dia: " + current : "verificação de versão sem resposta");
+        }, true);
+    }
+
+    function runUpdate() {
+        if (!update)
+            return;
+        const target = update.version;
+        managerState = "updating";
+        log("atualizando para " + target);
+        exec.run(logic.updateCommand(update), (code, stdout) => {
+            refreshStatus(() => {
+                if (code === 0 && logic.installedVersion(status) === target) {
+                    managerState = "updated";
+                    updatedTo = target;
+                    update = null;
+                    log("atualizado para " + target);
+                } else {
+                    managerState = "failed";
+                    log("atualização falhou (" + code + ")");
+                }
+            });
+        });
+    }
+
+    function runUninstall() {
+        managerState = "uninstalling";
+        log("desinstalando");
+        exec.run(logic.uninstallCommand(), (code, stdout) => {
+            managerState = code === 0 ? "removed" : "failed";
+            log(code === 0 ? "desinstalado" : "desinstalação falhou (" + code + ")");
+        });
+    }
+
+    // Na janela (o usuário abriu o gerenciador) sempre verifica; na bandeja,
+    // ao iniciar e a cada 6 h, se "Procurar versões novas" estiver marcado.
+    Timer {
+        id: updateTimer
+
+        interval: root.logic.UPDATE_INTERVAL_MS
+        repeat: true
+        running: root.windowed || root.cfg.checkUpdates
+        onTriggered: root.checkUpdates()
+    }
+
+    Component.onCompleted: {
+        load();
+        refreshStatus(() => {
+            if (windowed || cfg.checkUpdates)
+                checkUpdates();
+        });
+    }
 
     Plasmoid.contextualActions: [
         PlasmaCore.Action {
@@ -300,6 +384,107 @@ PlasmoidItem {
                 icon.name: "configure"
                 text: i18n("Configure…")
                 onClicked: Plasmoid.internalAction("configure").trigger()
+            }
+
+            Kirigami.Separator {
+                Layout.fillWidth: true
+                Layout.topMargin: Kirigami.Units.smallSpacing
+            }
+
+            // Avisos do estado (componente parado).
+            Kirigami.InlineMessage {
+                objectName: "effectWarning"
+                Layout.fillWidth: true
+                type: Kirigami.MessageType.Warning
+                visible: !!root.status && !!root.status.effect && !root.status.effectLoaded && root.managerState !== "removed"
+                text: i18n("Animations start after you log out and back in.")
+            }
+            Kirigami.InlineMessage {
+                objectName: "scriptWarning"
+                Layout.fillWidth: true
+                type: Kirigami.MessageType.Warning
+                visible: !!root.status && !!root.status.script && !root.status.scriptLoaded && root.managerState !== "removed"
+                text: i18n("The tiling script is not running. Turn it on in System Settings › Window Management › KWin Scripts.")
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                PlasmaComponents3.Label {
+                    id: versionLabel
+
+                    objectName: "versionLabel"
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    opacity: root.update ? 1 : 0.7
+                    text: {
+                        const v = root.logic.installedVersion(root.status);
+                        switch (root.managerState) {
+                        case "updating":
+                            return i18n("Updating to %1…", root.update ? root.update.version : "");
+                        case "updated":
+                            return i18n("Updated to %1.", root.updatedTo);
+                        case "failed":
+                            return i18n("Something went wrong. Check your internet connection and try again.");
+                        case "uninstalling":
+                            return i18n("Removing Kubik…");
+                        case "removed":
+                            return i18n("Kubik was removed. You can close this window.");
+                        }
+                        if (root.update)
+                            return i18n("New version %1 available", root.update.version);
+                        return v ? i18n("Version %1", v) : "";
+                    }
+                }
+                PlasmaComponents3.BusyIndicator {
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                    visible: root.managerState === "updating" || root.managerState === "uninstalling"
+                    running: visible
+                }
+                PlasmaComponents3.Button {
+                    objectName: "updateButton"
+                    visible: !!root.update && root.managerState !== "updating" && root.managerState !== "removed"
+                    icon.name: "update-none"
+                    text: i18n("Update")
+                    onClicked: root.runUpdate()
+                }
+            }
+
+            // Desinstalar: só na janela do gerenciador, com confirmação.
+            RowLayout {
+                Layout.fillWidth: true
+                visible: root.windowed && root.managerState !== "removed" && root.managerState !== "uninstalling"
+
+                PlasmaComponents3.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    visible: root.managerState === "confirm"
+                    text: i18n("Remove Kubik, its tray icon and its shortcuts?")
+                }
+                Item {
+                    Layout.fillWidth: true
+                    visible: root.managerState !== "confirm"
+                }
+                PlasmaComponents3.Button {
+                    objectName: "uninstallButton"
+                    visible: root.managerState !== "confirm"
+                    icon.name: "edit-delete"
+                    text: i18n("Uninstall…")
+                    onClicked: root.managerState = "confirm"
+                }
+                PlasmaComponents3.Button {
+                    objectName: "confirmUninstall"
+                    visible: root.managerState === "confirm"
+                    icon.name: "edit-delete"
+                    text: i18n("Remove")
+                    onClicked: root.runUninstall()
+                }
+                PlasmaComponents3.Button {
+                    visible: root.managerState === "confirm"
+                    text: i18n("Cancel")
+                    onClicked: root.managerState = ""
+                }
             }
         }
     }

@@ -45,6 +45,15 @@ class FirstInstallTest(unittest.TestCase):
         self.assertIn("=== active after Meta+Left: Alpha", self.log)
         self.assertIn("=== after uninstall quicktile=[285212690] switchwin=[419430418] backup=no", self.log)
 
+    def test_app_icon_menu_entry_and_stored_uninstaller(self):
+        self.assertIn("=== files installed icon=yes menu=yes uninstaller=yes "
+                      "list=[Plasma/Applet io.github.dionatansimioni.kubik,KWin/Script kubik,KWin/Effect kubikanimations]",
+                      self.log)
+        self.assertIn("=== files uninstalled icon=no menu=no uninstaller=no list=[]", self.log)
+
+    def test_uninstall_stops_the_script_right_away(self):
+        self.assertIn("=== script loaded after uninstall: false", self.log)
+
     def test_tray_icon_is_installed(self):
         self.assertIn("=== tray installed: true", self.log)
         self.assertIn("Ícone na bandeja", self.log)

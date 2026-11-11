@@ -24,15 +24,21 @@ if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
 fi
 
 mapfile -t FILES < <(python3 scripts/build.py "$PKG")
+# Instalador AppImage, feito do .tar.gz (só o do Kubik tem; o protótipo não).
+TARBALL=$(printf '%s\n' "${FILES[@]}" | grep '\.tar\.gz$')
+if [ "$ID" = kubik ]; then
+    FILES=("$(scripts/appimage.sh "$TARBALL" dist)" "${FILES[@]}")
+fi
 
 NOTES=$(cat <<EOF
 Versão de teste **$VERSION** de \`$ID\` (commit $(git rev-parse --short HEAD)).
 
 **Instalar (escolha um):**
-- Configurações do Sistema › Scripts do KWin › *Instalar de arquivo…* › \`$ID-$VERSION.kwinscript\`
-- \`tar xzf $ID-$VERSION.tar.gz && ./$ID-$VERSION/install.sh\`
+- **Mais fácil:** baixe \`Kubik-$VERSION-x86_64.AppImage\`, marque como executável (botão direito › Propriedades › Permissões) e abra com dois cliques.
+- Terminal: \`tar xzf $ID-$VERSION.tar.gz && ./$ID-$VERSION/install.sh\`
 
-Para remover: \`./$ID-$VERSION/uninstall.sh\`
+Depois, o **Kubik** no menu abre o gerenciador: estado, versão nova (com o botão Atualizar) e Desinstalar.
+Pelo terminal: \`./$ID-$VERSION/uninstall.sh\`
 EOF
 )
 

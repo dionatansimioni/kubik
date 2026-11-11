@@ -251,6 +251,15 @@ describe("Controller", () => {
       expect(logs).toContain("flutuante 'Ponte de vídeo Xwayland': janela oculta (fora da barra de tarefas e do Alt+Tab)");
     });
 
+    it("o gerenciador do Kubik (applet no plasmawindowed) flutua", () => {
+      const a = ws.open(win("a"));
+      const manager = win("Kubik");
+      manager.resourceClass = "plasmawindowed";
+      ws.open(manager);
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(logs).toContain("flutuante 'Kubik': classe flutuante (plasmawindowed)");
+    });
+
     it("janela invisível (opacidade 0) não ocupa tile", () => {
       const a = ws.open(win("a"));
       const ghost = win("fantasma");

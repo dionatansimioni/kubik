@@ -4,9 +4,9 @@
         "Name": "Kubik",
         "Description": "Controls Kubik's auto-tiling: on/off, gaps, border, exceptions and animation.",
         "Description[pt_BR]": "Controla o auto-tiling do Kubik: liga/desliga, gaps, borda, exceções e animação.",
-        "Icon": "view-grid",
+        "Icon": "io.github.dionatansimioni.kubik",
         "Category": "Windows and Tasks",
-        "Version": "0.9.0",
+        "Version": "0.10.0",
         "License": "GPL-3.0-or-later",
         "Website": "https://github.com/dionatansimioni/kubik",
         "EnabledByDefault": true

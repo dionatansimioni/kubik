@@ -15,6 +15,9 @@ export const DEFAULT_FLOATING_CLASSES = [
   "org.kde.spectacle",
   "xwaylandvideobridge",
   "org.kde.xwaylandvideobridge",
+  // Applets numa janela, como o gerenciador do Kubik (entrada "Kubik" do menu).
+  "plasmawindowed",
+  "org.kde.plasmawindowed",
 ];
 
 /**

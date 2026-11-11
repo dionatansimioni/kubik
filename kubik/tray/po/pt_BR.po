@@ -114,3 +114,51 @@ msgstr "Tiling ligado · gaps %1 px · borda %2"
 
 msgid "off"
 msgstr "desligada"
+
+msgid "Updates:"
+msgstr "Atualizações:"
+
+msgid "Check GitHub for new versions"
+msgstr "Procurar versões novas no GitHub"
+
+msgid "New version %1 available"
+msgstr "Nova versão %1 disponível"
+
+msgid "Animations start after you log out and back in."
+msgstr "As animações começam depois que você sair e entrar na sessão."
+
+msgid "The tiling script is not running. Turn it on in System Settings › Window Management › KWin Scripts."
+msgstr "O script de tiling não está rodando. Ative em Configurações do Sistema › Gerenciamento de janelas › Scripts do KWin."
+
+msgid "Updating to %1…"
+msgstr "Atualizando para %1…"
+
+msgid "Updated to %1."
+msgstr "Atualizado para %1."
+
+msgid "Something went wrong. Check your internet connection and try again."
+msgstr "Algo deu errado. Confira sua conexão com a internet e tente de novo."
+
+msgid "Removing Kubik…"
+msgstr "Removendo o Kubik…"
+
+msgid "Kubik was removed. You can close this window."
+msgstr "O Kubik foi removido. Pode fechar esta janela."
+
+msgid "Version %1"
+msgstr "Versão %1"
+
+msgid "Update"
+msgstr "Atualizar"
+
+msgid "Remove Kubik, its tray icon and its shortcuts?"
+msgstr "Remover o Kubik, o ícone da bandeja e os atalhos?"
+
+msgid "Uninstall…"
+msgstr "Desinstalar…"
+
+msgid "Remove"
+msgstr "Remover"
+
+msgid "Cancel"
+msgstr "Cancelar"

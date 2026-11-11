@@ -12,6 +12,9 @@ need dbus-send
 
 NEEDS_RELOGIN=""
 TRAY_ID=""
+INSTALLED=""
+DATA=${XDG_DATA_HOME:-$HOME/.local/share}
+APP_ID=io.github.dionatansimioni.kubik
 
 meta() { sed -n "s/.*\"$2\": *\"\([^\"]*\)\".*/\1/p" "$1/metadata.json" | head -n1; }
 kwin() { dbus-send --session --print-reply --dest=org.kde.KWin "$@" >/dev/null 2>&1; }
@@ -27,6 +30,7 @@ for PKG in ./packages/*/; do
     VERSION=$(meta "$PKG" Version)
     TYPE=$(meta "$PKG" KPackageStructure)
     [ -n "$ID" ] && [ -n "$TYPE" ] || { echo "erro: metadata.json inválido em $PKG" >&2; exit 1; }
+    INSTALLED="$INSTALLED$TYPE $ID"$'\n'
 
     if kpackagetool6 --type="$TYPE" --show "$ID" >/dev/null 2>&1; then
         echo "Atualizando $ID para $VERSION…"
@@ -55,6 +59,20 @@ for PKG in ./packages/*/; do
     esac
 done
 
+# Ícone do app (menu, Scripts do KWin, bandeja) e a entrada "Kubik" no menu,
+# que abre o gerenciador (a bandeja numa janela, via plasmawindowed).
+if [ -d ./share ]; then
+    install -Dm644 "./share/$APP_ID.svg" "$DATA/icons/hicolor/scalable/apps/$APP_ID.svg"
+    install -Dm644 "./share/$APP_ID.desktop" "$DATA/applications/$APP_ID.desktop"
+    command -v kbuildsycoca6 >/dev/null && { kbuildsycoca6 >/dev/null 2>&1 || true; }
+fi
+# Para desinstalar sem o pacote (botão "Desinstalar" do gerenciador): uma cópia
+# do uninstall.sh e a lista do que foi instalado.
+mkdir -p "$DATA/kubik"
+install -m755 ./uninstall.sh "$DATA/kubik/uninstall.sh"
+install -m644 ./shortcuts.sh "$DATA/kubik/shortcuts.sh"
+printf '%s' "$INSTALLED" > "$DATA/kubik/installed.list"
+
 kwin /KWin org.kde.KWin.reconfigure || true
 SCRIPT_STARTED=1
 kwin /Scripting org.kde.kwin.Scripting.start || SCRIPT_STARTED=""
@@ -75,6 +93,7 @@ if [ -n "${TRAY_ID:-}" ]; then
     echo "Ícone na bandeja: clique para ligar/desligar e ajustar; botão direito › Configurar Kubik…"
     echo "  (Se ele não aparecer ou não atualizar: systemctl --user restart plasma-plasmashell)"
 fi
+echo "Menu: \"Kubik\" abre o gerenciador (estado, atualizações e o botão Desinstalar)."
 echo "Teclado: Meta+setas focam, Meta+Shift+setas movem, Meta+Alt+setas redimensionam;"
 echo "  Meta+O gira a divisão, Meta+F flutua a janela, Meta+M monocle, Meta+Y liga/desliga."
 echo "  (O quick tile do KDE nessas teclas foi desligado; o uninstall.sh devolve.)"

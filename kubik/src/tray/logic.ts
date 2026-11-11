@@ -194,3 +194,150 @@ export function statusText(c: Partial<TrayConfig>): string {
   if (!s.enabled) return "Tiling desligado (Meta+Y liga)";
   return `Tiling ligado · gaps ${s.gaps.inner} px · borda ${s.border.enabled ? `${s.border.width} px` : "desligada"}`;
 }
+
+// ---- gerenciador: estado, versões novas no GitHub, atualizar, desinstalar ----
+
+/** Repositório dos releases (as versões são pré-releases com a tag kubik-v<versão>). */
+export const REPO = "dionatansimioni/kubik";
+export const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases?per_page=20`;
+/** De quanto em quanto tempo a bandeja procura versão nova (6 h). */
+export const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+/** Os três componentes instalados pelo install.sh. */
+export const COMPONENTS = [
+  { key: "script", type: "KWin/Script", id: "kubik" },
+  { key: "effect", type: "KWin/Effect", id: EFFECT_ID },
+  { key: "tray", type: "Plasma/Applet", id: "io.github.dionatansimioni.kubik" },
+] as const;
+
+export interface Status {
+  /** Versão instalada de cada componente (null: não instalado). */
+  script: string | null;
+  effect: string | null;
+  tray: string | null;
+  scriptLoaded: boolean;
+  effectLoaded: boolean;
+}
+
+/**
+ * Comando que imprime "chave=valor" do estado: a versão de cada componente
+ * (do metadata.json no Path que o kpackagetool6 mostra) e se o script e o
+ * efeito estão carregados no KWin agora.
+ */
+export function statusCommand(): string {
+  const version = COMPONENTS.map(
+    (c) =>
+      `p=$(kpackagetool6 --type=${c.type} --show ${c.id} 2>/dev/null | sed -n 's/^ *Path *: *//p'); ` +
+      `v=""; [ -n "$p" ] && v=$(sed -n 's/.*"Version": *"\\([^"]*\\)".*/\\1/p' "\${p%/}/metadata.json" 2>/dev/null | head -n1); ` +
+      `echo "${c.key}=$v"`,
+  );
+  const dbus = "dbus-send --session --print-reply --dest=org.kde.KWin";
+  const loaded = (key: string, path: string, method: string, id: string) =>
+    `echo "${key}=$(${dbus} ${path} ${method} string:${id} 2>/dev/null | grep -c 'boolean true')"`;
+  return [
+    ...version,
+    loaded("scriptLoaded", "/Scripting", "org.kde.kwin.Scripting.isScriptLoaded", "kubik"),
+    loaded("effectLoaded", "/Effects", "org.kde.kwin.Effects.isEffectLoaded", EFFECT_ID),
+  ].join("; ");
+}
+
+export function parseStatus(stdout: string): Status {
+  const v: Record<string, string> = {};
+  for (const line of String(stdout || "").split("\n")) {
+    const i = line.indexOf("=");
+    if (i > 0) v[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+  }
+  const ver = (k: string) => (isVersion(v[k] ?? "") ? v[k] : null);
+  return {
+    script: ver("script"),
+    effect: ver("effect"),
+    tray: ver("tray"),
+    scriptLoaded: v.scriptLoaded === "1",
+    effectLoaded: v.effectLoaded === "1",
+  };
+}
+
+/** A versão "do Kubik": a do script (o principal) ou, sem ele, a da bandeja. */
+export function installedVersion(s: Status | null | undefined): string | null {
+  return s ? (s.script ?? s.tray) : null;
+}
+
+export function isVersion(s: string): boolean {
+  return /^\d+\.\d+\.\d+$/.test(s);
+}
+
+/** Compara "1.2.3" com "1.10.0" numericamente: <0, 0 ou >0. */
+export function compareVersions(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/**
+ * Lista os releases do GitHub. KUBIK_RELEASES_URL troca o endereço (o
+ * testenv aponta para um servidor local). Sem rede: saída vazia, sem erro.
+ */
+export function releasesCommand(): string {
+  return `curl -fsSL --max-time 20 -H 'Accept: application/vnd.github+json' "\${KUBIK_RELEASES_URL:-${RELEASES_URL}}" 2>/dev/null || true`;
+}
+
+export interface Release {
+  version: string;
+  /** O kubik-<versão>.tar.gz do release. */
+  url: string;
+  /** Página do release (notas). */
+  page: string;
+}
+
+/** Endereço seguro para ir ao shell (entre aspas simples, mas por garantia). */
+function isSafeUrl(s: string): boolean {
+  return /^https?:\/\/[A-Za-z0-9._~:/?#@!$&()*+,;=%-]+$/.test(s) && !s.includes("'");
+}
+
+/** O release mais novo com o .tar.gz anexado, se for mais novo que `current`. */
+export function newerRelease(json: string, current: string | null): Release | null {
+  let list: unknown;
+  try {
+    list = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(list)) return null;
+  let best: Release | null = null;
+  for (const r of list as Array<Record<string, unknown>>) {
+    if (!r || r.draft) continue;
+    const m = /^kubik-v(\d+\.\d+\.\d+)$/.exec(String(r.tag_name ?? ""));
+    if (!m) continue;
+    const version = m[1];
+    const assets = Array.isArray(r.assets) ? (r.assets as Array<Record<string, unknown>>) : [];
+    const tar = assets.find((a) => a && a.name === `kubik-${version}.tar.gz`);
+    const url = tar ? String(tar.browser_download_url ?? "") : "";
+    if (!isSafeUrl(url)) continue;
+    if (best && compareVersions(version, best.version) <= 0) continue;
+    const page = String(r.html_url ?? "");
+    best = { version, url, page: isSafeUrl(page) ? page : `https://github.com/${REPO}/releases` };
+  }
+  if (!best) return null;
+  return current && isVersion(current) && compareVersions(best.version, current) <= 0 ? null : best;
+}
+
+/** Baixa o .tar.gz do release e roda o install.sh dele (o mesmo da instalação manual). */
+export function updateCommand(r: Release): string {
+  if (!isSafeUrl(r.url) || !isVersion(r.version)) throw new Error(`release inválido: ${r.version} ${r.url}`);
+  return (
+    `d=$(mktemp -d) && curl -fsSL --max-time 600 -o "$d/kubik.tar.gz" ${q(r.url)} && ` +
+    `tar xzf "$d/kubik.tar.gz" -C "$d" && "$d/kubik-${r.version}/install.sh"; ` +
+    `r=$?; rm -rf "$d"; exit $r`
+  );
+}
+
+/** Onde o install.sh guarda uma cópia do uninstall.sh (para desinstalar sem o pacote). */
+export const DATA_DIR = "${XDG_DATA_HOME:-$HOME/.local/share}/kubik";
+
+export function uninstallCommand(): string {
+  return `bash "${DATA_DIR}/uninstall.sh"`;
+}

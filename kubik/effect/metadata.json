@@ -7,7 +7,8 @@
         "Description": "Animates windows sliding and resizing when Kubik rearranges the layout.",
         "Description[pt_BR]": "Anima as janelas deslizando e redimensionando quando o kubik reorganiza o layout.",
         "Category": "Window Management",
-        "Version": "0.9.0",
+        "Icon": "io.github.dionatansimioni.kubik",
+        "Version": "0.10.0",
         "License": "GPL-3.0-or-later",
         "Website": "https://github.com/dionatansimioni/kubik",
         "EnabledByDefault": false

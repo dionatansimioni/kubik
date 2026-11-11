@@ -1,6 +1,11 @@
 # Funções para cenários do testenv (source /work/testenv/lib.sh).
 # Rodam DENTRO do container, como sessão do KWin.
 
+# A bandeja procura versões novas no GitHub: nos testes, nunca na internet
+# (um endereço que não responde). O cenário do gerenciador troca por um
+# servidor local (fake_releases).
+export KUBIK_RELEASES_URL=${KUBIK_RELEASES_URL:-http://127.0.0.1:9/offline}
+
 # Abre uma janela de teste e espera ela mapear: open_window <título> [LxA] [cor] [extras…]
 QML_BIN=$(command -v /usr/lib/qt6/bin/qml /usr/lib64/qt6/bin/qml | head -n1)
 open_window() {
@@ -106,4 +111,37 @@ kwin_eval() {
 open_app() {
     $1 >/dev/null 2>&1 &
     sleep "${2:-2.5}"
+}
+
+# Servidor local com um "release" mais novo, para a bandeja achar e instalar:
+# fake_releases <versão>. Reempacota o .tar.gz do build com a versão trocada e
+# serve releases.json no formato da API do GitHub em 127.0.0.1:8765.
+fake_releases() {
+    local v=$1 srv=/tmp/releases src
+    rm -rf "$srv" && mkdir -p "$srv/build"
+    tar xzf /out/pkg/kubik-*.tar.gz -C "$srv/build"
+    src=$(find "$srv/build" -maxdepth 1 -type d -name 'kubik-*' | head -n1)
+    sed -i "s/\"Version\": *\"[^\"]*\"/\"Version\": \"$v\"/" "$src"/packages/*/metadata.json
+    mv "$src" "$srv/build/kubik-$v"
+    tar czf "$srv/kubik-$v.tar.gz" -C "$srv/build" "kubik-$v"
+    cat > "$srv/releases.json" <<JSON
+[{"tag_name": "kubik-v$v", "draft": false, "prerelease": true,
+  "html_url": "http://127.0.0.1:8765/kubik-v$v",
+  "assets": [{"name": "kubik-$v.tar.gz", "browser_download_url": "http://127.0.0.1:8765/kubik-$v.tar.gz"}]},
+ {"tag_name": "kubik-v0.0.1", "draft": false, "prerelease": true, "html_url": "", "assets": []}]
+JSON
+    (cd "$srv" && exec python3 -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1) &
+    sleep 1
+    export KUBIK_RELEASES_URL=http://127.0.0.1:8765/releases.json
+}
+
+# Espera uma linha aparecer no kwin.log: wait_log <texto> [segundos]
+wait_log() {
+    local i
+    for i in $(seq "${2:-20}"); do
+        grep -qF "$1" /out/kwin.log && return 0
+        sleep 1
+    done
+    echo "=== TIMEOUT esperando: $1" >&2
+    return 1
 }

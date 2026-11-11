@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Kubik
+GenericName=Window Tiling
+GenericName[pt_BR]=Tiling de janelas
+Comment=Status, updates and settings of Kubik's auto-tiling
+Comment[pt_BR]=Estado, atualizações e configurações do auto-tiling do Kubik
+Exec=plasmawindowed io.github.dionatansimioni.kubik
+Icon=io.github.dionatansimioni.kubik
+Categories=Qt;KDE;Settings;DesktopSettings;
+Keywords=tiling;window;tile;layout;
+Keywords[pt_BR]=tiling;janela;mosaico;layout;
+StartupNotify=false

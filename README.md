@@ -31,20 +31,24 @@
 - **Tray icon:**
   - on/off, gaps, border, and per-screen "tile windows on all desktops";
   - exceptions (apps that always float), picked from the open apps;
-  - animation settings.
+  - animation settings;
+  - update check against GitHub releases (can be turned off).
 - English and Portuguese UI, following the system language.
 
 ## Install
 
-Download the latest `kubik-<version>.tar.gz` from [Releases](https://github.com/dionatansimioni/kubik/releases), then run:
+Download `Kubik-<version>-x86_64.AppImage` from [Releases](https://github.com/dionatansimioni/kubik/releases), make it executable (right-click › Properties › Permissions) and double-click it. It's about 1 MB and uses KDE's own tools, with no bundled Qt.
+
+It installs the KWin script, the animation effect, the tray icon and a **Kubik** entry in the app menu. It also frees Meta+arrows from KDE's quick tile, and uninstalling gives them back. On the very first install, log out and back in once, because KWin only discovers new effects at login. The installer tells you when that's needed.
+
+**Kubik** in the menu opens the manager: the tray's settings plus the installed version, an **Update** button when GitHub has a newer release, and **Uninstall…**.
+
+Prefer the terminal?
 
 ```sh
-tar xzf kubik-<version>.tar.gz && ./kubik-<version>/install.sh
+tar xzf kubik-<version>.tar.gz && ./kubik-<version>/install.sh   # or: ./Kubik-<version>-x86_64.AppImage --install --yes
+./kubik-<version>/uninstall.sh                                   # or: ./Kubik-<version>-x86_64.AppImage --uninstall --yes
 ```
-
-The installer sets up the script, the animation effect and the tray icon. It also frees Meta+arrows from KDE's quick tile; `uninstall.sh` gives them back. On the very first install, log out and back in once, because KWin only discovers new effects at login.
-
-A one-click AppImage installer with a manager app (updates, uninstall) is coming.
 
 ## Development
 

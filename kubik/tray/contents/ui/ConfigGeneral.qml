@@ -14,6 +14,7 @@ KCM.SimpleKCM {
     property alias cfg_gapsOuter: gapsOuter.value
     property alias cfg_borderEnabled: borderCheck.checked
     property alias cfg_borderWidth: borderWidth.value
+    property alias cfg_checkUpdates: updatesCheck.checked
 
     Kirigami.FormLayout {
         QQC2.CheckBox {
@@ -65,6 +66,17 @@ KCM.SimpleKCM {
             to: logic.LIMITS.borderWidth.max
             textFromValue: (v, locale) => i18n("%1 px", v)
             valueFromText: (t, locale) => parseInt(t)
+        }
+
+        Item {
+            Kirigami.FormData.isSection: true
+        }
+
+        QQC2.CheckBox {
+            id: updatesCheck
+
+            Kirigami.FormData.label: i18n("Updates:")
+            text: i18n("Check GitHub for new versions")
         }
     }
 }

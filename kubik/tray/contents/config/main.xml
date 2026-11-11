@@ -16,4 +16,8 @@
     <entry name="animDuration" type="Int"><default>250</default></entry>
     <entry name="animCurve" type="String"><default>OutCubic</default></entry>
   </group>
+  <!-- Só da bandeja (não vai ao kwinrc). -->
+  <group name="Manager">
+    <entry name="checkUpdates" type="Bool"><default>true</default></entry>
+  </group>
 </kcfg>

@@ -6,6 +6,7 @@ Gera em dist/:
                             Scripts do KWin › "Instalar de arquivo…"
                             (ou kpackagetool6 -t KWin/Script -i arquivo)
   <id>-<versão>.tar.gz      pacote + install.sh / uninstall.sh / diagnose.sh
+                            + share/ (ícone do app e entrada do menu)
 
 Uso: scripts/build.py [diretório-do-pacote]   (padrão: kubik/package)
 Imprime os caminhos dos arquivos gerados, um por linha.
@@ -31,6 +32,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DIST = Path(os.environ.get("KUBIK_DIST", ROOT / "dist"))
 SCRIPTS = ROOT / "scripts"
+ASSETS = ROOT / "assets"
+APP_ID = "io.github.dionatansimioni.kubik"
 # Data fixa nos arquivos para builds reproduzíveis.
 FIXED_ZIP_DATE = (2026, 1, 1, 0, 0, 0)
 
@@ -97,6 +100,9 @@ def build_tarball(pkgs, plugin_id: str, version: str, out: Path):
         for script in ("install.sh", "uninstall.sh", "diagnose.sh"):
             add(tar, (SCRIPTS / script).read_bytes(), script, 0o755)
         add(tar, (SCRIPTS / "shortcuts.sh").read_bytes(), "shortcuts.sh", 0o644)
+        # Ícone do app e entrada do menu (o install.sh põe em ~/.local/share).
+        add(tar, (ASSETS / "kubik.svg").read_bytes(), f"share/{APP_ID}.svg", 0o644)
+        add(tar, (ASSETS / f"{APP_ID}.desktop").read_bytes(), f"share/{APP_ID}.desktop", 0o644)
         main = pkgs[0]
         readme = next((p for p in (main / "README.md", main.parent / "README.md") if p.is_file()), None)
         if readme:

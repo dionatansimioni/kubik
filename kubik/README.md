@@ -6,10 +6,20 @@ Auto-tiling de janelas no estilo Pop!_Shell para o KDE Plasma 6.
 
 Baixe a versão mais recente em **Releases** e escolha uma das formas:
 
-- **Pela interface:** Configurações do Sistema › Scripts do KWin › *Instalar de arquivo…* › `kubik-<versão>.kwinscript`, e marque **Kubik**.
+- **Instalador (mais fácil):** `Kubik-<versão>-x86_64.AppImage`. Marque como executável (botão direito › Propriedades › Permissões) e abra com dois cliques. Ele mostra o que vai instalar e, no fim, avisa se falta sair e entrar na sessão. Aberto de novo com o Kubik já instalado, oferece abrir o gerenciador ou reinstalar. Pelo terminal: `--install --yes` ou `--uninstall --yes`. Tem ~1 MB e não traz Qt: usa o `kdialog` e as ferramentas do Plasma.
 - **Pelo terminal:** `tar xzf kubik-<versão>.tar.gz && ./kubik-<versão>/install.sh`.
+- **Só o script, pela interface:** Configurações do Sistema › Scripts do KWin › *Instalar de arquivo…* › `kubik-<versão>.kwinscript`, e marque **Kubik** (sem animações, bandeja e menu).
 
-Para remover: `./kubik-<versão>/uninstall.sh`.
+Para remover: o botão **Desinstalar** do gerenciador, ou `./kubik-<versão>/uninstall.sh`.
+
+### Gerenciador (menu › Kubik)
+
+O instalador põe o ícone do Kubik (também usado em *Scripts do KWin*) e uma entrada **Kubik** no menu. Ela abre o ícone da bandeja numa janela (`plasmawindowed`), com:
+
+- as mesmas opções do popup da bandeja;
+- a versão instalada e avisos de estado (efeito que só liga depois de sair e entrar; script parado);
+- **versão nova:** o gerenciador consulta os releases do GitHub ao abrir. A bandeja consulta ao iniciar e a cada 6 h, o que se desliga em *Configurar… › Geral › Atualizações*. Com versão nova, aparece **Atualizar**, que baixa o `.tar.gz` do release e roda o `install.sh` dele;
+- **Desinstalar…**, com confirmação. Usa a cópia do `uninstall.sh` que o `install.sh` guarda em `~/.local/share/kubik/` e remove tudo, inclusive o ícone, o menu e os atalhos (devolve os do KDE).
 
 O `.tar.gz` instala o script **e** o efeito de animação. **Na primeira instalação do efeito, saia e entre na sessão uma vez**: o KWin só reconhece efeitos novos ao iniciar, e o `install.sh` avisa quando é o caso. As atualizações seguintes valem na hora. Para instalar só pela interface, use o `.kwinscript` em *Scripts do KWin*. O efeito vem como `.kwineffect`, que por enquanto só o `install.sh` instala.
 
@@ -28,7 +38,7 @@ A interface (bandeja e nomes dos atalhos) segue o idioma do sistema: português 
 
 Tudo vale na hora e fica gravado no `kwinrc` (grupos `[Script-kubik]` e `[Effect-kubikanimations]`), inclusive o liga/desliga, que é lembrado depois de reiniciar a sessão. O Meta+Y continua funcionando, e o ícone acompanha.
 
-## O que já funciona (0.9.0)
+## O que já funciona (0.10.0)
 
 - Janelas novas são organizadas em árvore BSP: a janela nova divide ao meio, pelo lado mais longo, a **maior** janela (no empate, a focada). Assim, 1 janela fica cheia, 2 ficam lado a lado, 3 ficam com metade + 2 quadrantes e 4 ficam em quadrantes. Minimizadas liberam o espaço.
 - Janelas **em todos os desktops** entram no tiling do desktop visível e acompanham a troca de desktop. Com o plugin "Virtual desktops only on primary", isso inclui todas as janelas da tela secundária. Dá para desligar isso por tela, na bandeja.
@@ -69,7 +79,7 @@ Tudo vale na hora e fica gravado no `kwinrc` (grupos `[Script-kubik]` e `[Effect
 
 ## Ainda não
 
-Layout guardado entre sessões; README e página da loja em inglês. Ver `docs/DESIGN.md`.
+Layout guardado entre sessões. Ver `docs/DESIGN.md`.
 
 ## Desenvolvimento
 
@@ -85,9 +95,10 @@ python3 -m unittest discover -s tests # tudo, inclusive o KWin real do testenv
 - `src/kwin/`: o controlador, que liga a árvore ao KWin por meio da interface mínima de `api.ts`. É testado contra o KWin falso de `test/fake-kwin.ts`.
 - `src/effect/`: o efeito de animação. A decisão e o cálculo ficam em `morph.ts`, que é puro e testado; `main.ts` liga isso à API de efeitos. O resultado vai para `effect/`.
 - `src/kwin/settings.ts`: as preferências do `kwinrc`, com padrões e limites. O script e a bandeja usam o mesmo leitor.
-- `src/tray/logic.ts`: a lógica do ícone da bandeja (comandos, listas e validação). O resultado vai para `tray/contents/code/logic.js`; o QML do plasmoide fica em `tray/contents/ui/`.
+- `src/tray/logic.ts`: a lógica do ícone da bandeja e do gerenciador (comandos, listas, validação, estado, releases do GitHub). O resultado vai para `tray/contents/code/logic.js`; o QML do plasmoide fica em `tray/contents/ui/`.
 - `src/qml/Kubik.qml`: o modelo em que o build embute o bundle.
 - `package/`: o pacote do KWin. O `main.qml` é só um carregador.
+- `scripts/appimage.sh` + `scripts/appimage/AppRun`: o instalador AppImage, feito do `.tar.gz` (runtime oficial do AppImage em versão fixa, conferido por sha256, + squashfs).
 
 ## Diagnóstico
 

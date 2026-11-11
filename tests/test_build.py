@@ -3,6 +3,7 @@ import json
 import re
 import os
 import shutil
+import sys
 import subprocess
 import tarfile
 import tempfile
@@ -14,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PKG = ROOT / "prototype" / "overlay"
 META = json.loads((PKG / "metadata.json").read_text(encoding="utf-8"))
 ID, VERSION = META["KPlugin"]["Id"], META["KPlugin"]["Version"]
+KUBIK_VERSION = json.loads((ROOT / "kubik" / "package" / "metadata.json").read_text())["KPlugin"]["Version"]
 
 
 class BuildTest(unittest.TestCase):
@@ -60,6 +62,79 @@ class BuildTest(unittest.TestCase):
             self.assertIn(f"{top}/{name}", members)
         for script in ("install.sh", "diagnose.sh"):
             self.assertTrue(members[f"{top}/{script}"].mode & 0o111, f"{script} não é executável")
+        # Ícone do app e entrada do menu, que o install.sh põe em ~/.local/share.
+        for name in ("share/io.github.dionatansimioni.kubik.svg", "share/io.github.dionatansimioni.kubik.desktop"):
+            self.assertIn(f"{top}/{name}", members)
+
+
+class AppAssetsTest(unittest.TestCase):
+    APP_ID = "io.github.dionatansimioni.kubik"
+
+    @unittest.skipUnless(shutil.which("desktop-file-validate"), "desktop-file-validate não instalado")
+    def test_menu_entry_is_valid(self):
+        subprocess.run(["desktop-file-validate", str(ROOT / "assets" / f"{self.APP_ID}.desktop")], check=True)
+
+    def test_menu_entry_opens_the_manager(self):
+        entry = (ROOT / "assets" / f"{self.APP_ID}.desktop").read_text()
+        self.assertIn(f"Exec=plasmawindowed {self.APP_ID}\n", entry)
+        self.assertIn(f"Icon={self.APP_ID}\n", entry)
+
+    def test_every_component_uses_the_app_icon(self):
+        for comp in ("package", "effect", "tray"):
+            meta = json.loads((ROOT / "kubik" / comp / "metadata.json").read_text())
+            self.assertEqual(meta["KPlugin"]["Icon"], self.APP_ID, comp)
+
+    def test_versions_match(self):
+        versions = {c: json.loads((ROOT / "kubik" / c / "metadata.json").read_text())["KPlugin"]["Version"]
+                    for c in ("package", "effect", "tray")}
+        self.assertEqual(len(set(versions.values())), 1, versions)
+
+
+@unittest.skipUnless(shutil.which("mksquashfs") and shutil.which("unsquashfs"), "squashfs-tools não instalado")
+class AppImageBuildTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="kubik-appimage-build-"))
+        out = subprocess.run([sys.executable, str(ROOT / "scripts" / "build.py")], cwd=ROOT, check=True,
+                             capture_output=True, text=True, env=dict(os.environ, KUBIK_DIST=str(cls.tmp))).stdout
+        cls.tarball = next(l for l in out.splitlines() if l.endswith(".tar.gz"))
+        run = lambda d: Path(subprocess.run([str(ROOT / "scripts" / "appimage.sh"), cls.tarball, str(d)],
+                                            check=True, capture_output=True, text=True).stdout.strip())
+        cls.appimage = run(cls.tmp / "a")
+        cls.again = run(cls.tmp / "b")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def listing(self):
+        # O runtime (ELF) vem antes da imagem squashfs, que começa onde o ELF
+        # termina: fim da tabela de seções (o mesmo cálculo do runtime).
+        import struct
+        data = self.appimage.read_bytes()
+        shoff, = struct.unpack_from("<Q", data, 0x28)
+        shentsize, shnum = struct.unpack_from("<HH", data, 0x3A)
+        offset = shoff + shentsize * shnum
+        self.assertEqual(data[offset:offset + 4], b"hsqs")
+        return subprocess.run(["unsquashfs", "-o", str(offset), "-lls", str(self.appimage)],
+                              check=True, capture_output=True, text=True).stdout
+
+    def test_name_size_and_executable(self):
+        self.assertEqual(self.appimage.name, f"Kubik-{KUBIK_VERSION}-x86_64.AppImage")
+        self.assertLess(self.appimage.stat().st_size, 3 * 1024 * 1024)
+        self.assertTrue(self.appimage.stat().st_mode & 0o111)
+        self.assertTrue(self.appimage.read_bytes()[:4] == b"\x7fELF")
+
+    def test_contents(self):
+        ls = self.listing()
+        for name in ("AppRun", ".DirIcon", "io.github.dionatansimioni.kubik.desktop",
+                     "io.github.dionatansimioni.kubik.svg", f"kubik-{KUBIK_VERSION}/install.sh",
+                     f"kubik-{KUBIK_VERSION}/packages/kubik/metadata.json"):
+            self.assertRegex(ls, rf"squashfs-root/{re.escape(name)}\n")
+        self.assertRegex(ls, r"-rwxr-xr-x root/root .* squashfs-root/AppRun\n")
+
+    def test_reproducible(self):
+        self.assertEqual(self.appimage.read_bytes(), self.again.read_bytes())
 
 
 @unittest.skipUnless(shutil.which("docker"), "docker indisponível (build do TypeScript)")
@@ -116,7 +191,8 @@ class KubikBuildTest(unittest.TestCase):
 
 
 class ShellScriptsTest(unittest.TestCase):
-    SCRIPTS = [ROOT / "scripts" / n for n in ("install.sh", "uninstall.sh", "release.sh", "diagnose.sh", "shortcuts.sh")]
+    SCRIPTS = [ROOT / "scripts" / n for n in ("install.sh", "uninstall.sh", "release.sh", "diagnose.sh", "shortcuts.sh",
+                                              "appimage.sh", "appimage/AppRun")]
 
     def test_bash_syntax(self):
         for s in self.SCRIPTS:
