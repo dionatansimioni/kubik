@@ -82,7 +82,10 @@ class AppImageInstallTest(unittest.TestCase):
 
     def test_second_run_knows_it_is_installed(self):
         d = self.dialogs("gui_again")
-        self.assertEqual(len(d), 1, d)
+        # Falhou uma vez no Fedora com a máquina carregada (nenhuma janela):
+        # a mensagem traz a fase inteira para diagnosticar.
+        phase = "\n".join(l for l in self.phase("gui_again").splitlines() if "kwin_core" not in l)
+        self.assertEqual(len(d), 1, phase)
         self.assertRegex(d[0], r"\[--yesnocancel\] \[Kubik \d+\.\d+\.\d+ is already installed\.\]")
         self.assertIn("=== exit 0", self.phase("gui_again"))
 
