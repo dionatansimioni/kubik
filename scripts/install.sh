@@ -64,17 +64,22 @@ done
 mkdir -p "$DATA/kubik"
 install -m755 ./uninstall.sh "$DATA/kubik/uninstall.sh"
 install -m644 ./shortcuts.sh "$DATA/kubik/shortcuts.sh"
+install -m755 ./open.sh "$DATA/kubik/open.sh"
 printf '%s' "$INSTALLED" > "$DATA/kubik/installed.list"
+# O gerenciador é um plasmoide oculto (fora da lista de widgets) que o
+# plasmawindowed abre numa janela; basta estar na pasta de plasmoides.
 if [ -d ./manager ]; then
-    install -m755 ./manager.sh "$DATA/kubik/manager.sh"
-    install -Dm644 -t "$DATA/kubik/manager" ./manager/*
+    MANAGER=$DATA/plasma/plasmoids/$APP_ID.manager
+    rm -rf "$MANAGER"
+    mkdir -p "$MANAGER"
+    cp -R ./manager/. "$MANAGER/"
 fi
 # Ícone do app (menu, Scripts do KWin) e a entrada "Kubik" no menu, que abre o
-# gerenciador (o Exec aponta para a cópia instalada acima).
+# gerenciador pelo open.sh (ver lá por quê).
 if [ -d ./share ]; then
     install -Dm644 "./share/$APP_ID.svg" "$DATA/icons/hicolor/scalable/apps/$APP_ID.svg"
     mkdir -p "$DATA/applications"
-    sed "s|^Exec=.*|Exec=\"$DATA/kubik/manager.sh\"|" "./share/$APP_ID.desktop" > "$DATA/applications/$APP_ID.desktop"
+    sed "s|^Exec=.*|Exec=\"$DATA/kubik/open.sh\"|" "./share/$APP_ID.desktop" > "$DATA/applications/$APP_ID.desktop"
     command -v kbuildsycoca6 >/dev/null && { kbuildsycoca6 >/dev/null 2>&1 || true; }
 fi
 

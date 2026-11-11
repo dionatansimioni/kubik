@@ -101,13 +101,20 @@ def build_tarball(pkgs, plugin_id: str, version: str, out: Path):
         for script in ("install.sh", "uninstall.sh", "diagnose.sh"):
             add(tar, (SCRIPTS / script).read_bytes(), script, 0o755)
         add(tar, (SCRIPTS / "shortcuts.sh").read_bytes(), "shortcuts.sh", 0o644)
-        # O gerenciador (janela do AppImage e da entrada "Kubik" do menu).
+        add(tar, (SCRIPTS / "open.sh").read_bytes(), "open.sh", 0o755)
+        # O gerenciador (janela do AppImage e da entrada "Kubik" do menu): um
+        # plasmoide oculto que o install.sh/AppRun copiam para
+        # ~/.local/share/plasma/plasmoids, com a versão do pacote principal.
         manager = main.parent / "manager"
-        if (manager / "Main.qml").is_file():
-            add(tar, (SCRIPTS / "manager.sh").read_bytes(), "manager.sh", 0o755)
-            for f in ("Main.qml", "logic.js"):
-                add(tar, (manager / f).read_bytes(), f"manager/{f}", 0o644)
-            add(tar, (ASSETS / "kubik.svg").read_bytes(), "manager/kubik.svg", 0o644)
+        if (manager / "metadata.json").is_file():
+            for f in package_files(manager):
+                data = f.read_bytes()
+                if f.name == "metadata.json":
+                    meta = json.loads(data)
+                    meta["KPlugin"]["Version"] = version
+                    data = (json.dumps(meta, indent=4, ensure_ascii=False) + "\n").encode()
+                add(tar, data, "manager/" + f.relative_to(manager).as_posix(), 0o644)
+            add(tar, (ASSETS / "kubik.svg").read_bytes(), "manager/contents/images/kubik.svg", 0o644)
         # Ícone do app e entrada do menu (o install.sh põe em ~/.local/share).
         add(tar, (ASSETS / "kubik.svg").read_bytes(), f"share/{APP_ID}.svg", 0o644)
         add(tar, (ASSETS / f"{APP_ID}.desktop").read_bytes(), f"share/{APP_ID}.desktop", 0o644)

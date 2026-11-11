@@ -76,9 +76,33 @@ class AppAssetsTest(unittest.TestCase):
 
     def test_menu_entry_opens_the_manager(self):
         entry = (ROOT / "assets" / f"{self.APP_ID}.desktop").read_text()
-        # O install.sh troca pelo caminho do gerenciador instalado (manager.sh).
-        self.assertIn("Exec=kubik-manager\n", entry)
+        # O gerenciador é um plasmoide oculto aberto pelo plasmawindowed (o
+        # install.sh troca pelo open.sh instalado, que reabre com segurança).
+        self.assertIn(f"Exec=plasmawindowed {self.APP_ID}.manager\n", entry)
         self.assertIn(f"Icon={self.APP_ID}\n", entry)
+
+    def test_manager_does_not_need_the_qml_tool(self):
+        # O `qml` vem no qt6-qtdeclarative-devel no Fedora (não num desktop
+        # comum): o 0.11.0 caía no kdialog, que só instala. O plasmawindowed
+        # vem em todo Plasma (plasma-workspace).
+        apprun = (ROOT / "scripts" / "appimage" / "AppRun").read_text()
+        code = "\n".join(l for l in apprun.splitlines() if not l.lstrip().startswith("#"))
+        self.assertNotRegex(code, r"\bqml6?\b")
+        self.assertIn('"$BUNDLE/open.sh" "$MANAGER_ID"', apprun)
+        self.assertFalse((ROOT / "scripts" / "manager.sh").exists())
+
+    def test_manager_is_a_hidden_plasmoid(self):
+        meta = json.loads((ROOT / "kubik" / "manager" / "metadata.json").read_text())
+        self.assertEqual(meta["KPlugin"]["Id"], f"{self.APP_ID}.manager")
+        self.assertEqual(meta["KPackageStructure"], "Plasma/Applet")
+        self.assertTrue(meta["NoDisplay"])  # fora da lista de widgets
+        self.assertEqual(meta["KPlugin"]["Icon"], self.APP_ID)
+
+    def test_apprun_and_manager_agree_on_the_staged_bundle(self):
+        apprun = (ROOT / "scripts" / "appimage" / "AppRun").read_text()
+        logic = (ROOT / "kubik" / "src" / "manager" / "logic.ts").read_text()
+        stage = re.search(r'STAGE_DIR = "([^"]+)"', logic).group(1)
+        self.assertIn(f"STAGE={stage}\n", apprun)
 
     def test_every_component_uses_the_app_icon(self):
         for comp in ("package", "effect", "tray"):
@@ -130,7 +154,7 @@ class AppImageBuildTest(unittest.TestCase):
         ls = self.listing()
         for name in ("AppRun", ".DirIcon", "io.github.dionatansimioni.kubik.desktop",
                      "io.github.dionatansimioni.kubik.svg", f"kubik-{KUBIK_VERSION}/install.sh",
-                     f"kubik-{KUBIK_VERSION}/manager/Main.qml",
+                     f"kubik-{KUBIK_VERSION}/manager/contents/ui/main.qml",
                      f"kubik-{KUBIK_VERSION}/packages/kubik/metadata.json"):
             self.assertRegex(ls, rf"squashfs-root/{re.escape(name)}\n")
         self.assertRegex(ls, r"-rwxr-xr-x root/root .* squashfs-root/AppRun\n")
@@ -142,12 +166,16 @@ class AppImageBuildTest(unittest.TestCase):
         top = f"kubik-{KUBIK_VERSION}"
         with tarfile.open(self.tarball) as t:
             members = {m.name: m for m in t.getmembers()}
-        for name in ("manager.sh", "manager/Main.qml", "manager/logic.js", "manager/kubik.svg"):
+        self.assertTrue(members[f"{top}/open.sh"].mode & 0o111)
+        for name in ("manager/metadata.json", "manager/contents/ui/main.qml", "manager/contents/code/logic.js",
+                     "manager/contents/images/kubik.svg"):
             self.assertIn(f"{top}/{name}", members)
-        self.assertTrue(members[f"{top}/manager.sh"].mode & 0o111)
         with tarfile.open(self.tarball) as t:
-            js = t.extractfile(f"{top}/manager/logic.js").read().decode()
+            js = t.extractfile(f"{top}/manager/contents/code/logic.js").read().decode()
+            meta = json.loads(t.extractfile(f"{top}/manager/metadata.json").read())
         self.assertIn("var KubikManager = ", js)
+        # A versão do gerenciador é a do pacote (o AppRun compara com a instalada).
+        self.assertEqual(meta["KPlugin"]["Version"], KUBIK_VERSION)
 
 
 @unittest.skipUnless(shutil.which("docker"), "docker indisponível (build do TypeScript)")
@@ -205,7 +233,7 @@ class KubikBuildTest(unittest.TestCase):
 
 class ShellScriptsTest(unittest.TestCase):
     SCRIPTS = [ROOT / "scripts" / n for n in ("install.sh", "uninstall.sh", "release.sh", "diagnose.sh", "shortcuts.sh",
-                                              "appimage.sh", "appimage/AppRun", "manager.sh")]
+                                              "appimage.sh", "appimage/AppRun", "open.sh")]
 
     def test_bash_syntax(self):
         for s in self.SCRIPTS:

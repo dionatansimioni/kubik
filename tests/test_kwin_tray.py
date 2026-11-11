@@ -146,7 +146,7 @@ class TrayUpdateTest(unittest.TestCase):
         self.assertIn("estado: script 99.0.0 (ativo), efeito 99.0.0 (ativo), bandeja 99.0.0", self.log)
         self.assertIn("=== FILES updated icon=yes desktop=yes uninstaller=yes script=yes tray=yes", self.log)
         # A entrada do menu aponta para o gerenciador instalado.
-        self.assertIn('=== desktop exec: "/home/tester/.local/share/kubik/manager.sh"', self.log)
+        self.assertIn('=== desktop exec: "/home/tester/.local/share/kubik/open.sh"', self.log)
 
     def test_no_qml_errors(self):
         applet = [l for l in self.log.splitlines()

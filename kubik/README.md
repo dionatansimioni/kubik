@@ -24,7 +24,7 @@ Uma janela pequena, que abre pelo AppImage e pela entrada **Kubik** do menu. Mos
 | Falta algum componente | **Configurações**, **Remover…**, **Reparar** |
 
 - Avisa quando as animações só ligam depois de sair e entrar na sessão, e quando o script está parado.
-- **Configurações** abre o ícone da bandeja numa janela (`plasmawindowed`).
+- **Configurações** abre o ícone da bandeja numa janela, no lugar da do gerenciador (o `plasmawindowed` mostra uma por vez; o "Kubik" do menu traz o gerenciador de volta).
 - **Remover…** pede confirmação e tira tudo: script, efeito, bandeja, ícone, menu e atalhos (devolve os do KDE).
 - O `install.sh` guarda o gerenciador e uma cópia do `uninstall.sh` em `~/.local/share/kubik/`, de onde a entrada do menu o abre.
 
@@ -87,8 +87,8 @@ python3 -m unittest discover -s tests # tudo, inclusive o KWin real do testenv
 - `src/kwin/`: o controlador, que liga a árvore ao KWin por meio da interface mínima de `api.ts`. É testado contra o KWin falso de `test/fake-kwin.ts`.
 - `src/effect/`: o efeito de animação. A decisão e o cálculo ficam em `morph.ts`, que é puro e testado; `main.ts` liga isso à API de efeitos. O resultado vai para `effect/`.
 - `src/kwin/settings.ts`: as preferências do `kwinrc`, com padrões e limites. O script e a bandeja usam o mesmo leitor.
-- `src/tray/logic.ts`: a lógica do ícone da bandeja (comandos, listas, validação, estado, releases do GitHub).
-- `src/manager/logic.ts` + `manager/Main.qml`: o gerenciador (estado → ações, comandos, textos em en/pt). Roda pelo `scripts/manager.sh`. O resultado vai para `tray/contents/code/logic.js`; o QML do plasmoide fica em `tray/contents/ui/`.
+- `src/tray/logic.ts`: a lógica do ícone da bandeja (comandos, listas, validação, estado, releases do GitHub). O resultado vai para `tray/contents/code/logic.js`; o QML do plasmoide fica em `tray/contents/ui/`.
+- `src/manager/logic.ts` + `manager/` (plasmoide oculto): o gerenciador (estado → ações, comandos, textos em en/pt). Abre no `plasmawindowed` pelo `scripts/open.sh`. O resultado vai para `manager/contents/code/logic.js`.
 - `src/qml/Kubik.qml`: o modelo em que o build embute o bundle.
 - `package/`: o pacote do KWin. O `main.qml` é só um carregador.
 - `scripts/appimage.sh` + `scripts/appimage/AppRun`: o instalador AppImage, feito do `.tar.gz` (runtime oficial do AppImage em versão fixa, conferido por sha256, + squashfs).

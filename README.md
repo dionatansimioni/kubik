@@ -44,7 +44,7 @@ It opens the **Kubik manager**, a small window that shows what's installed and o
 - **Install** when Kubik isn't there (the AppImage's version, or GitHub's if newer);
 - **Update to X** when the AppImage or GitHub has a newer release;
 - **Repair** when a component is missing;
-- **Settings** and **Remove…** when it's installed.
+- **Settings** (the tray icon's options, in the same window) and **Remove…** when it's installed.
 
 Installing adds the KWin script, the animation effect, the tray icon and a **Kubik** entry in the app menu, which opens the same manager. It also frees Meta+arrows from KDE's quick tile, and removing gives them back. On the very first install, log out and back in once, because KWin only discovers new effects at login. The manager tells you when that's needed.
 

@@ -4,4 +4,4 @@ node_modules/
 dist/
 .cache/
 screenshots_dio/
-kubik/manager/logic.js
+kubik/manager/contents/code/logic.js

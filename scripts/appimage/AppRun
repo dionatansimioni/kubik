@@ -49,7 +49,15 @@ summary() {
     fi
 }
 
-open_manager() { [ -x "$DATA/kubik/manager.sh" ] && (setsid "$DATA/kubik/manager.sh" >/dev/null &); }
+MANAGER_ID=$APP_ID.manager
+MANAGER_DIR=$DATA/plasma/plasmoids/$MANAGER_ID
+# O gerenciador é um plasmoide oculto aberto pelo plasmawindowed (vem em todo
+# Plasma, no plasma-workspace). Não o `qml`: no Fedora ele só vem com o
+# qt6-qtdeclarative-devel.
+open_manager() {
+    [ -f "$MANAGER_DIR/metadata.json" ] && [ -x "$DATA/kubik/open.sh" ] || return 1
+    (setsid "$DATA/kubik/open.sh" >/dev/null 2>&1 </dev/null &)
+}
 
 YES=""
 for a in "$@"; do [ "$a" = --yes ] && YES=1; done
@@ -76,11 +84,21 @@ esac
 
 # ---- gerenciador (janela própria) ---------------------------------------------
 # A mesma janela da entrada "Kubik" do menu, oferecendo instalar a versão que
-# vem aqui dentro. Sem o qml ou os módulos do Plasma (sai com 3): kdialog.
+# vem aqui dentro. O plasmawindowed é instância única (um segundo processo só
+# repassa o nome do plasmoide, sem argumentos nem ambiente) e o AppImage
+# desmonta ao sair: o pacote vai para um lugar fixo da sessão (STAGE_DIR em
+# src/manager/logic.ts) e o plasmoide para a pasta de plasmoides, de onde
+# qualquer plasmawindowed o acha. Sem plasmawindowed: kdialog.
 # KUBIK_KDIALOG=1 força o plano B (os testes do kdialog).
-if [ -z "${KUBIK_KDIALOG:-}" ]; then
-    "$BUNDLE/manager.sh" --bundle "$BUNDLE"
-    [ $? -eq 3 ] || exit 0
+STAGE=${XDG_RUNTIME_DIR:-/tmp}/kubik-appimage-$(id -u)
+if [ -z "${KUBIK_KDIALOG:-}" ] && command -v plasmawindowed >/dev/null; then
+    rm -rf "$STAGE" && mkdir -p "$STAGE" && cp -R "$BUNDLE/." "$STAGE/" || exit 1
+    # Só troca o gerenciador instalado se o deste AppImage não for mais velho.
+    if [ ! -f "$MANAGER_DIR/metadata.json" ] || ! newer "$(meta_version "$MANAGER_DIR")" "$NEW"; then
+        rm -rf "$MANAGER_DIR" && mkdir -p "$MANAGER_DIR" && cp -R "$BUNDLE/manager/." "$MANAGER_DIR/" || exit 1
+    fi
+    "$BUNDLE/open.sh" "$MANAGER_ID"
+    exit 0
 fi
 
 # ---- plano B: janelas do kdialog -------------------------------------------------

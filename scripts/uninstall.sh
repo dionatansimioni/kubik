@@ -40,6 +40,6 @@ done < <(packages)
 
 rm -f "$DATA/icons/hicolor/scalable/apps/$APP_ID.svg" "$DATA/applications/$APP_ID.desktop"
 command -v kbuildsycoca6 >/dev/null && { kbuildsycoca6 >/dev/null 2>&1 || true; }
-rm -rf "$DATA/kubik"
+rm -rf "$DATA/kubik" "$DATA/plasma/plasmoids/$APP_ID.manager"
 dbus-send --session --print-reply --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true
 echo "Kubik removido."

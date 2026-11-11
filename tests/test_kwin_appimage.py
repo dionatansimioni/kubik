@@ -71,14 +71,16 @@ class AppImageInstallTest(unittest.TestCase):
 
     @unittest.skipUnless(plasma_available(), "sem os módulos do Plasma (gerenciador) na imagem")
     def test_open_kubik_shows_the_installed_manager(self):
-        self.assertIn("[kubik-manager] aberto pelo menu", self.phase("gui_first"))
+        self.assertIn("[kubik-manager] aberto", self.phase("gui_first"))
         m = re.search(r"=== MANAGER (\S+) (\d+)x(\d+)", self.log)
         self.assertTrue(m, "janela do gerenciador não apareceu")
         self.assertLess(int(m.group(2)), 900)  # janela pequena, fora do tiling
 
-    @unittest.skipIf(plasma_available(), "a imagem do Arch tem os módulos do Plasma")
-    def test_manager_without_plasma_falls_back(self):
-        self.assertIn("=== manager without plasma exit 3", self.log)
+    @unittest.skipIf(plasma_available(), "a imagem do Arch tem o Plasma (plasmawindowed)")
+    def test_without_plasmawindowed_falls_back_to_kdialog(self):
+        d = self.dialogs("no_plasmawindowed")
+        self.assertEqual(len(d), 1, self.phase("no_plasmawindowed"))
+        self.assertIn("is already installed", d[0])
 
     def test_second_run_knows_it_is_installed(self):
         d = self.dialogs("gui_again")
