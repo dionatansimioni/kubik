@@ -63,7 +63,7 @@ def companions(pkg: Path):
     return [(pkg / c).resolve() for c in meta.get("X-Kubik-Companions", [])]
 
 
-EXTENSIONS = {"KWin/Script": "kwinscript", "KWin/Effect": "kwineffect"}
+EXTENSIONS = {"KWin/Script": "kwinscript", "KWin/Effect": "kwineffect", "Plasma/Applet": "plasmoid"}
 
 
 def archive_name(pkg: Path) -> str:

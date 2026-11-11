@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Instala (ou atualiza), ativa e recarrega os pacotes em ./packages/*
-# (KWin Scripts e KWin Effects).
+# (KWin Scripts, KWin Effects e o ícone da bandeja, um Plasma/Applet).
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -11,6 +11,7 @@ need kwriteconfig6
 need dbus-send
 
 NEEDS_RELOGIN=""
+TRAY_ID=""
 
 meta() { sed -n "s/.*\"$2\": *\"\([^\"]*\)\".*/\1/p" "$1/metadata.json" | head -n1; }
 kwin() { dbus-send --session --print-reply --dest=org.kde.KWin "$@" >/dev/null 2>&1; }
@@ -29,6 +30,9 @@ for PKG in ./packages/*/; do
         echo "Instalando $ID $VERSION…"
         kpackagetool6 --type="$TYPE" --install "$PKG"
     fi
+    # O ícone da bandeja não é plugin do KWin: a bandeja do Plasma o mostra
+    # sozinha (EnabledByDefault + X-Plasma-NotificationAreaCategory).
+    [ "$TYPE" = Plasma/Applet ] && { TRAY_ID=$ID; continue; }
     kwriteconfig6 --file kwinrc --group Plugins --key "${ID}Enabled" true
 
     # Recarrega para pegar a versão nova.
@@ -55,5 +59,9 @@ elif [ -n "$NEEDS_RELOGIN" ]; then
     echo "         (O KWin só reconhece efeitos novos ao iniciar. Nas próximas atualizações não precisa.)"
 else
     echo "Pronto: tudo instalado e ativo."
+fi
+if [ -n "${TRAY_ID:-}" ]; then
+    echo "Ícone na bandeja: clique para ligar/desligar e ajustar; botão direito › Configurar Kubik…"
+    echo "  (Se ele não aparecer ou não atualizar: systemctl --user restart plasma-plasmashell)"
 fi
 echo "Logs: journalctl --user -f | grep kubik"

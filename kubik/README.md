@@ -13,25 +13,28 @@ Para remover: `./kubik-<versão>/uninstall.sh`.
 
 O `.tar.gz` instala o script **e** o efeito de animação. **Na primeira instalação do efeito, saia e entre na sessão uma vez**: o KWin só reconhece efeitos novos ao iniciar, e o `install.sh` avisa quando é o caso. As atualizações seguintes valem na hora. Para instalar só pela interface, use o `.kwinscript` em *Scripts do KWin*. O efeito vem como `.kwineffect`, que por enquanto só o `install.sh` instala.
 
-### Ajustar as animações
+### Ícone na bandeja
 
-```sh
-kwriteconfig6 --file kwinrc --group Effect-kubikanimations --key Duration 300   # ms (1–2000)
-kwriteconfig6 --file kwinrc --group Effect-kubikanimations --key Curve OutQuint # Linear, OutQuad, OutCubic, OutQuart, OutQuint, OutExpo, OutCirc, OutBack, InOutCubic
-dbus-send --session --dest=org.kde.KWin /Effects org.kde.kwin.Effects.reconfigureEffect string:kubikanimations
-```
+O `install.sh` instala também o ícone do Kubik, que aparece sozinho na bandeja do sistema (se não aparecer: `systemctl --user restart plasma-plasmashell`, ou adicione em *Configurar a bandeja do sistema › Entradas*).
 
-O padrão é 250 ms com `OutCubic`. Para algo mais próximo do Hyprland, experimente `OutQuint` ou `OutBack` (que tem um leve "quique"). Logs: `journalctl --user -b | grep '\[kubik\]'`.
+- **Clique:** abre o popup com o liga/desliga do tiling, os gaps, a borda (liga/desliga e espessura) e, por tela, se as janelas "em todos os desktops" entram no tiling.
+- **Clique do meio:** liga/desliga o tiling. O ícone fica apagado com o tiling desligado.
+- **Botão direito › Configurar Kubik…:**
+  - *Geral:* gaps entre janelas e nas bordas da tela, separados; borda.
+  - *Exceções:* apps que sempre flutuam. Os apps abertos aparecem para marcar com um clique; um campo aceita a classe de um app fechado.
+  - *Animação:* duração (0 a 600 ms; 0 desliga) e curva (Suave, Linear, Desacelerar forte, Com rebote), com uma prévia animada. Vale para as janelas e para os fades da borda, da prévia e das abas.
 
-## O que já funciona (0.3.1)
+Tudo vale na hora e fica gravado no `kwinrc` (grupos `[Script-kubik]` e `[Effect-kubikanimations]`), inclusive o liga/desliga, que é lembrado depois de reiniciar a sessão. O Meta+Y continua funcionando, e o ícone acompanha.
+
+## O que já funciona (0.7.0)
 
 - Janelas novas são organizadas em árvore BSP: a janela nova divide ao meio, pelo lado mais longo, a **maior** janela (no empate, a focada). Assim, 1 janela fica cheia, 2 ficam lado a lado, 3 ficam com metade + 2 quadrantes e 4 ficam em quadrantes. Minimizadas liberam o espaço.
-- Janelas **em todos os desktops** entram no tiling do desktop visível e acompanham a troca de desktop. Com o plugin "Virtual desktops only on primary", isso inclui todas as janelas da tela secundária. Uma opção por monitor na bandeja está planejada.
+- Janelas **em todos os desktops** entram no tiling do desktop visível e acompanham a troca de desktop. Com o plugin "Virtual desktops only on primary", isso inclui todas as janelas da tela secundária. Dá para desligar isso por tela, na bandeja.
 - Uma janela que abre maximizada (ex.: o Chrome restaurando a sessão) entra no tile desmaximizada.
 - Fechar ou minimizar uma janela devolve o espaço às vizinhas.
 - Há uma árvore por tela × desktop virtual. Mover uma janela de tela ou de desktop a reorganiza no destino.
-- Gaps de 4 px.
-- Ficam flutuantes, fora do tiling: janelas internas do KWin (bordas e prévias de scripts), janelas auxiliares ocultas (fora da barra de tarefas e do Alt+Tab, ou com opacidade 0, como a ponte de vídeo do XWayland), diálogos, transientes, splash, janelas de tamanho fixo ou não redimensionáveis, janelas em alguns desktops (2 ou mais, mas não todos), tela cheia, e algumas classes do Plasma (krunner, plasmashell, yakuake…).
+- Gaps de 4 px (ajustáveis na bandeja).
+- Ficam flutuantes, fora do tiling: janelas internas do KWin (bordas e prévias de scripts), janelas auxiliares ocultas (fora da barra de tarefas e do Alt+Tab, ou com opacidade 0, como a ponte de vídeo do XWayland), diálogos, transientes, splash, janelas de tamanho fixo ou não redimensionáveis, janelas em alguns desktops (2 ou mais, mas não todos), tela cheia, algumas classes do Plasma (krunner, plasmashell, yakuake…) e as **exceções** escolhidas na bandeja.
 - **Mouse:**
   - Arrastar uma janela pela barra de título mostra uma prévia translúcida de **onde ela vai ficar**. O que acontece depende de onde o cursor está sobre a janela-alvo:
     - **centro** (o terço do meio): as duas trocam de lugar, e uma segunda prévia, mais clara, mostra para onde vai a outra;
@@ -52,7 +55,7 @@ O padrão é 250 ms com `OutCubic`. Para algo mais próximo do Hyprland, experim
 
 ## Ainda não
 
-Ícone na bandeja com as configurações, navegação e movimento por teclado. Ver `docs/DESIGN.md`.
+Navegação e movimento por teclado, tradução para inglês. Ver `docs/DESIGN.md`.
 
 ## Desenvolvimento
 
@@ -67,6 +70,8 @@ python3 -m unittest discover -s tests # tudo, inclusive o KWin real do testenv
 - `src/core/`: a árvore BSP e a geometria, sem nenhuma dependência do KWin.
 - `src/kwin/`: o controlador, que liga a árvore ao KWin por meio da interface mínima de `api.ts`. É testado contra o KWin falso de `test/fake-kwin.ts`.
 - `src/effect/`: o efeito de animação. A decisão e o cálculo ficam em `morph.ts`, que é puro e testado; `main.ts` liga isso à API de efeitos. O resultado vai para `effect/`.
+- `src/kwin/settings.ts`: as preferências do `kwinrc`, com padrões e limites. O script e a bandeja usam o mesmo leitor.
+- `src/tray/logic.ts`: a lógica do ícone da bandeja (comandos, listas e validação). O resultado vai para `tray/contents/code/logic.js`; o QML do plasmoide fica em `tray/contents/ui/`.
 - `src/qml/Kubik.qml`: o modelo em que o build embute o bundle.
 - `package/`: o pacote do KWin. O `main.qml` é só um carregador.
 

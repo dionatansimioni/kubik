@@ -9,9 +9,9 @@
        um nome aqui viraria um subgrupo e nada seria lido. -->
   <group name="">
     <entry name="Duration" type="Int">
-      <label>Duração base da animação, em milissegundos</label>
+      <label>Duração base da animação, em milissegundos (0 = sem animação)</label>
       <default>250</default>
-      <min>1</min>
+      <min>0</min>
       <max>2000</max>
     </entry>
     <entry name="Curve" type="String">

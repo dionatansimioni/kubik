@@ -51,6 +51,7 @@ O `run.sh` instala o `.kwinscript` gerado pelo `scripts/build.py`, ou seja, o me
 | `QT_FORCE_STDERR_LOGGING=1` | Sem isso o Qt manda os logs para o journald, que não existe no container, e `console.log` some. |
 | `KWIN_WAYLAND_NO_PERMISSION_CHECKS=1` | Libera o protocolo de entrada simulada (`org_kde_kwin_fake_input`) para o `fakeinput.py`. |
 | `plasma-breeze` na imagem Fedora | Sem a decoração Breeze, as alças de redimensionar não se estendem para fora da janela, e o arrasto da divisa não pega. O Fedora KDE do usuário tem Breeze. |
+| `plasma-workspace`, `plasma-desktop` e `plasma-sdk` na imagem Arch | O ícone da bandeja roda no `plasmoidviewer` (precisa da contêiner `org.kde.desktopcontainment` do plasma-desktop) e usa módulos QML do plasma-workspace (D-Bus, barra de tarefas). Só o Arch tem isso: o teste da bandeja é pulado no Fedora. |
 | `KWIN_EFFECTS_FORCE_ANIMATIONS=1` | Com renderização por software (llvmpipe), o KWin desativa animações e nenhum efeito em JavaScript carrega. |
 | `KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1` | Libera a API D-Bus `ScreenShot2` para o `screenshot.py`. |
 

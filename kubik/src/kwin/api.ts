@@ -29,6 +29,8 @@ export interface KWinWindow {
   readonly internalId: unknown;
   readonly caption: string;
   readonly resourceClass: string;
+  /** Nome do .desktop do app (ex.: "org.kde.dolphin"); casa com o AppId da barra de tarefas. */
+  readonly desktopFileName?: string;
   readonly normalWindow: boolean;
   readonly dialog: boolean;
   readonly splash: boolean;

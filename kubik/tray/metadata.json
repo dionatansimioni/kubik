@@ -1,0 +1,17 @@
+{
+    "KPlugin": {
+        "Id": "io.github.dionatansimioni.kubik",
+        "Name": "Kubik",
+        "Description": "Controla o auto-tiling do Kubik: liga/desliga, gaps, borda, exceções e animação.",
+        "Icon": "view-grid",
+        "Category": "Windows and Tasks",
+        "Version": "0.7.0",
+        "License": "GPL-3.0-or-later",
+        "Website": "https://github.com/dionatansimioni/kubik",
+        "EnabledByDefault": true
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-NotificationArea": "true",
+    "X-Plasma-NotificationAreaCategory": "SystemServices",
+    "KPackageStructure": "Plasma/Applet"
+}

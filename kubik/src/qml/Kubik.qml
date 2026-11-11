@@ -10,14 +10,20 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Window
 // Namespace obrigatório: org.kde.kwin exporta um tipo 'Window' que esconderia
-// o do QtQuick.
-import org.kde.kwin as KWin
+// o do QtQuick. E NÃO pode se chamar "KWin": esse nome é o objeto global do
+// script (KWin.readConfig), que o namespace esconderia.
+import org.kde.kwin as KWinQml
 import org.kde.kirigami as Kirigami
 
 Item {
     id: root
 
     property var controller: null
+    property var core: null
+    // Animação escolhida na bandeja (a mesma do efeito): os fades dos overlays
+    // duram 60% dela (250 ms → 150 ms) e usam a mesma curva.
+    property int fadeMs: 150
+    property int fadeEasing: Easing.OutCubic
     // Overlays: Components instanciados com createObject(null) (um Window
     // declarado dentro deste Item nunca apareceria: Qt 6.7+) e destruídos no
     // onDestruction (senão sobrevivem ao descarregamento do script).
@@ -74,7 +80,7 @@ Item {
     component FadingItem: Item {
         id: fading
 
-        property int fadeMs: 120
+        property int fadeMs: root.fadeMs
 
         function fadeIn() {
             fadeAnim.stop();
@@ -97,7 +103,7 @@ Item {
             from: 0
             to: 1
             duration: fading.fadeMs
-            easing.type: Easing.OutQuad
+            easing.type: root.fadeEasing
         }
     }
 
@@ -174,7 +180,6 @@ Item {
             FadingItem {
                 id: borderContent
 
-                fadeMs: 150
 
                 Rectangle {
                     anchors.fill: parent
@@ -418,12 +423,29 @@ Item {
         console.warn("[kubik] " + msg);
     }
 
+    // Preferências do kwinrc ([Script-kubik]), gravadas pela bandeja.
+    function readSettings() {
+        const s = core.parseSettings((key, fallback) => KWin.readConfig(key, fallback));
+        fadeMs = Math.round(s.animation.duration * 0.6);
+        fadeEasing = Easing[s.animation.curve] !== undefined ? Easing[s.animation.curve] : Easing.OutCubic;
+        return s;
+    }
+
+    // A bandeja grava o kwinrc e pede um reconfigure ao KWin, que emite isto.
+    Connections {
+        target: KWinQml.Options
+        function onConfigChanged() {
+            if (root.controller)
+                root.controller.applySettings(root.readSettings());
+        }
+    }
+
     function loadCore() {
         /* @@KUBIK_BUNDLE@@ */
         return Kubik;
     }
 
-    KWin.ShortcutHandler {
+    KWinQml.ShortcutHandler {
         name: "Kubik: Toggle tiling"
         text: "Kubik: liga/desliga o tiling"
         sequence: "Meta+Y"
@@ -433,7 +455,7 @@ Item {
         }
     }
 
-    KWin.ShortcutHandler {
+    KWinQml.ShortcutHandler {
         name: "Kubik: Next tab"
         text: "Kubik: próxima aba da pilha"
         sequence: "Meta+Ctrl+Tab"
@@ -443,7 +465,7 @@ Item {
         }
     }
 
-    KWin.ShortcutHandler {
+    KWinQml.ShortcutHandler {
         name: "Kubik: Previous tab"
         text: "Kubik: aba anterior da pilha"
         sequence: "Meta+Ctrl+Shift+Tab"
@@ -454,7 +476,7 @@ Item {
     }
 
     // Sem tecla padrão: usado pelo scripts/diagnose.sh (kglobalaccel invokeShortcut).
-    KWin.ShortcutHandler {
+    KWinQml.ShortcutHandler {
         name: "Kubik: Log state"
         text: "Kubik: registra o estado no log (diagnóstico)"
         sequence: ""
@@ -470,17 +492,19 @@ Item {
             ghost: true
         });
         borderWin = borderComponent.createObject(null);
-        const core = loadCore();
-        const maximizeArea = KWin.Workspace.MaximizeArea !== undefined ? KWin.Workspace.MaximizeArea : 2;
+        core = loadCore();
+        const settings = readSettings();
+        log("configuração: " + core.describeSettings(settings));
+        const maximizeArea = KWinQml.Workspace.MaximizeArea !== undefined ? KWinQml.Workspace.MaximizeArea : 2;
         controller = core.start({
-            workspace: KWin.Workspace,
-            clientArea: (output, desktop) => KWin.Workspace.clientArea(maximizeArea, output, desktop),
+            workspace: KWinQml.Workspace,
+            clientArea: (output, desktop) => KWinQml.Workspace.clientArea(maximizeArea, output, desktop),
             log: root.log,
             preview: root.showPreview,
             border: root.showBorder,
             tabs: root.showTabs,
             later: root.later
-        });
+        }, settings);
     }
 
     Component.onDestruction: {

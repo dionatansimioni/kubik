@@ -49,13 +49,16 @@ Decisões fechadas em 2026-11-09.
 
 ## Bandeja (plasmoid)
 
-Um applet QML no system tray, separado do KWin Script, que oferece:
+Um applet QML na bandeja do sistema (`kubik/tray`, id `io.github.dionatansimioni.kubik`), separado do KWin Script. Desenho aprovado pelo usuário:
 
-- liga/desliga;
-- "Flutuar esta janela sempre", que captura a janela focada e cria a regra;
-- edição das exceções e dos atalhos básicos.
+- **Popup** (clique): liga/desliga, gaps (um valor), borda (liga/desliga + espessura) e, por tela, se as janelas "em todos os desktops" entram no tiling. Clique do meio liga/desliga.
+- **Configurar…** (páginas do plasmoide): *Geral* (gaps internos e externos separados, borda), *Exceções* (apps abertos para marcar + campo para classe de app fechado + as embutidas, só leitura) e *Animação* (duração 0–600 ms e curva nomeada, com prévia animada).
 
-Comunicação com o script: o plasmoid aciona os atalhos globais do script via kglobalaccel/D-Bus. Para mudar configurações, ele grava a config do script e chama o `reconfigure` do KWin.
+Comunicação:
+
+- **Fonte da verdade: o `kwinrc`.** A bandeja lê `[Script-kubik]` ao iniciar (com o mesmo `parseSettings` do script) e espelha os valores na própria configuração. A cada mudança, grava tudo com `kwriteconfig6` e chama `org.kde.KWin.reconfigure` (o script ouve `Options.configChanged`) e `reconfigureEffect kubikanimations` (o efeito só ouve esse).
+- **Meta+Y** muda o estado direto no script. A bandeja ouve o sinal `globalShortcutPressed` do kglobalaccel (D-Bus) e grava o estado novo. O script só aplica `Enabled` do kwinrc quando o valor **muda**, para que um reconfigure qualquer não desfaça o atalho.
+- A animação é uma só: o efeito usa a duração e a curva, e os fades dos overlays duram 60% dela com a mesma curva. A borda espera a duração + 50 ms para voltar.
 
 ## Fora do escopo do MVP
 
@@ -106,6 +109,10 @@ Validadas no `testenv/`:
 21. **Overlay que segue janela em movimento sempre fica para trás.** A borda é uma janela à parte, atualizada um quadro depois da janela. Primeiro tentamos animá-la com a mesma curva do efeito: ficava de 8 a 12 px atrás, e o usuário via a borda "seguindo" a janela. Solução: esconder enquanto a janela se move (arrasto ou mudança de layout) e redesenhar quando ela parar por 300 ms (a animação padrão de 250 ms mais uma folga).
 22. **Pilhas sem esconder janelas.** O KWin não tem como esconder uma janela por script sem minimizá-la, e minimizada ela sairia do tiling. As abas de uma pilha ficam todas na mesma geometria, e a à vista fica na frente: ativar (`workspace.activeWindow = w`) também traz para a frente. Quando a aba à vista sai, a nova vem com `workspace.raiseWindow`. Uma aba escondida ativada por fora (Alt+Tab) vira a aba à vista.
 23. **Nunca feche e reabra um overlay.** Cada vez que um overlay (borda, prévia, barra de abas) voltava a ficar visível, o KWin o tratava como janela nova e aplicava a animação de abrir janela do usuário (no Fedora dele, crescendo do centro), o que parecia um glitch. Os overlays são criados uma vez e ficam sempre abertos: escondidos, ficam transparentes (a barra de abas, que recebe clique, vai para fora da tela). O que aparece, aparece com um fade nosso. O teste conta quantas vezes cada overlay é aberto.
+24. **No QML do script, o import `org.kde.kwin` NÃO pode se chamar `KWin`.** O objeto global do script (`KWin.readConfig`, `KWin.registerShortcut`) se chama `KWin`, e um namespace com o mesmo nome o esconde (`readConfig` de undefined). O Kubik.qml importa como `KWinQml`.
+25. **Configuração ao vivo:** `reconfigure` (D-Bus `/KWin`) faz o KWin reler o kwinrc e emitir `Options.configChanged`, que o script pode ouvir; o `readConfig` já devolve o valor novo. Os efeitos em JavaScript **não** recebem esse reconfigure, só `org.kde.kwin.Effects.reconfigureEffect <id>`.
+26. **Palavras reservadas no bundle.** Funções chamadas `int` ou `bool` passam no TypeScript, mas o QML não as compila. Os nomes ficam `toInt`/`toBool`.
+27. **Bandeja que aparece sozinha:** o applet precisa de `X-Plasma-NotificationAreaCategory` e `EnabledByDefault: true`. A bandeja adiciona automaticamente plugins novos (que ainda não estão em `knownItems`); se o usuário tirar, ele não volta sozinho.
 
 ## Riscos
 

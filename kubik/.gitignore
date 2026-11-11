@@ -2,3 +2,4 @@ node_modules/
 .build/
 package/contents/ui/Kubik.qml
 effect/contents/code/main.js
+tray/contents/code/logic.js

@@ -84,6 +84,12 @@ describe("parseConfig", () => {
     expect(parseConfig(400, "OutBack")).toEqual({ duration: 400, curve: "OutBack" });
   });
 
+  it("0 desliga a animação (a bandeja oferece de 0 a 600 ms)", () => {
+    expect(parseConfig(0, "Linear")).toEqual({ duration: 0, curve: "Linear" });
+    expect(parseConfig("0", "Linear").duration).toBe(0);
+    expect(parseConfig("", "Linear").duration).toBe(250);
+  });
+
   it("rejeita valores inválidos", () => {
     expect(parseConfig(-5, "Bouncy")).toEqual({ duration: 250, curve: "OutCubic" });
     expect(parseConfig(99999, "OutQuint").duration).toBe(2000);

@@ -39,6 +39,10 @@ class FirstInstallTest(unittest.TestCase):
     def test_script_is_active(self):
         self.assertIn("=== script loaded: true", self.log)
 
+    def test_tray_icon_is_installed(self):
+        self.assertIn("=== tray installed: true", self.log)
+        self.assertIn("Ícone na bandeja", self.log)
+
     def test_new_effect_needs_relogin_and_installer_says_so(self):
         self.assertIn("=== effect loaded: false", self.log)  # limitação do KWin
         self.assertIn("SAIR E ENTRAR", self.log)

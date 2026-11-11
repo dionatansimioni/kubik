@@ -6,7 +6,7 @@ const ENFORCE_DELAY_MS = 250;
 const MAX_FIGHTS = 3;
 /** Depois deste tempo sem brigas, uma "briga" é esquecida. */
 const FIGHT_MEMORY_MS = 5000;
-import { type Gaps, Tree } from "../core/tree";
+import { Tree } from "../core/tree";
 import { type Side, type Zone, dropZone } from "../core/zones";
 import type { Host, KWinWindow, Output, TabBar, VirtualDesktop } from "./api";
 
@@ -34,35 +34,29 @@ interface DropTarget {
 
 const SIDE_NAMES: Record<Side, string> = { left: "à esquerda de", right: "à direita de", up: "acima de", down: "para baixo de" };
 import { DEFAULT_FLOATING_CLASSES, floatReason } from "./rules";
+import { DEFAULT_SETTINGS, type Settings, describeSettings } from "./settings";
 
-export interface Config {
-  gaps: Gaps;
+/**
+ * Configuração do controlador: as preferências do usuário (Settings, lidas do
+ * kwinrc e mudáveis ao vivo pela bandeja) e o que é fixo do código.
+ */
+export interface Config extends Settings {
   floatingClasses: readonly string[];
-  /**
-   * Janelas "em todos os desktops" entram no tiling (na árvore do desktop
-   * atual). Com o plugin virtualdesktopsonlyonprimary, TODAS as janelas da
-   * tela secundária são assim. Futuro: uma opção por tela na bandeja.
-   */
-  tileAllDesktops: boolean;
-  /** Borda de destaque em volta da janela em foco. */
-  border: { enabled: boolean; width: number };
   /** Pilhas (abas): altura da barra de abas. */
   tabs: { height: number };
 }
 
 export const DEFAULT_CONFIG: Config = {
-  gaps: { outer: 4, inner: 4 },
+  ...DEFAULT_SETTINGS,
   floatingClasses: DEFAULT_FLOATING_CLASSES,
-  tileAllDesktops: true,
-  border: { enabled: true, width: 3 },
   tabs: { height: 32 },
 };
 
 /**
- * Quanto tempo sem mudanças até a janela "assentar" e a borda ser redesenhada:
- * a animação padrão do efeito (250 ms) e uma folga.
+ * Folga, além da duração da animação, até a janela "assentar" e a borda ser
+ * redesenhada (com a animação padrão de 250 ms: 300 ms).
  */
-const BORDER_SETTLE_MS = 300;
+const BORDER_SETTLE_EXTRA_MS = 50;
 
 /** Segurar a janela arrastada parada sobre outra por este tempo empilha as duas. */
 const HOLD_TO_STACK_MS = 800;
@@ -141,8 +135,10 @@ export class Controller {
 
   constructor(
     private readonly host: Host,
-    private readonly config: Config = DEFAULT_CONFIG,
-  ) {}
+    private config: Config = DEFAULT_CONFIG,
+  ) {
+    this.enabled = config.enabled;
+  }
 
   get isEnabled(): boolean {
     return this.enabled;
@@ -209,6 +205,43 @@ export class Controller {
     }
     this.updateBorder();
     this.publishTabs();
+  }
+
+  /**
+   * Preferências novas (a bandeja gravou o kwinrc e pediu um reconfigure).
+   * "Ligado" só vale quando MUDA no kwinrc: o Meta+Y liga/desliga sem gravar
+   * nada, e um reconfigure qualquer (ex.: mudar o tema) não pode desfazê-lo.
+   */
+  applySettings(s: Settings): void {
+    const before = this.config;
+    this.config = { ...before, ...s };
+    this.host.log(`configuração: ${describeSettings(s)}`);
+    if (s.enabled !== before.enabled && s.enabled !== this.enabled) {
+      this.toggle(); // religar já reavalia tudo com a configuração nova
+      return;
+    }
+    if (!this.enabled) return;
+    for (const t of this.tracked.values()) {
+      const wasTiled = t.key !== null;
+      this.refresh(t);
+      // Virou exceção (ou a tela deixou de ladrilhar "todos os desktops"):
+      // volta para onde estava antes do tiling, como ao desligar.
+      if (wasTiled && t.key === null && t.saved) {
+        t.window.frameGeometry = copy(t.saved);
+        t.saved = null;
+      }
+    }
+    const gapsChanged = s.gaps.inner !== before.gaps.inner || s.gaps.outer !== before.gaps.outer;
+    if (gapsChanged) for (const key of [...this.trees.keys()]) this.retile(key);
+    // Só a espessura mudou: a janela está parada, a borda nova vale na hora.
+    // Com gaps novos, as janelas se movem: espera assentar, como sempre.
+    this.updateBorder(!gapsChanged);
+  }
+
+  /** A exceção do usuário que pega esta janela (classe ou .desktop), ou null. */
+  private exceptionOf(w: KWinWindow): string | null {
+    const names = [w.resourceClass, w.desktopFileName ?? ""].map((n) => (n || "").toLowerCase()).filter(Boolean);
+    return this.config.exceptions.find((e) => names.includes(e)) ?? null;
   }
 
   // ---- abas (pilhas) ---------------------------------------------------------
@@ -289,7 +322,7 @@ export class Controller {
    * A borda NUNCA persegue a janela em movimento: como overlay, ela anda um
    * quadro atrás e parece arrastada pela janela (reclamação do usuário).
    * Enquanto a janela se move (arrasto, ou o efeito animando uma mudança de
-   * layout), ela some; volta quando a janela assenta (BORDER_SETTLE_MS sem
+   * layout), ela some; volta quando a janela assenta (duração da animação + folga, sem
    * mudanças). Trocar o foco é instantâneo.
    * `settled`: chamado pelo timer, a janela já está no lugar.
    */
@@ -327,7 +360,7 @@ export class Controller {
   /** Redesenha a borda quando a janela parar de mudar (reinicia a cada mudança). */
   private settleBorder(): void {
     const gen = ++this.borderGen;
-    this.host.later(BORDER_SETTLE_MS, () => {
+    this.host.later(this.config.animation.duration + BORDER_SETTLE_EXTRA_MS, () => {
       if (gen === this.borderGen) this.updateBorder(true);
     });
   }
@@ -500,7 +533,10 @@ export class Controller {
     if (t.rebel) return "o app não aceita o tile";
     const rule = floatReason(t.window, this.config.floatingClasses);
     if (rule !== null) return rule;
-    if (t.window.onAllDesktops && !this.config.tileAllDesktops) return "em todos os desktops";
+    const exception = this.exceptionOf(t.window);
+    if (exception !== null) return `exceção do usuário (${exception})`;
+    if (t.window.onAllDesktops && this.config.allDesktopsOff.includes(t.window.output.name.toLowerCase()))
+      return "em todos os desktops (desligado nesta tela)";
     return null;
   }
 

@@ -6,3 +6,4 @@ mkdir -p /tmp/bundle && cd /tmp/bundle && tar xzf /out/pkg/kubik-*.tar.gz
 sleep 1
 echo "=== effect loaded: $(dbus-send --session --print-reply --dest=org.kde.KWin /Effects org.kde.kwin.Effects.isEffectLoaded string:kubikanimations | awk '/boolean/ {print $2}')" >&2
 echo "=== script loaded: $(dbus-send --session --print-reply --dest=org.kde.KWin /Scripting org.kde.kwin.Scripting.isScriptLoaded string:kubik | awk '/boolean/ {print $2}')" >&2
+echo "=== tray installed: $(kpackagetool6 -t Plasma/Applet --show io.github.dionatansimioni.kubik >/dev/null 2>&1 && echo true || echo false)" >&2

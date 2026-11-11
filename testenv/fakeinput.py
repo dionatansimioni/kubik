@@ -124,8 +124,12 @@ def main(argv):
     if cmd == "move":
         fi.move(*args)
     elif cmd == "click":
+        # Pausas: sem elas o app pode receber o press antes do "entrou" e
+        # perder o release (o Plasma entendia um clique longo: modo de edição).
         fi.move(*args)
+        time.sleep(0.15)
         fi.button(True)
+        time.sleep(0.08)
         fi.button(False)
     elif cmd == "drag":
         x1, y1, x2, y2 = args[:4]

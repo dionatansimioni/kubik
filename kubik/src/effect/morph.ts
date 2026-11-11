@@ -3,6 +3,7 @@
  * geometria deve ser animada e calcula de onde a animação parte.
  */
 import type { Rect } from "../core/rect";
+import { CURVES, type CurveName } from "../kwin/settings";
 
 /** O que o efeito lê de uma EffectWindow do KWin 6. */
 export interface MorphWindow {
@@ -70,12 +71,11 @@ export function morph(old: Rect, now: Rect): Morph {
   };
 }
 
-/** Curvas oferecidas (nomes do QEasingCurve). */
-export const CURVES = ["Linear", "OutQuad", "OutCubic", "OutQuart", "OutQuint", "OutExpo", "OutCirc", "OutBack", "InOutCubic"] as const;
-export type CurveName = (typeof CURVES)[number];
+// As curvas são as mesmas do script (a bandeja grava as duas configurações).
+export { CURVES, type CurveName };
 
 export interface EffectConfig {
-  /** Duração base em ms (o KWin ainda aplica a velocidade de animação global). */
+  /** Duração base em ms (o KWin ainda aplica a velocidade de animação global); 0 = sem animação. */
   duration: number;
   curve: CurveName;
 }
@@ -85,7 +85,10 @@ export const DEFAULT_EFFECT_CONFIG: EffectConfig = { duration: 250, curve: "OutC
 export function parseConfig(duration: unknown, curve: unknown): EffectConfig {
   const d = Number(duration);
   return {
-    duration: Number.isFinite(d) && d > 0 ? Math.min(2000, Math.round(d)) : DEFAULT_EFFECT_CONFIG.duration,
+    duration:
+      duration !== undefined && duration !== null && String(duration).trim() !== "" && Number.isFinite(d) && d >= 0
+        ? Math.min(2000, Math.round(d))
+        : DEFAULT_EFFECT_CONFIG.duration,
     curve: (CURVES as readonly string[]).includes(String(curve)) ? (curve as CurveName) : DEFAULT_EFFECT_CONFIG.curve,
   };
 }

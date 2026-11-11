@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { rect } from "../src/core/rect";
 import { Controller, DEFAULT_CONFIG } from "../src/kwin/controller";
+import { DEFAULT_SETTINGS } from "../src/kwin/settings";
 import {
   DESK_1, DESK_2, FakeWindow, FakeWorkspace, SCREEN_A, SCREEN_B, fakeHost,
 } from "./fake-kwin";
@@ -230,12 +231,12 @@ describe("Controller", () => {
     it("com a opção desligada, ficam flutuantes", () => {
       const h = fakeHost(ws);
       ctl.stop();
-      const off = new Controller(h.host, { ...DEFAULT_CONFIG, tileAllDesktops: false });
+      const off = new Controller(h.host, { ...DEFAULT_CONFIG, allDesktopsOff: ["dp-1"] });
       off.start();
       const a = ws.open(win("a"));
       ws.open(sticky("s"));
       expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
-      expect(h.logs).toContain("flutuante 's': em todos os desktops");
+      expect(h.logs).toContain("flutuante 's': em todos os desktops (desligado nesta tela)");
     });
   });
 
@@ -611,6 +612,98 @@ describe("Controller", () => {
       expect(lines).toContain("flutuante 'diálogo' (org.example.app): diálogo");
       expect(lines.some((l) => l.startsWith("forma DP-1|desk-1 "))).toBe(true);
       void a;
+    });
+  });
+
+  describe("configuração ao vivo (bandeja → kwinrc → applySettings)", () => {
+    const settings = (over: Partial<import("../src/kwin/settings").Settings>) => ({ ...DEFAULT_SETTINGS, ...over });
+
+    it("gaps novos reorganizam na hora", () => {
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      ctl.applySettings(settings({ gaps: { inner: 10, outer: 0 } }));
+      expect(a.frameGeometry).toEqual(rect(0, 0, 635, 800));
+      expect(b.frameGeometry).toEqual(rect(645, 0, 635, 800));
+      expect(logs.some((l) => l.startsWith("configuração: tiling ligado; gaps 10/0"))).toBe(true);
+    });
+
+    it("exceção nova: a janela sai do tiling e volta para onde estava; tirar a exceção a devolve", () => {
+      const a = ws.open(win("a"));
+      const steam = new FakeWindow("Steam", SCREEN_A, DESK_1, rect(200, 150, 500, 400));
+      steam.resourceClass = "steam";
+      ws.open(steam);
+      ctl.applySettings(settings({ exceptions: ["steam"] }));
+      expect(steam.frameGeometry).toEqual(rect(200, 150, 500, 400));
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      expect(logs).toContain("flutuante 'Steam': exceção do usuário (steam)");
+      ctl.applySettings(settings({ exceptions: [] }));
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      expect(steam.frameGeometry).toEqual(rect(642, 4, 634, 792));
+    });
+
+    it("a exceção também casa com o nome do .desktop (o AppId da barra de tarefas)", () => {
+      ctl.applySettings(settings({ exceptions: ["org.gimp.gimp"] }));
+      const g = win("GIMP");
+      g.resourceClass = "gimp-2.99";
+      g.desktopFileName = "org.gimp.GIMP";
+      ws.open(g);
+      expect(logs).toContain("flutuante 'GIMP': exceção do usuário (org.gimp.gimp)");
+    });
+
+    it("Enabled no kwinrc liga/desliga; um reconfigure sem mudar Enabled não desfaz o Meta+Y", () => {
+      const a = new FakeWindow("a", SCREEN_A, DESK_1, rect(100, 100, 300, 300));
+      ws.open(a);
+      ctl.applySettings(settings({ enabled: false }));
+      expect(ctl.isEnabled).toBe(false);
+      expect(a.frameGeometry).toEqual(rect(100, 100, 300, 300));
+      ctl.toggle(); // Meta+Y: liga sem gravar nada
+      expect(ctl.isEnabled).toBe(true);
+      ctl.applySettings(settings({ enabled: false })); // ex.: mudou o tema
+      expect(ctl.isEnabled).toBe(true);
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      ctl.applySettings(settings({ enabled: true })); // a bandeja sincronizou
+      ctl.applySettings(settings({ enabled: false })); // e agora desligou de fato
+      expect(ctl.isEnabled).toBe(false);
+    });
+
+    it("começa desligado se o kwinrc diz Enabled=false", () => {
+      ctl.stop();
+      const off = new Controller(fakeHost(ws).host, { ...DEFAULT_CONFIG, enabled: false });
+      off.start();
+      const a = new FakeWindow("a", SCREEN_A, DESK_1, rect(100, 100, 300, 300));
+      ws.open(a);
+      expect(a.frameGeometry).toEqual(rect(100, 100, 300, 300));
+    });
+
+    it("borda: desligar some com ela; a espessura nova vale na hora", () => {
+      ws.open(win("a"));
+      ctl.applySettings(settings({ border: { enabled: false, width: 3 } }));
+      expect(borders[borders.length - 1]).toBeNull();
+      ctl.applySettings(settings({ border: { enabled: true, width: 6 } }));
+      expect(borders[borders.length - 1]).toEqual(rect(-2, -2, 1284, 804));
+    });
+
+    it("todos os desktops por tela: desligado só no DP-1", () => {
+      const s1 = win("s1");
+      s1.desktops = [];
+      const s2 = win("s2", SCREEN_B);
+      s2.desktops = [];
+      ws.open(s1);
+      ws.open(s2);
+      ctl.applySettings(settings({ allDesktopsOff: ["dp-1"] }));
+      expect(logs).toContain("flutuante 's1': em todos os desktops (desligado nesta tela)");
+      expect(s2.frameGeometry).toEqual(rect(1284, 4, 992, 992));
+    });
+
+    it("a borda espera a duração da animação configurada (+50 ms) para voltar", () => {
+      ctl.applySettings(settings({ animation: { duration: 100, curve: "Linear" } }));
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      ws.activate(a);
+      ws.close(b);
+      expect(borders[borders.length - 1]).toBeNull();
+      tick(150);
+      expect(borders[borders.length - 1]).toEqual(rect(1, 1, 1278, 798));
     });
   });
 

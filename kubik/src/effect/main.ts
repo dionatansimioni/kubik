@@ -50,7 +50,7 @@ function onGeometryChanged(w: EffectWindow, old: Rect): void {
   const now = w.geometry;
   const skip = skipReason(w, old, now, { resizingSomething: resizing > 0, skipNext: !!w.kubikSkipNext });
   w.kubikSkipNext = false;
-  if (skip) return;
+  if (skip || config.duration === 0) return;
   // Uma mudança nova no meio da anterior: recomeça a partir da geometria anterior.
   if (w.kubikAnimation !== undefined) cancel(w.kubikAnimation);
   const m = morph(old, now);

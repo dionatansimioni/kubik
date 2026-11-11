@@ -28,6 +28,7 @@ let nextId = 1;
 export class FakeWindow implements KWinWindow {
   readonly internalId = `{uuid-${nextId++}}`;
   resourceClass = "org.example.app";
+  desktopFileName = "";
   normalWindow = true;
   dialog = false;
   splash = false;

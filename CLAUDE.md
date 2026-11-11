@@ -4,7 +4,7 @@ Auto-tiling no estilo Pop!_Shell para KDE Plasma 6. O design está em `docs/DESI
 
 ## Estrutura
 
-- `kubik/`: o script principal (TypeScript → bundle embutido em QML). Ver `kubik/README.md`.
+- `kubik/`: o script principal (TypeScript → bundle embutido em QML), o efeito de animação (`kubik/effect`) e o ícone da bandeja (`kubik/tray`, plasmoid). Ver `kubik/README.md`.
 - `prototype/overlay/`: protótipo dos overlays (borda e abas), referência para a borda ativa e o stacking.
 - `testenv/`: KWin real headless (Arch e Fedora 44) para os testes de integração.
 - `scripts/`: `build.py` (artefatos), `release.sh` (publica), `node.sh` (Node em container), `install.sh`/`uninstall.sh`.

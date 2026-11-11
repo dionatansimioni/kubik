@@ -86,12 +86,16 @@ class KubikBuildTest(unittest.TestCase):
         version = json.loads((ROOT / "kubik" / "package" / "metadata.json").read_text())["KPlugin"]["Version"]
         effect = json.loads((ROOT / "kubik" / "effect" / "metadata.json").read_text())
         self.assertEqual(effect["KPlugin"]["Version"], version, "efeito e script devem ter a mesma versão")
+        tray = json.loads((ROOT / "kubik" / "tray" / "metadata.json").read_text())
+        self.assertEqual(tray["KPlugin"]["Version"], version, "bandeja e script devem ter a mesma versão")
+        tray_id = tray["KPlugin"]["Id"]
         with tempfile.TemporaryDirectory() as out:
             proc = subprocess.run(["python3", str(ROOT / "scripts" / "build.py"), "kubik/package"],
                                   env=dict(os.environ, KUBIK_DIST=out), check=True, capture_output=True, text=True)
             files = [Path(p) for p in proc.stdout.split()]
             self.assertEqual([f.name for f in files],
-                             [f"kubik-{version}.kwinscript", f"kubik-{version}.tar.gz", f"kubikanimations-{version}.kwineffect"])
+                             [f"kubik-{version}.kwinscript", f"kubik-{version}.tar.gz", f"kubikanimations-{version}.kwineffect",
+                              f"{tray_id}-{version}.plasmoid"])
             with zipfile.ZipFile(files[2]) as z:
                 self.assertIn("contents/code/main.js", z.namelist())
                 self.assertIn("[kubik-animations] carregado", z.read("contents/code/main.js").decode())
@@ -100,6 +104,14 @@ class KubikBuildTest(unittest.TestCase):
             top = f"kubik-{version}"
             self.assertIn(f"{top}/packages/kubik/contents/ui/Kubik.qml", names)
             self.assertIn(f"{top}/packages/kubikanimations/contents/code/main.js", names)
+            # O ícone da bandeja, com a lógica gerada do TypeScript.
+            self.assertIn(f"{top}/packages/{tray_id}/contents/ui/main.qml", names)
+            self.assertIn(f"{top}/packages/{tray_id}/contents/code/logic.js", names)
+            with zipfile.ZipFile(files[3]) as z:
+                self.assertIn("var KubikTray = ", z.read("contents/code/logic.js").decode())
+            # A bandeja aparece sozinha na área de notificação ao instalar.
+            self.assertTrue(tray["KPlugin"]["EnabledByDefault"])
+            self.assertTrue(tray["X-Plasma-NotificationAreaCategory"])
 
 
 class ShellScriptsTest(unittest.TestCase):

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Espelho do [Script-kubik] do kwinrc (a fonte da verdade). A bandeja lê o
+     kwinrc ao iniciar e grava nele a cada mudança: ver src/tray/logic.ts. -->
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0 http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="enabled" type="Bool"><default>true</default></entry>
+    <entry name="gapsInner" type="Int"><default>4</default></entry>
+    <entry name="gapsOuter" type="Int"><default>4</default></entry>
+    <entry name="borderEnabled" type="Bool"><default>true</default></entry>
+    <entry name="borderWidth" type="Int"><default>3</default></entry>
+    <entry name="allDesktopsOff" type="StringList"><default></default></entry>
+    <entry name="exceptions" type="StringList"><default></default></entry>
+    <entry name="animDuration" type="Int"><default>250</default></entry>
+    <entry name="animCurve" type="String"><default>OutCubic</default></entry>
+  </group>
+</kcfg>
