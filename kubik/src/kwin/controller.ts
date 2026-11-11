@@ -612,7 +612,28 @@ export class Controller {
       lines.push(`forma ${key} ${JSON.stringify(tree.shape())}`);
     }
     for (const t of floating) lines.push(`flutuante ${name(t.window)}: ${this.floatReasonOf(t) ?? "?"}`);
+    const m = this.memoryCounts();
+    lines.push(`memória: ${Object.entries(m).map(([k, v]) => `${k}=${v}`).join(" ")}`);
     return lines;
+  }
+
+  /**
+   * Tamanho do que o Kubik guarda. Árvores e lugares são por tela × desktop
+   * (limitados); o resto tem que voltar a zero quando as janelas fecham. O
+   * teste de memória confere isso depois de muitos ciclos.
+   */
+  memoryCounts(): Record<"tracked" | "tiled" | "trees" | "places" | "focusHistory" | "monocle" | "subscriptions", number> {
+    let tiled = 0;
+    for (const tree of this.trees.values()) tiled += tree.size;
+    return {
+      tracked: this.tracked.size,
+      tiled,
+      trees: this.trees.size,
+      places: this.places.size,
+      focusHistory: this.focusHistory.length,
+      monocle: this.monocle.size,
+      subscriptions: this.unsubscribe.length,
+    };
   }
 
   private noteFocus(id: string): void {
@@ -759,6 +780,7 @@ export class Controller {
       if (sticky.length === members.length && !this.trees.get(nextKey)?.size) {
         const before = this.area(key);
         this.trees.delete(key);
+        this.places.delete(key);
         this.trees.set(nextKey, tree);
         this.places.set(nextKey, next);
         for (const t of members) t.key = nextKey;

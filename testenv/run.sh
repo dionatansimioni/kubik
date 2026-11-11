@@ -73,5 +73,6 @@ docker run --rm \
     -e KWIN_EFFECTS_FORCE_ANIMATIONS=1 \
     -e SCENARIO="/work/${SCENARIO#"$ROOT"/}" \
     -e KUBIK_KWINRC="${KUBIK_KWINRC:-}" \
+    -e KUBIK_MEM_CYCLES="${KUBIK_MEM_CYCLES:-}" \
     "$IMAGE" bash -c 'chmod 666 /dev/dri/renderD* && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix && exec su tester -c "bash /work/testenv/session.sh"'
 echo "$OUT/kwin.log"

@@ -343,6 +343,32 @@ describe("Controller", () => {
     });
   });
 
+  it("memória: depois de 50 ciclos de abrir, reorganizar e fechar, não sobra nada", () => {
+    const before = { added: ws.windowAdded.count, removed: ws.windowRemoved.count, activated: ws.windowActivated.count };
+    const closed: FakeWindow[] = [];
+    for (let i = 0; i < 50; i++) {
+      const w = ["a", "b", "c", "d"].map((c) => ws.open(win(`${c}${i}`, i % 2 ? SCREEN_B : SCREEN_A)));
+      ctl.runKey({ kind: "focus", dir: "left" });
+      ctl.runKey({ kind: "move", dir: "right" });
+      ctl.runKey({ kind: "rotate" });
+      ctl.runKey({ kind: "monocle" });
+      ctl.runKey({ kind: "monocle" });
+      ctl.runKey({ kind: "float" });
+      tick();
+      for (const x of w) ws.close(x);
+      closed.push(...w);
+    }
+    tick();
+    expect(ctl.memoryCounts()).toEqual({ tracked: 0, tiled: 0, trees: 2, places: 2, focusHistory: 0, monocle: 0, subscriptions: 4 });
+    // Nenhum sinal das janelas fechadas continua ligado ao Kubik.
+    for (const x of closed)
+      for (const s of [x.minimizedChanged, x.captionChanged, x.frameGeometryChanged, x.interactiveMoveResizeFinished])
+        expect(s.count).toBe(0);
+    expect({ added: ws.windowAdded.count, removed: ws.windowRemoved.count, activated: ws.windowActivated.count }).toEqual(before);
+    ctl.runKey({ kind: "monocle" }); // sem janela: não cria nada
+    expect(ctl.memoryCounts().monocle).toBeLessThanOrEqual(1);
+  });
+
   it("stop desconecta todos os sinais", () => {
     const a = ws.open(win("a"));
     ctl.stop();
