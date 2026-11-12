@@ -15,6 +15,7 @@
 #include <QIcon>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMetaEnum>
 #include <QPalette>
 #include <QProcess>
 #include <QQmlApplicationEngine>
@@ -162,6 +163,20 @@ QVariantMap applyKdeTheme() {
     for (auto role : {QPalette::WindowText, QPalette::Text, QPalette::ButtonText})
         p.setColor(QPalette::Disabled, role, inactive);
     QGuiApplication::setPalette(p);
+    // O Fusion do QtQuick.Controls não herda a paleta do QGuiApplication (fica
+    // no claro do próprio tema): o QML aplica estas cores na janela.
+    QVariantMap roles;
+    const QMetaEnum names = QMetaEnum::fromType<QPalette::ColorRole>();
+    for (int i = 0; i < names.keyCount(); ++i) {
+        const auto role = static_cast<QPalette::ColorRole>(names.value(i));
+        if (role >= QPalette::NColorRoles || !p.isBrushSet(QPalette::Active, role))
+            continue;
+        QString name = QString::fromLatin1(names.key(i));
+        name[0] = name[0].toLower();
+        roles[name] = p.color(QPalette::Active, role);
+    }
+    theme[QStringLiteral("palette")] = roles;
+    theme[QStringLiteral("disabledText")] = inactive;
 
     theme[QStringLiteral("positive")] = pick("Colors:Window", "ForegroundPositive", theme[QStringLiteral("positive")].value<QColor>());
     theme[QStringLiteral("neutral")] = pick("Colors:Window", "ForegroundNeutral", theme[QStringLiteral("neutral")].value<QColor>());

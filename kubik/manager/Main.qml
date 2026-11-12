@@ -177,9 +177,22 @@ ApplicationWindow {
         buttonsTimer.restart();
     }
 
+    // As cores do KDE (main.cpp): o Fusion não as pega do QGuiApplication.
+    function applyKdePalette() {
+        const roles = kdeTheme.palette || {};
+        for (const role in roles)
+            palette[role] = roles[role];
+        if (kdeTheme.disabledText) {
+            palette.disabled.windowText = kdeTheme.disabledText;
+            palette.disabled.text = kdeTheme.disabledText;
+            palette.disabled.buttonText = kdeTheme.disabledText;
+        }
+    }
+
     Component.onCompleted: {
+        applyKdePalette();
         showTimer.start();
-        log("aberto (Qt " + qtVersion + ")" + (bundled ? ", pacote " + bundled : ", sem pacote") + ", fonte " + Qt.application.font.family + " " + Qt.application.font.pointSize);
+        log("aberto (Qt " + qtVersion + ")" + (bundled ? ", pacote " + bundled : ", sem pacote") + ", fonte " + Qt.application.font.family + " " + Qt.application.font.pointSize + ", cores " + (kdeTheme.fromKde ? "do KDE" : "padrão") + " (janela " + palette.window + ")");
         refresh();
         checkReleases();
     }

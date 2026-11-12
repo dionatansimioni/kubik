@@ -58,6 +58,10 @@ class ManagerWindowTest(unittest.TestCase):
         self.assertIn("fonte DejaVu Sans 10", self.appimage)
         self.assertNotIn("QFont::fromString", self.log)
 
+    def test_follows_the_dark_kde_color_scheme(self):
+        # A janela com a cor do kdeglobals (Breeze Dark), não o Fusion claro (#efefef).
+        self.assertIn("cores do KDE (janela #202326)", self.appimage)
+
     def test_uses_its_own_qt(self):
         # O Qt de dentro do AppImage (6.8), não o do sistema (Arch e Fedora: mais novo).
         for qt in re.findall(r"\[kubik-manager\] aberto \(Qt ([\d.]+)\)", self.log):
