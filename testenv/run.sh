@@ -10,6 +10,7 @@
 #        <saída>/*.png     (screenshots tirados pelo cenário)
 #
 # KUBIK_KWINRC="Grupo/Chave=Valor ...": kwinrc aplicado antes do KWin iniciar.
+# KUBIK_SCREEN=LxA: tamanho da tela virtual (padrão 1280x800).
 # KUBIK_EXTRA_PKGS="dir1 dir2": pacotes (scripts ou efeitos) instalados e
 # ativados junto (ex.: o efeito de animação, ou outro script para convivência).
 #
@@ -22,6 +23,9 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 case "${KUBIK_TESTENV:-arch}" in
     arch)   IMAGE=kubik-testenv;        CONTEXT="$ROOT/testenv" ;;
     fedora) IMAGE=kubik-testenv-fedora; CONTEXT="$ROOT/testenv/fedora" ;;
+    # Para os screenshots do README/site (não para testes): apps reais.
+    showcase) docker build -q -t kubik-testenv "$ROOT/testenv" >/dev/null
+              IMAGE=kubik-testenv-showcase; CONTEXT="$ROOT/testenv/showcase" ;;
     *) echo "erro: KUBIK_TESTENV desconhecido: $KUBIK_TESTENV" >&2; exit 2 ;;
 esac
 [ $# -eq 3 ] || { echo "uso: $0 <pacote> <cenário.sh> <saída>" >&2; exit 2; }
@@ -74,5 +78,6 @@ docker run --rm \
     -e SCENARIO="/work/${SCENARIO#"$ROOT"/}" \
     -e KUBIK_KWINRC="${KUBIK_KWINRC:-}" \
     -e KUBIK_MEM_CYCLES="${KUBIK_MEM_CYCLES:-}" \
+    -e KUBIK_SCREEN="${KUBIK_SCREEN:-1280x800}" \
     "$IMAGE" bash -c 'chmod 666 /dev/dri/renderD* && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix && exec su tester -c "bash /work/testenv/session.sh"'
 echo "$OUT/kwin.log"

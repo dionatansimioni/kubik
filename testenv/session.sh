@@ -13,5 +13,6 @@ for kv in ${KUBIK_KWINRC:-}; do
     group=${kv%%/*}; rest=${kv#*/}
     kwriteconfig6 --file kwinrc --group "$group" --key "${rest%%=*}" "${rest#*=}"
 done
-dbus-run-session -- kwin_wayland --virtual --xwayland --width 1280 --height 800 \
+SCREEN=${KUBIK_SCREEN:-1280x800}
+dbus-run-session -- kwin_wayland --virtual --xwayland --width "${SCREEN%x*}" --height "${SCREEN#*x}" \
     --exit-with-session "bash $SCENARIO" > /out/kwin.log 2>&1 || true
