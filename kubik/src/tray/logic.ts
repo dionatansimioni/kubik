@@ -197,7 +197,7 @@ export function statusText(c: Partial<TrayConfig>): string {
 
 // ---- gerenciador: estado, versões novas no GitHub, atualizar, desinstalar ----
 
-/** Repositório dos releases (as versões são pré-releases com a tag kubik-v<versão>). */
+/** Repositório dos releases (tag kubik-v<versão>; até a 0.12.1, pré-releases). */
 export const REPO = "dionatansimioni/kubik";
 export const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases?per_page=20`;
 /** De quanto em quanto tempo a bandeja procura versão nova (6 h). */

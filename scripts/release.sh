@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publica uma versão de teste como GitHub Release (pré-release) com os pacotes anexados.
+# Publica uma versão como GitHub Release (versão normal, marcada como a mais recente) com os pacotes anexados.
 # Uso: scripts/release.sh [diretório-do-pacote]   (padrão: kubik/package)
 # A versão vem de KPlugin.Version no metadata.json; a tag é <Id>-v<Versão>.
 set -euo pipefail
@@ -34,7 +34,7 @@ if [ "$ID" = kubik ]; then
 fi
 
 NOTES=$(cat <<EOF
-Versão de teste **$VERSION** de \`$ID\` (commit $(git rev-parse --short HEAD)).
+Versão **$VERSION** de \`$ID\` (commit $(git rev-parse --short HEAD)).
 
 **Instalar (escolha um):**
 - **Mais fácil:** baixe \`Kubik-$VERSION-x86_64.AppImage\`, marque como executável (botão direito › Propriedades › Permissões) e abra com dois cliques: o gerenciador oferece instalar, atualizar, reparar ou remover, conforme o que já está no sistema.
@@ -47,4 +47,4 @@ EOF
 
 git tag -a "$TAG" -m "$ID $VERSION"
 git push origin HEAD --follow-tags
-gh release create "$TAG" "${FILES[@]}" --prerelease --title "$ID $VERSION" --notes "$NOTES"
+gh release create "$TAG" "${FILES[@]}" --latest --title "$ID $VERSION" --notes "$NOTES"

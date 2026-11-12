@@ -1,6 +1,6 @@
 // O botão de download do site: acha o AppImage do release mais novo do Kubik
-// na API do GitHub. Todos os releases são pré-releases, então /releases/latest
-// (que ignora pré-releases) não serve. Testado em kubik/test/site.test.ts.
+// na API do GitHub. Até a 0.12.1 os releases eram pré-releases, que o
+// /releases/latest ignora: por isso a lista inteira. Testado em kubik/test/site.test.ts.
 
 export const REPO = "dionatansimioni/kubik";
 export const RELEASES_PAGE = `https://github.com/${REPO}/releases`;
