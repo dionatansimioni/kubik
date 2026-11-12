@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, Ppm, is_accent, kwin_env_available, parse_log
+from test_kwin_overlay import ROOT, Ppm, is_accent, kwin_env_available, parse_log, needs_pixels
 
 MARKER = "carregado-VERSAO-NOVA"
 
@@ -52,12 +52,14 @@ class UpgradeInRunningKWinTest(unittest.TestCase):
     def test_new_code_is_running(self):
         self.assertTrue(MARKER in self.log, "o KWin recarregou o código antigo (ver kwin.log)")
 
+    @needs_pixels
     def test_border_on_focused_window_after_upgrade(self):
         img = Ppm(self.out / "upgraded.ppm")
         beta = self.marks["after"]["Beta"]
         x, y, h = round(beta["x"]), round(beta["y"]), round(beta["height"])
         self.assertTrue(is_accent(img.getpixel((x - 2, y + h // 2))), "sem borda na janela focada")
 
+    @needs_pixels
     def test_no_ghost_border_from_old_instance(self):
         img = Ppm(self.out / "upgraded.ppm")
         alpha = self.marks["after"]["Alpha"] if "Alpha" in self.marks["after"] else self.marks["before"]["Alpha"]

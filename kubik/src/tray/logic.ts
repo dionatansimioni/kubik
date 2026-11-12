@@ -283,7 +283,19 @@ export function compareVersions(a: string, b: string): number {
  * testenv aponta para um servidor local). Sem rede: saída vazia, sem erro.
  */
 export function releasesCommand(): string {
-  return `curl -fsSL --max-time 20 -H 'Accept: application/vnd.github+json' "\${KUBIK_RELEASES_URL:-${RELEASES_URL}}" 2>/dev/null || true`;
+  return `${download(`"\${KUBIK_RELEASES_URL:-${RELEASES_URL}}"`, "-", 20, "Accept: application/vnd.github+json")} 2>/dev/null || true`;
+}
+
+/**
+ * Baixa `url` (já citado para o shell) para `out` ("-" = saída padrão) com o
+ * curl ou, sem ele, com o wget: o Debian não instala o curl por padrão, só o
+ * wget. Os dois falham (saída ≠ 0) com erro HTTP.
+ */
+function download(url: string, out: string, seconds: number, header?: string): string {
+  const o = out === "-" ? "-" : `"${out}"`;
+  const curl = `curl -fsSL --max-time ${seconds}${header ? ` -H '${header}'` : ""} -o ${o} ${url}`;
+  const wget = `wget -q -T ${seconds}${header ? ` --header='${header}'` : ""} -O ${o} ${url}`;
+  return `{ if command -v curl >/dev/null 2>&1; then ${curl}; else ${wget}; fi; }`;
 }
 
 export interface Release {
@@ -337,12 +349,12 @@ export function updateCommand(r: Release): string {
   // Com o AppImage, ele mesmo instala (e guarda a si próprio como o gerenciador).
   if (r.appimage && isSafeUrl(r.appimage))
     return (
-      `d=$(mktemp -d) && curl -fsSL --max-time 600 -o "$d/Kubik.AppImage" ${q(r.appimage)} && ` +
+      `d=$(mktemp -d) && ${download(q(r.appimage), "$d/Kubik.AppImage", 600)} && ` +
       `chmod +x "$d/Kubik.AppImage" && "$d/Kubik.AppImage" --install --yes; ` +
       `r=$?; rm -rf "$d"; exit $r`
     );
   return (
-    `d=$(mktemp -d) && curl -fsSL --max-time 600 -o "$d/kubik.tar.gz" ${q(r.url)} && ` +
+    `d=$(mktemp -d) && ${download(q(r.url), "$d/kubik.tar.gz", 600)} && ` +
     `tar xzf "$d/kubik.tar.gz" -C "$d" && "$d/kubik-${r.version}/install.sh"; ` +
     `r=$?; rm -rf "$d"; exit $r`
   );

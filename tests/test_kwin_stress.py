@@ -15,7 +15,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, Ppm, kwin_env_available
+from test_kwin_overlay import ROOT, Ppm, kwin_env_available, needs_pixels
 
 AREA = (4, 4, 1276, 796)  # x0, y0, x1, y1 depois do gap externo
 GAP = 4
@@ -126,6 +126,7 @@ class StressTwelveWindowsTest(unittest.TestCase):
             with self.subTest(checkpoint=cp, windows=len(tiles)):
                 self.assertGreater(used / full, 0.9, "sobrou área vazia demais")
 
+    @needs_pixels
     def test_windows_rendered_where_kwin_says(self):
         for cp in CHECKPOINTS:
             img = Ppm(self.out / f"{cp}.ppm")

@@ -44,6 +44,8 @@ export interface KWinWindow {
   readonly onAllDesktops: boolean;
   /** Fora do Alt+Tab. Junto com resourceClass vazio, indica janela interna do KWin. */
   readonly skipSwitcher: boolean;
+  /** false nas janelas internas do KWin (overlays de scripts), em qualquer versão. */
+  readonly wantsInput?: boolean;
   /** Fora da barra de tarefas. Junto com skipSwitcher: janela auxiliar oculta. */
   readonly skipTaskbar: boolean;
   /** 0 = invisível (ex.: xwaylandvideobridge). */

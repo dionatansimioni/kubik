@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, Ppm, kwin_env_available
+from test_kwin_overlay import ROOT, Ppm, kwin_env_available, needs_effects
 from test_kwin_tiling import LEFT, RIGHT, parse_windows
 
 PROBE = (760, 780)  # dentro da Alpha no meio do encolhimento; dentro da Beta no final
@@ -53,6 +53,7 @@ class _AnimationScenario(unittest.TestCase):
 
 
 @unittest.skipUnless(kwin_env_available(), "testenv indisponível (docker/vgem)")
+@needs_effects
 class AnimationEffectTest(_AnimationScenario):
     EXTRA_PKGS = "kubik/effect"
 
@@ -69,6 +70,7 @@ class AnimationEffectTest(_AnimationScenario):
 
 
 @unittest.skipUnless(kwin_env_available(), "testenv indisponível (docker/vgem)")
+@needs_effects
 class NoAnimationControlTest(_AnimationScenario):
     EXTRA_PKGS = ""
 
@@ -78,6 +80,7 @@ class NoAnimationControlTest(_AnimationScenario):
 
 
 @unittest.skipUnless(kwin_env_available(), "testenv indisponível (docker/vgem)")
+@needs_effects
 class SwapAnimationTest(unittest.TestCase):
     """Relato do usuário: ao trocar janelas de lugar não havia animação.
     0,5 s depois de soltar a Alpha sobre a Beta (efeito em 2 s, linear), a

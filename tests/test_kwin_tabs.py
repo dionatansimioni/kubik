@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, Ppm, is_accent, kwin_env_available
+from test_kwin_overlay import ROOT, Ppm, is_accent, kwin_env_available, needs_pixels
 from test_kwin_tiling import parse_windows
 
 TL, BL = (4, 4, 634, 394), (4, 402, 634, 394)
@@ -58,17 +58,20 @@ class TabsInKWinTest(unittest.TestCase):
         self.assertIn("empilhou 'Gamma' com 'Beta'", self.log)
         self.assertEqual(self.active["stacked"], "Gamma")
 
+    @needs_pixels
     def test_preview_shows_stack_icon_while_holding(self):
         # O ícone de pilha (destaque) no centro do tile final (a direita inteira).
         img = Ppm(self.out / "stack_holding.ppm")
         center = [img.getpixel((x, y)) for x in range(930, 990, 3) for y in (400, 410, 420)]
         self.assertGreater(sum(map(is_accent, center)), 5, "sem ícone de pilha na prévia")
 
+    @needs_pixels
     def test_tab_bar_highlights_the_shown_tab(self):
         self.assertGreater(self.accent_share("stacked", *TAB2), 0.6, "aba à vista (Gamma) sem destaque")
         self.assertLess(self.accent_share("stacked", *TAB1), 0.2, "aba escondida (Beta) destacada")
         self.assertGreater(self.accent_share("stacked", 650, 672), 0.1, "sem o ícone de pilha na barra")
 
+    @needs_pixels
     def test_clicking_a_tab_shows_that_window(self):
         self.assertEqual(self.active["clicked"], "Beta")
         self.assertGreater(self.accent_share("clicked", *TAB1), 0.6)
@@ -78,6 +81,7 @@ class TabsInKWinTest(unittest.TestCase):
     def test_next_tab_shortcut(self):
         self.assertEqual(self.active["next"], "Gamma")
 
+    @needs_pixels
     def test_close_button_unstacks_back_to_tiling(self):
         self.assertEqual(self.w["closed_x"], {"Alpha": LEFT, "Gamma": TR, "Beta": BR})
         self.assertIn("tirou 'Beta' da pilha", self.log)

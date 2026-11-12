@@ -9,7 +9,7 @@ export KUBIK_RELEASES_URL=${KUBIK_RELEASES_URL:-http://127.0.0.1:9/offline}
 # Abre uma janela de teste e espera ela mapear: open_window <título> [LxA] [cor] [extras…]
 QML_BIN=$(command -v /usr/lib/qt6/bin/qml /usr/lib64/qt6/bin/qml | head -n1)
 open_window() {
-    "$QML_BIN" /work/testenv/clients/window.qml -- "$@" >/dev/null 2>&1 &
+    "$QML_BIN" /work/testenv/clients/window.qml -- "$@" >"/tmp/window-$1.log" 2>&1 &
     echo $! > "/tmp/window-$1.pid"
     wait_window "$1"
 }
@@ -24,6 +24,18 @@ wait_window() {
         grep -q "SEEN-WINDOW-$i $1\$" /out/kwin.log && break
     done
     sleep 0.5
+}
+
+# Clique simples do mouse simulado: click X Y
+click() {
+    python3 /work/testenv/fakeinput.py click "$1" "$2"
+    sleep 0.4
+}
+
+# Copia para o kwin.log os cliques que a janela <título> recebeu, um por linha:
+# "CLICKS <tag> <título> <x> <y>" (nenhuma linha: nenhum clique chegou).
+clicks() {
+    grep -ao "CLICK $2 .*" "/tmp/window-$2.log" 2>/dev/null | sed "s/^CLICK/CLICKS $1/" >&2 || true
 }
 
 # Fecha a janela de teste aberta com open_window <título>.

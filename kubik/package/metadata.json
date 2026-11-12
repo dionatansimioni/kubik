@@ -5,7 +5,7 @@
         "Description": "Pop!_Shell-style auto-tiling for KDE Plasma 6: BSP layout, drag-and-drop rearranging, tabs, keyboard navigation.",
         "Description[pt_BR]": "Auto-tiling de janelas no estilo Pop!_Shell: layout BSP, reorganizar arrastando, abas e teclado.",
         "Icon": "io.github.dionatansimioni.kubik",
-        "Version": "0.12.1",
+        "Version": "0.12.2",
         "License": "GPL-3.0-or-later",
         "Website": "https://github.com/dionatansimioni/kubik",
         "EnabledByDefault": false

@@ -12,13 +12,23 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, Ppm, kwin_env_available
+from test_kwin_overlay import OLD_KWIN, ROOT, Ppm, kwin_env_available, needs_pixels
 from test_kwin_tiling import parse_windows
 
 
+# Os cliques do cenário têm coordenadas conferidas no screenshot do popup no
+# Plasma 6.8; o popup do 6.3 tem outro layout, e o Debian não tem screenshot
+# para recalibrar. Lá vale o que não depende de clique: carregar, ler o kwinrc,
+# achar a versão nova (pelo wget) e não ter erro de QML.
+needs_popup_clicks = unittest.skipIf(OLD_KWIN, "cliques calibrados no popup do Plasma 6.8 (Debian: outro layout, sem screenshot)")
+
+# O único erro esperado no Plasma 6.3: o ShortcutWatcher.qml (Loader) sem o tipo.
+SIGNALWATCHER_63 = "ShortcutWatcher.qml:7:1: DBus.SignalWatcher is not a type"
+
+
 def plasma_available():
-    """Só a imagem do Arch tem o Plasma (plasmoidviewer); a do Fedora tem só o KWin."""
-    return os.environ.get("KUBIK_TESTENV", "arch") == "arch"
+    """As imagens do Arch e do Debian têm o Plasma (plasmoidviewer); a do Fedora tem só o KWin."""
+    return os.environ.get("KUBIK_TESTENV", "arch") in ("arch", "debian")
 
 
 @unittest.skipUnless(kwin_env_available() and plasma_available(), "testenv com Plasma indisponível")
@@ -43,6 +53,7 @@ class TrayInPlasmaTest(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.out, ignore_errors=True)
 
+    @needs_pixels
     def test_reads_existing_config_without_rewriting_it(self):
         self.assertIn("[kubik-tray] configuração lida do kwinrc: Tiling ligado · gaps 6 px", self.log)
         # Nada gravado só por abrir: Enabled ainda não existe no kwinrc.
@@ -52,38 +63,52 @@ class TrayInPlasmaTest(unittest.TestCase):
         r, g, b = Ppm(self.out / "popup.ppm").getpixel((1093, 101))[:3]
         self.assertTrue(b > 200 and b - r > 60, (r, g, b))
 
+    @needs_popup_clicks
     def test_switch_turns_tiling_off(self):
         self.assertEqual(self.rc["switch_off"]["Enabled"], "false")
         self.assertIn("[kubik] tiling desligado", self.log)
 
     def test_follows_the_keyboard_shortcut(self):
+        if OLD_KWIN:
+            # Plasma 6.3: sem DBus.SignalWatcher, a bandeja carrega sem acompanhar
+            # o Meta+Y (antes, o tipo desconhecido derrubava a bandeja inteira).
+            self.assertIn("[kubik-tray] sem DBus.SignalWatcher", self.log)
+            self.assertIn("[kubik-tray] configuração lida do kwinrc", self.log)
+            return
+        self.assertNotIn("sem DBus.SignalWatcher", self.log)
         self.assertIn("[kubik-tray] atalho: tiling ligado", self.log)
         self.assertEqual(self.rc["shortcut_on"]["Enabled"], "true")
         self.assertEqual(self.w["on"]["Alpha"], (6, 6, 631, 788))
 
+    @needs_popup_clicks
     def test_gaps_spinbox(self):
         self.assertEqual(self.rc["gaps"]["Gaps"], "8/8")
         self.assertEqual(self.w["gaps"]["Alpha"], (8, 8, 628, 784))
 
+    @needs_popup_clicks
     def test_border_checkbox(self):
         self.assertEqual(self.rc["border"]["Border"], "false/3")
         self.assertIn("borda desligada", self.log)
 
+    @needs_popup_clicks
     def test_all_desktops_per_screen(self):
         self.assertEqual(self.rc["screen"]["AllOff"], "virtual-0")
         self.assertIn("fora em todos os desktops: virtual-0", self.log)
 
+    @needs_popup_clicks
     def test_exceptions_page_marks_an_open_app(self):
         self.assertEqual(self.rc["exceptions"]["Exc"], "org.kde.plasmoidviewer,plasmoidviewer,org.qt-project.qml")
         self.assertIn("flutuante 'Alpha': exceção do usuário (org.qt-project.qml)", self.log)
 
+    @needs_popup_clicks
     def test_animation_page_writes_script_and_effect(self):
         self.assertEqual(self.rc["anim"], {"AnimDuration": "0", "AnimCurve": "OutCubic", "EffectDuration": "0"})
         self.assertIn("[kubik-animations] configuração: 0ms", self.log)
 
     def test_no_qml_errors_in_the_applet(self):
         applet = [l for l in self.log.splitlines()
-                  if "io.github.dionatansimioni.kubik" in l and re.search(r"Error|error|is not|undefined|usedbeforedeclared", l)]
+                  if "io.github.dionatansimioni.kubik" in l and re.search(r"Error|error|is not|undefined|usedbeforedeclared", l)
+                  and not (OLD_KWIN and SIGNALWATCHER_63 in l)]
         self.assertEqual(applet, [])
         self.assertNotIn("comando falhou", self.log)
 
@@ -137,10 +162,14 @@ class TrayUpdateTest(unittest.TestCase):
         shutil.rmtree(cls.out, ignore_errors=True)
 
     def test_shows_status_and_finds_the_new_version(self):
-        self.assertRegex(self.log, r"\[kubik-tray\] estado: script (\d+\.\d+\.\d+) \(ativo\), efeito \1 \(ativo\), bandeja \1")
+        # Sem animações (Debian do testenv), o efeito fica instalado mas parado.
+        effect = r"\((ativo|parado)\)" if OLD_KWIN else r"\(ativo\)"
+        self.assertRegex(self.log, r"\[kubik-tray\] estado: script (\d+\.\d+\.\d+) \(ativo\), efeito \1 " + effect + r", bandeja \1")
         self.assertRegex(self.log, r"\[kubik-tray\] nova versão: 99\.0\.0 \(instalada: \d+\.\d+\.\d+\)")
-        self.assertNotIn("TIMEOUT", self.log)
+        if not OLD_KWIN:  # no Debian, o clique em "Atualizar" erra o botão (needs_popup_clicks)
+            self.assertNotIn("TIMEOUT", self.log)
 
+    @needs_popup_clicks
     def test_update_button_installs_the_new_release(self):
         self.assertIn("[kubik-tray] atualizado para 99.0.0", self.log)
         self.assertIn("estado: script 99.0.0 (ativo), efeito 99.0.0 (ativo), bandeja 99.0.0", self.log)
@@ -150,7 +179,8 @@ class TrayUpdateTest(unittest.TestCase):
 
     def test_no_qml_errors(self):
         applet = [l for l in self.log.splitlines()
-                  if "io.github.dionatansimioni.kubik" in l and re.search(r"Error|error|is not|undefined", l)]
+                  if "io.github.dionatansimioni.kubik" in l and re.search(r"Error|error|is not|undefined", l)
+                  and not (OLD_KWIN and SIGNALWATCHER_63 in l)]
         self.assertEqual(applet, [])
         self.assertNotIn("comando falhou", self.log)
 

@@ -77,7 +77,7 @@ tar xzf kubik-<version>.tar.gz && ./kubik-<version>/install.sh   # or: ./Kubik-<
 ## Development
 
 - The core is TypeScript (`kubik/src`), bundled into QML.
-- Tests run against a fake KWin (Vitest) and against a real headless KWin 6 in Docker (Arch and Fedora 44); see `testenv/`.
+- Tests run against a fake KWin (Vitest) and against a real headless KWin 6 in Docker (Arch, Fedora 44 and Debian 13 with Plasma 6.3); see `testenv/`.
 
 ```sh
 scripts/node.sh kubik npm test           # unit tests (Node in a container)

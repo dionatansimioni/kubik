@@ -40,6 +40,8 @@ export class FakeWindow implements KWinWindow {
   maxSize = { width: 0, height: 0 };
   onAllDesktops = false;
   skipSwitcher = false;
+  /** false nas janelas internas do KWin (overlays de scripts). */
+  wantsInput = true;
   skipTaskbar = false;
   opacity = 1;
   maximizeMode = 0;

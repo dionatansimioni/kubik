@@ -21,14 +21,23 @@ export const DEFAULT_FLOATING_CLASSES = [
 ];
 
 /**
+ * Overlays do próprio KWin/scripts (bordas, prévias): sem classe e fora do
+ * Alt+Tab. No KWin 6.3 elas ainda aparecem no Alt+Tab; o que têm em toda
+ * versão é não aceitar foco (wantsInput false).
+ */
+export function isInternalWindow(w: KWinWindow): boolean {
+  return !w.resourceClass && (w.skipSwitcher || w.wantsInput === false);
+}
+
+/**
  * Motivo para a janela NÃO entrar no tiling, ou null se ela deve entrar.
  * Devolver o motivo (em vez de um booleano) deixa o log explicável.
  */
 export function floatReason(w: KWinWindow, floatingClasses: readonly string[]): string | null {
   if (!w.normalWindow) return "não é janela normal";
-  // Overlays do próprio KWin/scripts (bordas, prévias): sem classe e fora do
-  // Alt+Tab. Sem esta regra, a borda do protótipo entrava no tiling.
-  if (!w.resourceClass && w.skipSwitcher) return "janela interna do KWin";
+  // Sem esta regra, a borda do protótipo entrava no tiling (e, no KWin 6.3,
+  // os próprios overlays do Kubik).
+  if (isInternalWindow(w)) return "janela interna do KWin";
   // Auxiliares que o app esconde do usuário (ex.: a ponte de vídeo do
   // XWayland, transparente): sem esta regra, ocupavam um tile vazio.
   if (w.skipTaskbar && w.skipSwitcher) return "janela oculta (fora da barra de tarefas e do Alt+Tab)";

@@ -291,6 +291,10 @@ describe("Controller", () => {
       // Regressão: a borda do protótipo (janela interna do KWin) entrou no
       // tiling e empurrou as janelas do usuário para a metade direita.
       ["janela interna do KWin (overlay)", (w) => { w.resourceClass = ""; w.skipSwitcher = true; }],
+      // Regressão: no KWin 6.3 (Debian 13) as janelas internas não vêm fora
+      // do Alt+Tab; o Kubik punha os próprios overlays (borda, prévias) no
+      // tiling. O que elas têm em toda versão: sem classe e sem aceitar foco.
+      ["janela interna do KWin 6.3 (overlay, ainda no Alt+Tab)", (w) => { w.resourceClass = ""; w.wantsInput = false; }],
     ];
     for (const [name, setup] of cases) {
       it(name, () => {
@@ -972,6 +976,12 @@ describe("Controller", () => {
       const ghost = win("ponte");
       ghost.skipTaskbar = ghost.skipSwitcher = true;
       ws.open(ghost);
+      expect(last()).toBeNull();
+      // Overlay interno como no KWin 6.3: no Alt+Tab, mas sem aceitar foco.
+      const overlay = win("");
+      overlay.resourceClass = "";
+      overlay.wantsInput = false;
+      ws.open(overlay);
       expect(last()).toBeNull();
       const fixed = new FakeWindow("fixa", SCREEN_A, DESK_1, rect(100, 100, 300, 200));
       fixed.resizeable = false; // flutua, mas é uma janela de verdade

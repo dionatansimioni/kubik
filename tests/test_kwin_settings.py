@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, Ppm, is_accent, kwin_env_available
+from test_kwin_overlay import ROOT, Ppm, is_accent, kwin_env_available, needs_effects, needs_pixels
 from test_kwin_tiling import parse_windows
 
 
@@ -47,6 +47,7 @@ class SettingsInKWinTest(unittest.TestCase):
         self.assertEqual((after["Alpha"], after["Beta"]), ((0, 0, 630, 800), (650, 0, 630, 800)))
         self.assertIn("exceção do usuário (org.kde.kcalc)", self.log)
 
+    @needs_pixels
     def test_border_width_applies_live(self):
         # Alpha (0,0 630×800) com foco: borda de 8 px, para dentro da tela à
         # esquerda (cortada) e no gap de 20 px à direita (x 630..637).
@@ -60,6 +61,7 @@ class SettingsInKWinTest(unittest.TestCase):
         self.assertIn("tiling desligado", self.log)
         self.assertEqual(self.w["toggled_on"], {"Alpha": (0, 0, 630, 800), "Beta": (650, 0, 630, 800)})
 
+    @needs_effects
     def test_zero_duration_disables_animation(self):
         self.assertIn("[kubik-animations] configuração: 0ms", self.log)
         # 150 ms depois de fechar a Beta, a Alpha já está no lugar final (sem animação).

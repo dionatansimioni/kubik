@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, Ppm, is_accent, kwin_env_available
+from test_kwin_overlay import ROOT, Ppm, is_accent, kwin_env_available, needs_pixels
 from test_kwin_tiling import parse_windows
 
 
@@ -41,21 +41,25 @@ class BorderInKWinTest(unittest.TestCase):
     def assertNoAccent(self, shot, xy):
         self.assertFalse(is_accent(self.px(shot, xy)), f"{shot}: borda indevida em {xy}: {self.px(shot, xy)}")
 
+    @needs_pixels
     def test_border_around_focused_window(self):
         for xy in ((640, 400), (1278, 400), (960, 798), (960, 2)):
             self.assertAccent("beta_focused", xy)
         self.assertNoAccent("beta_focused", (2, 400))  # Alpha sem foco
 
+    @needs_pixels
     def test_border_follows_focus(self):
         for xy in ((2, 400), (639, 400), (320, 798)):
             self.assertAccent("alpha_focused", xy)
         self.assertNoAccent("alpha_focused", (1278, 400))
 
+    @needs_pixels
     def test_border_follows_layout_change(self):
         self.assertEqual(self.w["alone"], {"Alpha": (4, 4, 1272, 792)})
         self.assertAccent("alpha_alone", (1278, 400))
         self.assertNoAccent("alpha_alone", (639, 400))  # nada de borda no lugar antigo
 
+    @needs_pixels
     def test_no_border_while_the_window_is_animating(self):
         # A borda não persegue a janela (pedido do usuário): no meio da
         # animação ela não aparece em lugar nenhum; volta com a janela parada.
@@ -64,6 +68,7 @@ class BorderInKWinTest(unittest.TestCase):
         self.assertEqual(accent, [], "borda desenhada durante a animação")
         self.assertAccent("alpha_alone", (1278, 400))
 
+    @needs_pixels
     def test_no_border_without_focused_window(self):
         img = Ppm(self.out / "none.ppm")
         accent = [(x, y) for x in range(0, 1280, 8) for y in range(0, 800, 8) if is_accent(img.getpixel((x, y)))]

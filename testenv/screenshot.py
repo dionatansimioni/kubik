@@ -12,7 +12,10 @@ from PIL import Image
 out = sys.argv[1]
 r, w = os.pipe()
 chunks = []
-reader = threading.Thread(target=lambda: chunks.extend(iter(lambda: os.read(r, 1 << 20), b"")))
+# daemon: se o KWin não responder (ex.: QPainter, sem ScreenShot2), o erro
+# encerra o script em vez de a leitura esperar o pipe para sempre (o UnixFd
+# do D-Bus guarda uma cópia da ponta de escrita).
+reader = threading.Thread(target=lambda: chunks.extend(iter(lambda: os.read(r, 1 << 20), b"")), daemon=True)
 reader.start()
 
 bus = dbus.SessionBus()

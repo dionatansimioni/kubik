@@ -6,6 +6,7 @@
 //               (como Chrome/Electron restaurando o tamanho da última sessão)
 // Obs.: limites de tamanho (minimumWidth…) definidos aqui NÃO chegam ao KWin
 // via runtime `qml`; para mínimos reais os cenários usam apps (ex.: kcalc).
+// Os cliques recebidos saem no stderr: "CLICK <título> <x> <y>".
 import QtQuick
 import QtQuick.Window
 Window {
@@ -33,4 +34,10 @@ Window {
     }
     color: (args[2] && args[2] !== "-") ? args[2] : Qt.hsla((win.title.length * 0.13) % 1, 0.5, 0.5, 1)
     Text { anchors.centerIn: parent; text: win.title; font.pixelSize: 24; color: "white" }
+    // Cada clique que CHEGA ao app vai para /tmp/window-<título>.log
+    // (open_window); clicks <título> o copia para o kwin.log.
+    MouseArea {
+        anchors.fill: parent
+        onClicked: mouse => console.warn("CLICK " + win.title + " " + Math.round(mouse.x) + " " + Math.round(mouse.y))
+    }
 }

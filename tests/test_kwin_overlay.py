@@ -25,6 +25,13 @@ def kwin_env_available():
     return has_vgem or os.geteuid() == 0
 
 
+# O testenv do Debian (KWin 6.3) não tem screenshot nem animações: lá o KWin
+# desenha com QPainter (a libdrm dele não reconhece o vgem). Ver testenv/README.md.
+OLD_KWIN = os.environ.get("KUBIK_TESTENV", "arch") == "debian"
+needs_pixels = unittest.skipIf(OLD_KWIN, "testenv sem screenshot (Debian: KWin com QPainter)")
+needs_effects = unittest.skipIf(OLD_KWIN, "testenv sem animações (Debian: KWin com QPainter)")
+
+
 def is_accent(px):
     """Cor de destaque (Breeze: #3daee9): azul claro e saturado."""
     r, g, b = px[:3]
@@ -105,9 +112,11 @@ class OverlayInKWinTest(unittest.TestCase):
         for bad in ("Component failed to load", "TypeError", "ReferenceError", "is not defined"):
             self.assertNotIn(bad, self.log)
 
+    @needs_pixels
     def test_border_around_single_window(self):
         self.assertBorderAround(self.image("single"), self.marks["single"]["Alpha"], "single")
 
+    @needs_pixels
     def test_border_follows_focus(self):
         img = self.image("two")
         self.assertBorderAround(img, self.marks["two"]["Beta"], "two/Beta")
@@ -115,6 +124,7 @@ class OverlayInKWinTest(unittest.TestCase):
         left = (round(alpha["x"]) - 2, round(alpha["y"] + alpha["height"] / 2))
         self.assertFalse(is_accent(img.getpixel(left)), "janela sem foco não deveria ter borda")
 
+    @needs_pixels
     def test_stacking_shows_tab_bar(self):
         img = self.image("stacked")
         beta = self.marks["two"]["Beta"]  # a pilha ocupa o retângulo original da Beta

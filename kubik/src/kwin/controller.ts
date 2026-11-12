@@ -35,7 +35,7 @@ interface DropTarget {
 }
 
 const SIDE_NAMES: Record<Side, string> = { left: "à esquerda de", right: "à direita de", up: "acima de", down: "para baixo de" };
-import { DEFAULT_FLOATING_CLASSES, floatReason } from "./rules";
+import { DEFAULT_FLOATING_CLASSES, floatReason, isInternalWindow } from "./rules";
 import { DEFAULT_SETTINGS, type Settings, describeSettings } from "./settings";
 
 /**
@@ -569,7 +569,7 @@ export class Controller {
   /** Janelas "de verdade" à vista: diálogos, overlays e janelas ocultas não. */
   private borderable(w: KWinWindow): boolean {
     if (!w.normalWindow || w.splash || w.minimized || w.fullScreen || w.maximizeMode !== 0) return false;
-    if (!w.resourceClass && w.skipSwitcher) return false;
+    if (isInternalWindow(w)) return false;
     if ((w.skipTaskbar && w.skipSwitcher) || w.opacity === 0) return false;
     return true;
   }

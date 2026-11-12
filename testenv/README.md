@@ -29,6 +29,7 @@ Os testes de integração (`tests/test_kwin_*.py`) usam esse fluxo e verificam o
 - `KUBIK_TESTENV=arch` (padrão): `testenv/Dockerfile`.
 - Os dois têm XWayland (o KWin sobe com `--xwayland`), KCalc, Chromium e `xdotool`, para testar apps X11 e apps com barra de título própria.
 - `KUBIK_TESTENV=fedora`: Fedora 44, a distro do usuário, em `testenv/fedora/Dockerfile`. Também tem KWin 6.8.2, mas com Qt 6.11.
+- `KUBIK_TESTENV=debian`: Debian 13, com Plasma/KWin 6.3.6 e Qt 6.8.2, o mais antigo suportado, em `testenv/debian/Dockerfile`. Pega o que só existe em KWin novo. Tem o Plasma (o teste da bandeja roda), mas **não tem screenshot**: a libdrm do KWin 6.3 não reconhece o vgem (no kernel 7 ele é um `faux_driver`, sem barramento), e o KWin desenha com QPainter, que não oferece o `ScreenShot2`. Lá as animações também não são forçadas (`KWIN_EFFECTS_FORCE_ANIMATIONS`): com QPainter, um efeito do KWin forçado a animar tenta criar textura OpenGL e o KWin cai ao desmaximizar uma janela. Sem animação, o efeito do Kubik não carrega. Os testes que dependem de screenshot, de animação ou dos cliques no popup da bandeja (calibrados no Plasma 6.8) usam `needs_pixels`, `needs_effects` e `needs_popup_clicks` e são pulados no Debian; o resto roda lá também (o `release.sh` roda a suíte nas três distros).
 
 `KUBIK_KWINRC="Grupo/Chave=Valor …"` aplica configuração no `kwinrc` antes de o KWin iniciar (ex.: duração do efeito).
 
@@ -52,7 +53,7 @@ O `run.sh` instala o `.kwinscript` gerado pelo `scripts/build.py`, ou seja, o me
 | `KWIN_WAYLAND_NO_PERMISSION_CHECKS=1` | Libera o protocolo de entrada simulada (`org_kde_kwin_fake_input`) para o `fakeinput.py`. |
 | `plasma-breeze` na imagem Fedora | Sem a decoração Breeze, as alças de redimensionar não se estendem para fora da janela, e o arrasto da divisa não pega. O Fedora KDE do usuário tem Breeze. |
 | `plasma-workspace`, `plasma-desktop` e `plasma-sdk` na imagem Arch | O ícone da bandeja roda no `plasmoidviewer` (precisa da contêiner `org.kde.desktopcontainment` do plasma-desktop) e usa módulos QML do plasma-workspace (D-Bus, barra de tarefas). Só o Arch tem isso: o teste da bandeja é pulado no Fedora. |
-| `KWIN_EFFECTS_FORCE_ANIMATIONS=1` | Com renderização por software (llvmpipe), o KWin desativa animações e nenhum efeito em JavaScript carrega. |
+| `KWIN_EFFECTS_FORCE_ANIMATIONS=1` (menos no Debian) | Com renderização por software (llvmpipe), o KWin desativa animações e nenhum efeito em JavaScript carrega. |
 | `KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1` | Libera a API D-Bus `ScreenShot2` para o `screenshot.py`. |
 
 ## Limites

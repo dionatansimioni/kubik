@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, Ppm, kwin_env_available
+from test_kwin_overlay import ROOT, Ppm, kwin_env_available, needs_pixels
 from test_kwin_tiling import parse_windows
 
 
@@ -53,8 +53,12 @@ class KeyboardInKWinTest(unittest.TestCase):
     def test_toggle_floating(self):
         self.assertIn("flutuante 'Alpha': flutuando por escolha (Meta+F)", self.log)
         self.assertEqual(self.w["floating"]["Gamma"], (706, 4, 570, 792))
-        self.assertEqual(self.w["floating"]["Alpha"], (440, 232, 400, 336))  # onde abriu
+        # Onde abriu. A moldura do Breeze muda 1-2 px entre versões do Plasma
+        # (6.3: 402×337 para o mesmo conteúdo), então com folga.
+        for got, want in zip(self.w["floating"]["Alpha"], (440, 232, 400, 336)):
+            self.assertAlmostEqual(got, want, delta=2, msg=self.w["floating"]["Alpha"])
 
+    @needs_pixels
     def test_monocle(self):
         for name in ("Alpha", "Beta", "Gamma"):
             self.assertEqual(self.w["monocle"][name], (4, 4, 1272, 792))

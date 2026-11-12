@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, Ppm, kwin_env_available
+from test_kwin_overlay import ROOT, Ppm, kwin_env_available, needs_pixels
 from test_kwin_tiling import parse_windows
 
 TL, BL = (4, 4, 634, 394), (4, 402, 634, 394)
@@ -51,6 +51,7 @@ class ReorganizeInKWinTest(unittest.TestCase):
         self.assertEqual(self.w["split"], {"Alpha": TL, "Gamma": BL, "Beta": RIGHT})
         self.assertIn("moveu 'Gamma' para baixo de 'Alpha'", self.log)
 
+    @needs_pixels
     def test_preview_shows_final_position_while_dragging(self):
         before = Ppm(self.out / "start.ppm").getpixel((321, 600))
         during = Ppm(self.out / "split_dragging.ppm").getpixel((321, 600))
@@ -62,6 +63,7 @@ class ReorganizeInKWinTest(unittest.TestCase):
     def test_center_drop_swaps(self):
         self.assertEqual(self.w["swapped"], {"Beta": TL, "Gamma": BL, "Alpha": RIGHT})
 
+    @needs_pixels
     def test_swap_shows_ghost_where_the_other_goes(self):
         img = Ppm(self.out / "swap_dragging.ppm")
         main, ghost = img.getpixel((321, 120)), img.getpixel((1200, 600))

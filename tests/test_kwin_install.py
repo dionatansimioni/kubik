@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, kwin_env_available
+from test_kwin_overlay import ROOT, kwin_env_available, needs_effects
 
 
 def run(extra=""):
@@ -41,7 +41,8 @@ class FirstInstallTest(unittest.TestCase):
 
     def test_keyboard_takes_meta_arrows_and_uninstall_gives_them_back(self):
         # Meta+← = 0x11000012; Meta+Alt+← = 0x19000012; Meta+M = 0x1000004D.
-        self.assertIn("=== keys quicktile=[] switchwin=[] focus=[285212690] resize=[419430418] monocle=[268435533]", self.log)
+        # Sem tecla: o KWin 6.8 lista [], o 6.3 (Debian) lista [0].
+        self.assertRegex(self.log, r"=== keys quicktile=\[0?\] switchwin=\[0?\] focus=\[285212690\] resize=\[419430418\] monocle=\[268435533\]")
         self.assertIn("=== active after Meta+Left: Alpha", self.log)
         self.assertIn("=== after uninstall quicktile=[285212690] switchwin=[419430418] backup=no", self.log)
 
@@ -78,6 +79,7 @@ class UpgradeInstallTest(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.out, ignore_errors=True)
 
+    @needs_effects
     def test_effect_reloads_without_relogin(self):
         self.assertIn("=== effect loaded: true", self.log)
         self.assertIn("Pronto: tudo instalado e ativo", self.log)

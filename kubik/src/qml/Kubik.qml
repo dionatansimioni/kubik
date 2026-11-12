@@ -124,6 +124,10 @@ Item {
             property bool shown: false
             readonly property alias content: previewContent
 
+            // O mouse atravessa o overlay. O KWin só lê a flag no 6.7+; até o
+            // 6.6 o hitTest dele lê a propriedade outputOnly (da Plasma::Dialog)
+            // por nome. Garantia: ver DESIGN, Lição 43.
+            property bool outputOnly: true
             flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint
             color: "transparent"
             visible: true
@@ -176,6 +180,10 @@ Item {
             property bool shown: false
             readonly property alias content: borderContent
 
+            // O mouse atravessa o overlay. O KWin só lê a flag no 6.7+; até o
+            // 6.6 o hitTest dele lê a propriedade outputOnly (da Plasma::Dialog)
+            // por nome. Garantia: ver DESIGN, Lição 43.
+            property bool outputOnly: true
             flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint
             color: "transparent"
             visible: true

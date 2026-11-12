@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_kwin_overlay import ROOT, Ppm, kwin_env_available
+from test_kwin_overlay import ROOT, Ppm, kwin_env_available, needs_pixels
 from test_kwin_tiling import LEFT, RIGHT, parse_windows
 
 
@@ -37,6 +37,7 @@ class MouseInKWinTest(unittest.TestCase):
         self.assertEqual(self.w["swapped"], {"Alpha": RIGHT, "Beta": LEFT})
         self.assertIn("trocou 'Alpha' de lugar", self.log)
 
+    @needs_pixels
     def test_preview_shown_over_drop_target_while_dragging(self):
         before = Ppm(self.out / "start.ppm").getpixel((960, 200))
         during = Ppm(self.out / "dragging.ppm").getpixel((960, 200))

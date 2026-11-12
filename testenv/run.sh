@@ -19,10 +19,12 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-# KUBIK_TESTENV=arch (padrão) ou fedora: escolhe a distro do container.
+# KUBIK_TESTENV=arch (padrão), fedora ou debian: escolhe a distro do container.
 case "${KUBIK_TESTENV:-arch}" in
     arch)   IMAGE=kubik-testenv;        CONTEXT="$ROOT/testenv" ;;
     fedora) IMAGE=kubik-testenv-fedora; CONTEXT="$ROOT/testenv/fedora" ;;
+    # Debian 13: Plasma 6.3, o mais antigo suportado.
+    debian) IMAGE=kubik-testenv-debian; CONTEXT="$ROOT/testenv/debian" ;;
     # Para os screenshots do README/site (não para testes): apps reais.
     showcase) docker build -q -t kubik-testenv "$ROOT/testenv" >/dev/null
               IMAGE=kubik-testenv-showcase; CONTEXT="$ROOT/testenv/showcase" ;;
@@ -44,6 +46,12 @@ vgem_node() {
 }
 NODE=$(vgem_node || { modprobe vgem && vgem_node; }) || { echo "erro: módulo vgem indisponível" >&2; exit 1; }
 
+# Com llvmpipe o KWin desliga as animações (e os efeitos em JS não carregam):
+# força. Menos no Debian: com QPainter, um efeito do KWin forçado a animar
+# tenta criar textura OpenGL e o KWin cai (ao desmaximizar uma janela).
+FORCE_ANIMATIONS=1
+[ "${KUBIK_TESTENV:-arch}" = debian ] && FORCE_ANIMATIONS=
+
 # Sempre: com cache é ~1 s, e mudanças no Dockerfile entram sem passo manual.
 docker build -q -t "$IMAGE" "$CONTEXT" >/dev/null
 
@@ -64,7 +72,9 @@ PY
 done
 
 # O KWin acha a GPU pelo sysfs do host (nome real do nó) mas às vezes tenta o
-# primeiro nó (renderD128); expomos o vgem com os dois nomes.
+# primeiro nó (renderD128); expomos o vgem com os dois nomes. O KWin 6.3 do
+# Debian não reconhece o vgem (no kernel 7 ele é um "faux_driver", e a libdrm
+# dele procura um barramento): lá o KWin desenha com QPainter, sem screenshot.
 docker run --rm \
     --device "/dev/dri/$NODE:/dev/dri/$NODE" \
     --device "/dev/dri/$NODE:/dev/dri/renderD128" \
@@ -74,7 +84,7 @@ docker run --rm \
     -e QT_FORCE_STDERR_LOGGING=1 \
     -e QT_QUICK_BACKEND=software \
     -e KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 \
-    -e KWIN_EFFECTS_FORCE_ANIMATIONS=1 \
+    -e KWIN_EFFECTS_FORCE_ANIMATIONS="$FORCE_ANIMATIONS" \
     -e SCENARIO="/work/${SCENARIO#"$ROOT"/}" \
     -e KUBIK_KWINRC="${KUBIK_KWINRC:-}" \
     -e KUBIK_MEM_CYCLES="${KUBIK_MEM_CYCLES:-}" \

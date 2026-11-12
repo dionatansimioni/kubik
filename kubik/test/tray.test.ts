@@ -156,6 +156,15 @@ describe("gerenciador", () => {
     expect(cmd).toMatch(/rm -rf "\$d"; exit \$r$/);
   });
 
+  it("sem curl (Debian padrão), baixa com o wget", () => {
+    const cmd = updateCommand({ version: "0.10.0", url: "https://github.com/a/kubik-0.10.0.tar.gz", page: "" });
+    expect(cmd).toContain("if command -v curl >/dev/null 2>&1; then curl ");
+    expect(cmd).toContain("else wget -q -T 600 -O \"$d/kubik.tar.gz\" 'https://github.com/a/kubik-0.10.0.tar.gz'; fi;");
+    const list = releasesCommand();
+    expect(list).toContain("wget -q -T 20 --header='Accept: application/vnd.github+json' -O - ");
+    expect(list).toMatch(/\|\| true$/);
+  });
+
   it("com o AppImage anexado, atualiza por ele (que também guarda o gerenciador)", () => {
     const r = rel("kubik-v0.12.0");
     r.assets.push({ name: "Kubik-0.12.0-x86_64.AppImage", browser_download_url: "https://github.com/a/Kubik-0.12.0-x86_64.AppImage" });

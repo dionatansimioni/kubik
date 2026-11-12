@@ -2,7 +2,9 @@
 // a geometria real de cada janela normal, com a marca @TAG@.
 for (const w of workspace.stackingOrder) {
     if (!w.normalWindow) continue;
-    if (!w.resourceClass && w.skipSwitcher) continue; // overlay interno (borda, prévia)
+    // Overlay interno (borda, prévia): sem classe e fora do Alt+Tab ou, no
+    // KWin < 6.8, sem aceitar foco (mesma regra do isInternalWindow do Kubik).
+    if (!w.resourceClass && (w.skipSwitcher || w.wantsInput === false)) continue;
     const g = w.frameGeometry;
     console.warn("WINDOW @TAG@ " + JSON.stringify({
         caption: w.caption, x: g.x, y: g.y, width: g.width, height: g.height,

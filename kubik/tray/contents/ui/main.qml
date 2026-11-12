@@ -12,7 +12,6 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasma5support as P5Support
-import org.kde.plasma.workspace.dbus as DBus
 import org.kde.kirigami as Kirigami
 
 import "../code/logic.js" as Logic
@@ -142,15 +141,23 @@ PlasmoidItem {
 
     // Meta+Y liga/desliga direto no script, sem passar por aqui: o atalho
     // aparece no D-Bus do kglobalaccel e a bandeja acompanha (e grava, para o
-    // estado valer depois de reiniciar a sessão).
-    DBus.SignalWatcher {
-        service: "org.kde.kglobalaccel"
-        path: "/component/kwin"
-        iface: "org.kde.kglobalaccel.Component"
+    // estado valer depois de reiniciar a sessão). O DBus.SignalWatcher só
+    // existe no Plasma 6.4+: num arquivo à parte, a falha fica só nele (no
+    // 6.3, um tipo desconhecido aqui derrubava a bandeja inteira).
+    Loader {
+        id: shortcutWatcher
 
-        function dbusglobalShortcutPressed(component, action, timestamp) {
-            // Os argumentos chegam como objetos do D-Bus, não como texto.
-            if (String(action) === root.logic.TOGGLE_SHORTCUT && root.loaded) {
+        source: "ShortcutWatcher.qml"
+        onStatusChanged: {
+            if (status === Loader.Error)
+                root.log("sem DBus.SignalWatcher (Plasma < 6.4): a bandeja não acompanha o Meta+Y");
+        }
+    }
+
+    Connections {
+        target: shortcutWatcher.item
+        function onPressed(action) {
+            if (action === root.logic.TOGGLE_SHORTCUT && root.loaded) {
                 root.cfg.enabled = !root.cfg.enabled;
                 root.log("atalho: tiling " + (root.cfg.enabled ? "ligado" : "desligado"));
             }
