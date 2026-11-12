@@ -4,15 +4,23 @@
 
 **Pop!_Shell-style auto-tiling for KDE Plasma 6** (Wayland and X11), as a KWin script plus a tray icon.
 
-*Português: veja [kubik/README.md](kubik/README.md).*
+**[Website](https://dionatansimioni.github.io/kubik/) · [Download](https://github.com/dionatansimioni/kubik/releases)** · *Português: veja [kubik/README.md](kubik/README.md).*
+
+![Konsole, Dolphin, Kate and a terminal tiled by Kubik on a KDE Plasma desktop](site/images/hero.png)
 
 ## Features
 
 - **Automatic BSP tiling:** each new window splits the largest one. One window fills the screen, two sit side by side, three become a half and two quarters. There is one tree per screen × virtual desktop.
+
+  ![New windows splitting the screen automatically](site/images/tiling.gif)
+
 - **Mouse:**
   - drag a window and drop it on another: the center swaps them, an edge splits there;
   - hold still over a window for ~0.8 s to **stack** them into tabs;
   - drag a border to resize both neighbors.
+
+  ![Dragging a window onto the center of another swaps them; onto an edge splits there](site/images/drag.gif)
+
 - **Keyboard:**
 
   | Keys | Action |
@@ -25,7 +33,12 @@
   | Meta+M | monocle |
   | Meta+Y | turn tiling on/off |
 
+  ![Focus, move, resize, rotate and monocle from the keyboard](site/images/keyboard.gif)
+
 - **Tabs (stacks)** with app icons. Cycle with Meta+Ctrl+Tab.
+
+  ![Holding a window over another stacks them into tabs](site/images/stack.gif)
+
 - **Highlight border** around the focused window, in the system accent color.
 - **Smooth animations** (a companion KWin effect) with configurable duration and curve.
 - **Tray icon:**
@@ -33,6 +46,9 @@
   - exceptions (apps that always float), picked from the open apps;
   - animation settings;
   - update check against GitHub releases (can be turned off).
+
+  <img src="site/images/tray.png" width="380" alt="Kubik settings in the system tray">
+
 - English and Portuguese UI, following the system language.
 
 ## Install
@@ -40,6 +56,9 @@
 Download `Kubik-<version>-x86_64.AppImage` from [Releases](https://github.com/dionatansimioni/kubik/releases), make it executable (right-click › Properties › Permissions) and double-click it. It's about 40 MB: the manager brings its own Qt, so it doesn't depend on the system's Qt or Plasma modules.
 
 It opens the **Kubik manager**, a small window that shows what's installed and offers only what makes sense:
+
+<img src="site/images/manager.png" width="440" alt="The Kubik manager">
+
 
 - **Install** when Kubik isn't there (the AppImage's version, or GitHub's if newer);
 - **Update to X** when the AppImage or GitHub has a newer release;
@@ -66,6 +85,8 @@ python3 -m unittest discover -s tests    # everything, including real KWin
 ```
 
 Design notes and lessons learned (in Portuguese) are in `docs/DESIGN.md`.
+
+The screenshots and GIFs come from a real Plasma session recorded in the test environment: `scripts/showcase.sh`. The website lives in `site/` and is published by `.github/workflows/pages.yml`.
 
 ## License
 

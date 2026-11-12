@@ -2,6 +2,16 @@
 
 Auto-tiling de janelas no estilo Pop!_Shell para o KDE Plasma 6.
 
+**[Site](https://dionatansimioni.github.io/kubik/) · [Baixar](https://github.com/dionatansimioni/kubik/releases)**
+
+![Konsole, Dolphin, Kate e um terminal organizados pelo Kubik num desktop KDE Plasma](../site/images/hero.png)
+
+| Janelas novas se organizam sozinhas | Arrastar: centro troca, borda divide |
+|---|---|
+| ![Janelas novas dividindo a tela](../site/images/tiling.gif) | ![Arrastando janelas para trocar e dividir](../site/images/drag.gif) |
+| **Segurar sobre outra: abas** | **Teclado: foco, mover, redimensionar, girar, monóculo** |
+| ![Empilhando janelas em abas](../site/images/stack.gif) | ![Atalhos de teclado](../site/images/keyboard.gif) |
+
 ## Instalar
 
 Baixe a versão mais recente em **Releases** e escolha uma das formas:
@@ -13,6 +23,8 @@ Baixe a versão mais recente em **Releases** e escolha uma das formas:
 Para remover: **Remover…** no gerenciador, ou `./kubik-<versão>/uninstall.sh`.
 
 ### Gerenciador (o app Kubik)
+
+<img src="../site/images/manager.png" width="440" alt="O gerenciador do Kubik">
 
 Uma janela pequena, que abre pelo AppImage e pela entrada **Kubik** do menu. Mostra a versão instalada e a disponível, e só oferece o que faz sentido no momento:
 
@@ -31,7 +43,7 @@ Uma janela pequena, que abre pelo AppImage e pela entrada **Kubik** do menu. Mos
 
 A bandeja também avisa de versão nova (ao iniciar e a cada 6 h; desliga em *Configurar… › Geral › Atualizações*) e tem o botão **Atualizar**.
 
-## O que já funciona (0.11.0)
+## O que já funciona
 
 - Janelas novas são organizadas em árvore BSP: a janela nova divide ao meio, pelo lado mais longo, a **maior** janela (no empate, a focada). Assim, 1 janela fica cheia, 2 ficam lado a lado, 3 ficam com metade + 2 quadrantes e 4 ficam em quadrantes. Minimizadas liberam o espaço.
 - Janelas **em todos os desktops** entram no tiling do desktop visível e acompanham a troca de desktop. Com o plugin "Virtual desktops only on primary", isso inclui todas as janelas da tela secundária. Dá para desligar isso por tela, na bandeja.

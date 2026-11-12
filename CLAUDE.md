@@ -8,6 +8,7 @@ Auto-tiling no estilo Pop!_Shell para KDE Plasma 6. O design está em `docs/DESI
 - `prototype/overlay/`: protótipo dos overlays (borda e abas), referência para a borda ativa e o stacking.
 - `testenv/`: KWin real headless (Arch e Fedora 44) para os testes de integração.
 - `scripts/`: `build.py` (artefatos), `release.sh` (publica), `node.sh` (Node em container), `install.sh`/`uninstall.sh`.
+- `site/`: o site (GitHub Pages, `.github/workflows/pages.yml`). O botão de download busca o release mais novo na API do GitHub (`site/download.js`). As imagens (`site/images/`, usadas também nos READMEs) saem de `scripts/showcase.sh`: rode de novo quando a interface mudar.
 
 ## Regras de trabalho
 

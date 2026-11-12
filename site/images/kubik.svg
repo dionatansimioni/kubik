@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Kubik ("cubinho"): um cubo em que uma das faces está dividida em dois
+       tiles. Cantos arredondados pelo traço da mesma cor. -->
+  <g stroke-linejoin="round" stroke-width="10">
+    <path d="M128 26 L214 76 L128 126 L42 76 Z" fill="#7fd8f5" stroke="#7fd8f5"/>
+    <path d="M36 94 L120 143 L120 232 L36 183 Z" fill="#3daee9" stroke="#3daee9"/>
+    <path d="M136 141 L220 92 L220 133 L136 182 Z" fill="#1d6fa8" stroke="#1d6fa8"/>
+    <path d="M136 198 L220 149 L220 185 L136 234 Z" fill="#f39c3d" stroke="#f39c3d"/>
+  </g>
+</svg>
