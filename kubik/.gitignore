@@ -4,3 +4,4 @@ package/contents/ui/Kubik.qml
 effect/contents/code/main.js
 tray/contents/code/logic.js
 tray/contents/locale/
+tray/contents/ui/Tray.qml

@@ -193,5 +193,41 @@ class TrayUpdateTest(unittest.TestCase):
         self.assertNotIn("comando falhou", self.log)
 
 
+@unittest.skipUnless(kwin_env_available() and plasma_available(), "testenv com Plasma indisponível")
+class TrayReloadTest(unittest.TestCase):
+    """Atualizar com o plasmashell rodando: a bandeja recriada roda o código novo."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.out = Path(tempfile.mkdtemp(prefix="kubik-tray-reload-"))
+        subprocess.run(
+            [str(ROOT / "testenv" / "run.sh"), "kubik/package", "tests/scenarios/tray-reload.sh", str(cls.out)],
+            cwd=ROOT, check=True, capture_output=True, timeout=400,
+            env=dict(os.environ, KUBIK_EXTRA_PKGS="kubik/effect kubik/tray"),
+        )
+        cls.log = (cls.out / "kwin.log").read_text(errors="replace")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.out, ignore_errors=True)
+
+    def test_runs_in_the_panel(self):
+        before = self.log.partition("=== MARK reinstall")[0]
+        self.assertRegex(before, r"\[kubik-tray\] estado: script (\d+\.\d+\.\d+) \(ativo\)")
+        self.assertIn("[kubik-tray] configuração lida do kwinrc", before)
+
+    def test_recreated_applet_runs_the_new_code(self):
+        after = self.log.partition("=== MARK reinstall")[2]
+        self.assertIn("bandeja 99.0.0", after)
+        self.assertIn("[kubik-tray] CODIGO-NOVO", after)
+
+    def test_no_qml_errors(self):
+        applet = [l for l in self.log.splitlines()
+                  if "io.github.dionatansimioni.kubik" in l and re.search(r"Error|error|is not|undefined", l)
+                  and not (OLD_KWIN and SIGNALWATCHER_63 in l)]
+        self.assertEqual(applet, [])
+        self.assertNotIn("falha ao carregar Tray.qml", self.log)
+
+
 if __name__ == "__main__":
     unittest.main()

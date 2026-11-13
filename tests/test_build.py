@@ -228,6 +228,13 @@ class KubikBuildTest(unittest.TestCase):
             self.assertIn(f"{top}/packages/{tray_id}/contents/code/logic.js", names)
             with zipfile.ZipFile(files[3]) as z:
                 self.assertIn("var KubikTray = ", z.read("contents/code/logic.js").decode())
+                # A casca carrega o código por URL única (cache do plasmashell),
+                # com a lógica embutida (um .js importado também iria ao cache).
+                self.assertIn('Qt.resolvedUrl("Tray.qml") + "?load=" + Date.now()', z.read("contents/ui/main.qml").decode())
+                tray_qml = z.read("contents/ui/Tray.qml").decode()
+                self.assertIn("var KubikTray = ", tray_qml)
+                self.assertNotIn("@@KUBIK_BUNDLE@@", tray_qml)
+                self.assertNotIn("logic.js", tray_qml)
             # A bandeja aparece sozinha na área de notificação ao instalar.
             self.assertTrue(tray["KPlugin"]["EnabledByDefault"])
             self.assertTrue(tray["X-Plasma-NotificationAreaCategory"])
