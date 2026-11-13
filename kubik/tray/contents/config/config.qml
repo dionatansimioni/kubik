@@ -17,4 +17,9 @@ ConfigModel {
         icon: "preferences-desktop-animations"
         source: "ConfigAnimation.qml"
     }
+    ConfigCategory {
+        name: i18n("Tiling Shortcuts")
+        icon: "preferences-desktop-keyboard-shortcut"
+        source: "ConfigShortcuts.qml"
+    }
 }

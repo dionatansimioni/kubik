@@ -308,13 +308,27 @@ class ShortcutTableTest(unittest.TestCase):
         self.assertEqual({n: str(self.qt_key(seq)) for n, seq in bindings}, table)
 
 
+class FixedShortcutsTest(unittest.TestCase):
+    """Os atalhos fixos do Kubik.qml (toggle, abas) batem com FIXED_SHORTCUTS de keys.ts (a página de atalhos usa o padrão de lá)."""
+
+    def test_defaults_match(self):
+        qml = (ROOT / "kubik" / "src" / "qml" / "Kubik.qml").read_text()
+        in_qml = dict(re.findall(r'name: "(Kubik: [^"]+)"\n\s*text: [^\n]*\n\s*sequence: "([^"]*)"', qml))
+        keys = (ROOT / "kubik" / "src" / "kwin" / "keys.ts").read_text()
+        fixed = re.findall(r'\{ name: "(Kubik: [^"]+)", key: "\w+", sequence: "([^"]+)" \}', keys)
+        self.assertEqual(len(fixed), 3)
+        for name, seq in fixed:
+            self.assertEqual(in_qml.get(name), seq, name)
+
+
 class TrayTranslationTest(unittest.TestCase):
     """Todo texto do ícone da bandeja (i18n no QML, rótulos de curva) tem tradução em pt_BR."""
 
     def msgids(self):
         tray = ROOT / "kubik" / "tray"
         ids = set()
-        for f in (tray / "contents").rglob("*.qml"):
+        # O Tray.qml do pacote é gerado do modelo em src/qml.
+        for f in [*(tray / "contents").rglob("*.qml"), ROOT / "kubik" / "src" / "qml" / "Tray.qml"]:
             ids |= set(re.findall(r'i18n\("((?:[^"\\]|\\.)*)"', f.read_text()))
         logic = (ROOT / "kubik" / "src" / "tray" / "logic.ts").read_text()
         ids |= set(re.findall(r'label: "([^"]+)"', logic))

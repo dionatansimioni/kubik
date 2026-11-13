@@ -46,6 +46,11 @@ class FirstInstallTest(unittest.TestCase):
         self.assertIn("=== active after Meta+Left: Alpha", self.log)
         self.assertIn("=== after uninstall quicktile=[285212690] switchwin=[419430418] backup=no", self.log)
 
+    def test_update_keeps_the_users_shortcuts(self):
+        # Atalhos personalizados (CustomShortcuts) e a tecla devolvida ao KDE
+        # sobrevivem a uma atualização; o resto continua com o padrão.
+        self.assertRegex(self.log, r"=== keys after update quicktile=\[285212690\] focus=\[268435528\] monocle=\[0?\] resize=\[419430418\]")
+
     def test_app_icon_and_stored_uninstaller(self):
         # Pelo .tar.gz não há gerenciador (ele é o AppImage), então nem entrada
         # "Kubik" no menu; com o AppImage: test_kwin_appimage/test_kwin_manager.

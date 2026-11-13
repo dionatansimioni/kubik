@@ -22,6 +22,19 @@ open_window Beta 400x300 "#2f6b2f"
 python3 /work/testenv/fakeinput.py key 125 105   # Meta+← de verdade
 sleep 0.5
 kwin_eval 'console.warn("=== active after Meta+Left: " + workspace.activeWindow.caption)'
+# O usuário muda os atalhos (como a página Configurar… › Atalhos de teclado
+# faz): focar à esquerda vai para Meta+H, a tecla Meta+← volta ao quick tile e
+# o monocle fica sem tecla. Uma atualização (install.sh de novo) mantém tudo.
+setsc() {
+    dbus-send --session --print-reply --dest=org.kde.kglobalaccel /kglobalaccel \
+        org.kde.KGlobalAccel.setForeignShortcut "array:string:kwin,$1,KWin,$1" "array:int32:$2" >/dev/null
+}
+setsc 'Kubik: Focus Left' 268435528       # Meta+H
+setsc 'Kubik: Toggle monocle' 0
+setsc 'Window Quick Tile Left' 285212690  # Meta+←
+kwriteconfig6 --file kwinrc --group Script-kubik --key CustomShortcuts 'Kubik: Focus Left,Kubik: Toggle monocle'
+./kubik-*/install.sh >&2
+echo "=== keys after update quicktile=[$(sc 'Window Quick Tile Left')] focus=[$(sc 'Kubik: Focus Left')] monocle=[$(sc 'Kubik: Toggle monocle')] resize=[$(sc 'Kubik: Resize Left')]" >&2
 ./kubik-*/uninstall.sh >&2
 sleep 0.5
 echo "=== after uninstall quicktile=[$(sc 'Window Quick Tile Left')] switchwin=[$(sc 'Switch Window Left')] backup=$(test -f ~/.local/share/kubik/kde-shortcuts.backup && echo yes || echo no)" >&2

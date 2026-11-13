@@ -40,25 +40,30 @@ sc_set() {
     _ga setForeignShortcut "array:string:kwin,$1,KWin,$1" "array:int32:${2:-0}" >/dev/null 2>&1
 }
 
-# Libera as teclas do KDE (guardando as de antes, uma vez) e dá as do kubik.
+# Libera as teclas do KDE (guardando as de antes) e dá as do kubik. Só na
+# primeira instalação (sem backup): numa atualização, o usuário pode ter
+# devolvido uma tecla ao KDE de propósito (Configurar… › Atalhos de teclado).
 # Antes de o script carregar: as ações novas do kubik pegam a tecla padrão.
 sc_free_kde() {
     command -v dbus-send >/dev/null || return 0
     _ga allMainComponents >/dev/null 2>&1 || return 0  # sem sessão do KWin
-    if [ ! -f "$KUBIK_SC_BACKUP" ]; then
-        mkdir -p "$(dirname "$KUBIK_SC_BACKUP")"
-        for a in "${KDE_ACTIONS[@]}"; do printf '%s\t%s\n' "$a" "$(sc_get "$a")"; done > "$KUBIK_SC_BACKUP"
-    fi
+    [ -f "$KUBIK_SC_BACKUP" ] && return 0
+    mkdir -p "$(dirname "$KUBIK_SC_BACKUP")"
+    for a in "${KDE_ACTIONS[@]}"; do printf '%s\t%s\n' "$a" "$(sc_get "$a")"; done > "$KUBIK_SC_BACKUP"
     for a in "${KDE_ACTIONS[@]}"; do sc_set "$a" 0; done
 }
 
 # Depois de o script carregar: ações do kubik sem tecla (ex.: registradas
-# quando a tecla ainda era do KDE) ganham a padrão.
+# quando a tecla ainda era do KDE) ganham a padrão. As que o usuário mudou
+# (CustomShortcuts no kwinrc, gravado pela bandeja) ficam como estão, mesmo
+# sem tecla.
 sc_assign_kubik() {
     command -v dbus-send >/dev/null || return 0
-    local kv name key
+    local kv name key custom
+    custom=",$(kreadconfig6 --file kwinrc --group Script-kubik --key CustomShortcuts 2>/dev/null),"
     for kv in "${KUBIK_KEYS[@]}"; do
         name=${kv%=*}; key=${kv##*=}
+        case "$custom" in *",$name,"*) continue ;; esac
         [ -n "$(sc_get "$name")" ] || sc_set "$name" "$key"
     done
 }

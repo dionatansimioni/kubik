@@ -8,10 +8,12 @@
  * páginas de "Configurar…" editam) e, a cada mudança, grava o kwinrc inteiro
  * e pede ao KWin para reler (writeCommand).
  */
+import { allShortcuts, langOf } from "../kwin/keys";
 import { DEFAULT_FLOATING_CLASSES } from "../kwin/rules";
+import { keyCode, keyText } from "./keycodes";
 import { CURVES, DEFAULT_SETTINGS, LIMITS, type Settings, parseSettings } from "../kwin/settings";
 
-export { CURVES, DEFAULT_FLOATING_CLASSES, DEFAULT_SETTINGS, LIMITS };
+export { CURVES, DEFAULT_FLOATING_CLASSES, DEFAULT_SETTINGS, LIMITS, keyCode, keyText };
 
 export const SCRIPT_GROUP = "Script-kubik";
 export const EFFECT_GROUP = "Effect-kubikanimations";
@@ -362,3 +364,69 @@ export function updateCommand(r: Release): string {
 
 /** Onde o install.sh guarda o gerenciador (Kubik.AppImage) e uma cópia do uninstall.sh. */
 export const DATA_DIR = "${XDG_DATA_HOME:-$HOME/.local/share}/kubik";
+
+// ---- atalhos de teclado (Configurar… › Atalhos de teclado) -----------------
+
+export interface ShortcutRow {
+  /** Nome da ação no kglobalaccel (componente kwin). */
+  name: string;
+  /** Texto no idioma do sistema, sem o "Kubik: " (a página já é do Kubik). */
+  text: string;
+  /** Tecla padrão ("Meta+Y"). */
+  sequence: string;
+}
+
+/** As ações da página, no idioma do locale do Qt ("pt_BR" → português). */
+export function shortcutRows(locale: string): ShortcutRow[] {
+  return allShortcuts(langOf(locale)).map((s) => ({ ...s, text: capitalize(s.text.replace(/^Kubik: /, "")) }));
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Chave no kwinrc ([Script-kubik]) com as ações que o usuário personalizou. */
+export const CUSTOM_SHORTCUTS_KEY = "CustomShortcuts";
+
+const KGA = "dbus-send --session --print-reply --dest=org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel";
+const actionId = (name: string) => `"array:string:kwin,${name},KWin,${name}"`;
+
+/** Lê as teclas atuais: uma linha "nome<TAB>inteiros,separados" por ação. */
+export function shortcutsReadCommand(names: readonly string[]): string {
+  return names
+    .filter(isShortcutName)
+    .map((n) => `echo "${n}\t$(${KGA}.shortcut ${actionId(n)} 2>/dev/null | awk '/int32/ && $2 != 0 {print $2}' | paste -sd, -)"`)
+    .join("; ");
+}
+
+/** Interpreta o shortcutsReadCommand: nome → tecla ("" sem tecla). Vale a primeira tecla. */
+export function parseShortcuts(stdout: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of String(stdout || "").split("\n")) {
+    const i = line.indexOf("\t");
+    if (i <= 0) continue;
+    const first = line.slice(i + 1).split(",")[0].trim();
+    out[line.slice(0, i)] = first ? keyText(Number(first)) : "";
+  }
+  return out;
+}
+
+/**
+ * Grava as teclas mudadas (code 0 = sem tecla) e a lista das ações
+ * personalizadas (o install.sh não mexe nelas numa atualização).
+ */
+export function shortcutsWriteCommand(changes: ReadonlyArray<{ name: string; code: number }>, custom: readonly string[]): string {
+  const sets = changes
+    .filter((c) => isShortcutName(c.name))
+    .map((c) => `${KGA}.setForeignShortcut ${actionId(c.name)} "array:int32:${Math.max(0, Math.floor(c.code)) || 0}" >/dev/null`);
+  const names = custom.filter(isShortcutName);
+  const rc = names.length
+    ? `kwriteconfig6 --file kwinrc --group ${SCRIPT_GROUP} --key ${CUSTOM_SHORTCUTS_KEY} '${names.join(",")}'`
+    : `kwriteconfig6 --file kwinrc --group ${SCRIPT_GROUP} --key ${CUSTOM_SHORTCUTS_KEY} --delete`;
+  return [...sets, rc].join("; ");
+}
+
+/** Só nomes de ações do Kubik vão ao shell (nada de aspas, vírgulas ou $). */
+function isShortcutName(name: string): boolean {
+  return /^Kubik: [A-Za-z ]+$/.test(name);
+}

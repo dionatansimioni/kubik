@@ -4,7 +4,9 @@ import {
   KEYS, RELEASES_URL, compareVersions, inList, installedVersion, isValidName, kwinrcValues, newerRelease,
   openApps, otherExceptions, parseRead, parseStatus, readCommand, releasesCommand, statusCommand, statusText,
   toSettings, toTrayConfig, toggleInList, updateCommand, writeCommand,
+  keyCode, keyText, shortcutRows, shortcutsReadCommand, parseShortcuts, shortcutsWriteCommand,
 } from "../src/tray/logic";
+import { keyBindings } from "../src/kwin/keys";
 
 describe("bandeja: ida e volta pelo kwinrc", () => {
   it("o que a bandeja grava, o script (parseSettings) lê igual", () => {
@@ -203,5 +205,66 @@ describe("gerenciador", () => {
     expect(calls).toHaveLength(3);
     for (const before of statusCommand().split("kpackagetool6").slice(0, -1))
       expect(before.endsWith("LC_ALL=C LANGUAGE= ")).toBe(true);
+  });
+});
+
+describe("atalhos de teclado: texto ↔ inteiro do Qt", () => {
+  it("as teclas do Kubik batem com as do install.sh (scripts/shortcuts.sh)", () => {
+    expect(keyCode("Meta+Left")).toBe(285212690);
+    expect(keyCode("Meta+Shift+Left")).toBe(318767122);
+    expect(keyCode("Meta+Alt+Down")).toBe(419430421);
+    expect(keyCode("Meta+O")).toBe(268435535);
+    expect(keyCode("Meta+Y")).toBe(0x10000000 + 0x59);
+  });
+
+  it("ida e volta no formato portável do Qt (ordem Meta, Ctrl, Alt, Shift)", () => {
+    for (const s of ["Meta+Y", "Meta+Ctrl+Tab", "Meta+Ctrl+Shift+Tab", "Ctrl+Alt+F5", "Meta+Shift+Space", "Meta+1", "Alt+PgDown", "Meta+Num+5", "Meta+/"])
+      expect(keyText(keyCode(s))).toBe(s);
+    expect(keyText(keyCode("shift+meta+left"))).toBe("Meta+Shift+Left");
+    expect(keyText(keyCode("Ctrl++"))).toBe("Ctrl++");
+  });
+
+  it("vazio, desconhecido ou várias teclas: 0 / \"\"", () => {
+    expect(keyCode("")).toBe(0);
+    expect(keyCode("Meta+Foo")).toBe(0);
+    expect(keyCode("Hyper+A")).toBe(0);
+    expect(keyCode("Meta+A, Meta+B")).toBe(0);
+    expect(keyText(0)).toBe("");
+    expect(keyText(0x10000000)).toBe("");
+  });
+});
+
+describe("atalhos de teclado: a página", () => {
+  it("todas as ações, com o padrão, no idioma do sistema", () => {
+    const en = shortcutRows("en_US");
+    expect(en.map((r) => r.name)).toEqual([
+      "Kubik: Toggle tiling",
+      ...keyBindings("en").map((b) => b.name),
+      "Kubik: Next tab",
+      "Kubik: Previous tab",
+    ]);
+    expect(en[0]).toEqual({ name: "Kubik: Toggle tiling", text: "Toggle tiling", sequence: "Meta+Y" });
+    expect(shortcutRows("pt_BR")[0].text).toBe("Liga/desliga o tiling");
+    for (const r of en) expect(keyCode(r.sequence), r.name).not.toBe(0);
+  });
+
+  it("lê do kglobalaccel e interpreta (a primeira tecla vale)", () => {
+    const cmd = shortcutsReadCommand(["Kubik: Toggle tiling", "Kubik: Move Left", "x'; rm -rf ~"]);
+    expect(cmd).toContain(`org.kde.KGlobalAccel.shortcut "array:string:kwin,Kubik: Toggle tiling,KWin,Kubik: Toggle tiling"`);
+    expect(cmd).toContain("Kubik: Move Left");
+    expect(cmd).not.toContain("rm -rf");
+    expect(parseShortcuts("Kubik: Toggle tiling\t268435545,123\nKubik: Move Left\t\n")).toEqual({
+      "Kubik: Toggle tiling": "Meta+Y",
+      "Kubik: Move Left": "",
+    });
+  });
+
+  it("grava as mudadas e a lista das personalizadas", () => {
+    const cmd = shortcutsWriteCommand([{ name: "Kubik: Toggle tiling", code: keyCode("Meta+H") }, { name: "Kubik: Move Up", code: 0 }],
+      ["Kubik: Toggle tiling", "Kubik: Move Up"]);
+    expect(cmd).toContain(`setForeignShortcut "array:string:kwin,Kubik: Toggle tiling,KWin,Kubik: Toggle tiling" "array:int32:${0x10000000 + 0x48}"`);
+    expect(cmd).toContain(`"array:int32:0"`);
+    expect(cmd).toContain("--key CustomShortcuts 'Kubik: Toggle tiling,Kubik: Move Up'");
+    expect(shortcutsWriteCommand([], [])).toContain("--key CustomShortcuts --delete");
   });
 });

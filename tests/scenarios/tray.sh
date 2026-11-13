@@ -71,3 +71,26 @@ click 537 208 0.5   # duração no começo do slider: 0 (sem animação)
 screenshot animation_page
 apply_settings
 echo "=== RC anim AnimDuration=$(rc AnimDuration) AnimCurve=$(rc AnimCurve) EffectDuration=$(kreadconfig6 --file kwinrc --group Effect-kubikanimations --key Duration)" >&2
+
+# Atalhos do tiling: grava Meta+H no "Toggle tiling" (primeira linha), aplica
+# e aperta Meta+H de verdade; depois volta ao padrão pelo botão da linha.
+kga() { dbus-send --session --print-reply --dest=org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel.shortcut "array:string:kwin,$1,KWin,$1" | awk '/int32/ && $2 != 0 {print $2}' | paste -sd, -; }
+show_keys() { echo "=== KEYS $1 toggle=[$(kga 'Kubik: Toggle tiling')] custom=[$(rc CustomShortcuts)]" >&2; }
+mark shortcuts_page
+click 343 380 3
+screenshot shortcuts_page
+show_keys start
+click 750 239 1                                  # grava a tecla do "Toggle tiling"
+python3 /work/testenv/fakeinput.py key 125 35    # Meta+H
+sleep 1.5
+screenshot shortcuts_recorded
+apply_settings
+show_keys changed
+mark shortcut_pressed
+python3 /work/testenv/fakeinput.py key 125 35    # o atalho novo, de verdade
+sleep 1.5
+mark shortcut_reset
+click 840 239 1                                  # voltar ao padrão (Meta+Y)
+screenshot shortcuts_reset
+apply_settings
+show_keys reset

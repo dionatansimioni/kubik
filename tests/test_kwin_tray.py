@@ -105,6 +105,19 @@ class TrayInPlasmaTest(unittest.TestCase):
         self.assertEqual(self.rc["anim"], {"AnimDuration": "0", "AnimCurve": "OutCubic", "EffectDuration": "0"})
         self.assertIn("[kubik-animations] configuração: 0ms", self.log)
 
+    @needs_popup_clicks
+    def test_shortcuts_page_changes_and_resets_a_shortcut(self):
+        keys = dict(re.findall(r"=== KEYS (\w+) (.*)", self.log))
+        # Meta+Y = 0x10000059; Meta+H = 0x10000048.
+        self.assertEqual(keys["start"], "toggle=[268435545] custom=[]")
+        self.assertEqual(keys["changed"], "toggle=[268435528] custom=[Kubik: Toggle tiling]")
+        self.assertEqual(keys["reset"], "toggle=[268435545] custom=[]")
+        self.assertIn("[kubik-tray] atalho gravado: Kubik: Toggle tiling=Meta+H", self.log)
+        # O KWin pega a tecla nova na hora: Meta+H liga/desliga o tiling.
+        pressed = self.log.split("=== MARK shortcut_pressed ===")[1].split("=== MARK shortcut_reset ===")[0]
+        self.assertRegex(pressed, r"\[kubik\] tiling (desligado|ligado)")
+        self.assertIn("[kubik-tray] atalhos lidos: Toggle tiling=Meta+Y, Focus Left=Meta+Left", self.log)
+
     def test_no_qml_errors_in_the_applet(self):
         applet = [l for l in self.log.splitlines()
                   if "io.github.dionatansimioni.kubik" in l and re.search(r"Error|error|is not|undefined|usedbeforedeclared", l)

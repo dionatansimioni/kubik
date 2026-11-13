@@ -63,7 +63,7 @@ A bandeja também avisa de versão nova (ao iniciar e a cada 6 h; desliga em *Co
 - **Abas (pilhas):** as janelas de uma pilha dividem o mesmo tile, abaixo de uma barra de abas com a aba à vista na cor de destaque. A pilha se comporta como uma janela só: divide, troca e redimensiona inteira.
   - Cada aba mostra o ícone e o título do app. Clique numa aba para trazer a janela dela; Alt+Tab ou a barra de tarefas também funcionam.
   - O **×** da aba (ou o clique do meio) tira a janela da pilha e a devolve ao tiling, ao lado da pilha.
-  - **Meta+Ctrl+Tab**: próxima aba; **Meta+Ctrl+Shift+Tab**: anterior. As teclas podem ser trocadas em Configurações do Sistema › Atalhos › KWin.
+  - **Meta+Ctrl+Tab**: próxima aba; **Meta+Ctrl+Shift+Tab**: anterior. As teclas podem ser trocadas no ícone da bandeja, em Configurar… › Atalhos do tiling.
   - Também dá para tirá-la arrastando pela barra de título dela (abaixo da barra de abas) e soltando em outro lugar.
 - **Borda de destaque:** um contorno de 3 px, na cor de destaque do sistema, envolve a janela em foco, seja ela do tiling ou uma janela flutuante comum. Ela nunca persegue a janela: enquanto a janela se move (arrasto com o mouse ou animação de layout), a borda some e é redesenhada com a janela já no lugar. Ao trocar o foco, muda na hora. Não aparece em diálogos, em tela cheia nem em janelas maximizadas.
 - **Animações** (efeito *Kubik: animações*, instalado junto): as janelas deslizam e redimensionam suavemente quando o layout muda. Ficam de fora o arrasto com o mouse, a tela cheia e o maximizar, que têm animação própria do KWin. A velocidade global de animação do Plasma também vale.
@@ -79,7 +79,7 @@ A bandeja também avisa de versão nova (ao iniciar e a cada 6 h; desliga em *Co
   | Meta+F | flutua a janela em foco (volta ao tamanho de antes); de novo, ela volta ao tiling |
   | Meta+M | monocle: todas as janelas da tela ocupam a tela inteira; Meta+←/→ passam por elas |
 
-  Essas teclas são, no KDE, do quick tile, de "mandar para outra tela" e de "trocar de janela por direção". O `install.sh` guarda os atalhos do KDE, libera essas teclas e as dá ao Kubik; o `uninstall.sh` devolve tudo. Dá para trocar qualquer uma em Configurações do Sistema › Atalhos › KWin (as ações começam com "Kubik:").
+  Essas teclas são, no KDE, do quick tile, de "mandar para outra tela" e de "trocar de janela por direção". Na primeira instalação, o `install.sh` guarda os atalhos do KDE, libera essas teclas e as dá ao Kubik; o `uninstall.sh` devolve tudo. Para trocar qualquer tecla, use o ícone da bandeja › Configurar… › **Atalhos do tiling**: cada ação mostra a tecla atual, um botão para voltar ao padrão, e há um "Restaurar todos os padrões". As mesmas ações aparecem em Configurações do Sistema › Atalhos › KWin (começam com "Kubik:"). O que você muda fica como está nas atualizações.
 - **Meta+Y** liga e desliga o tiling. Ao religar, a árvore é reconstruída equilibrada. Ao desligar, as janelas voltam à posição e ao tamanho de antes.
 
 ## Ainda não

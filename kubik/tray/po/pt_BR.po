@@ -150,3 +150,20 @@ msgstr "Atualizar"
 
 
 
+msgid "Tiling Shortcuts"
+msgstr "Atalhos do tiling"
+
+msgid "Global shortcuts for Kubik's actions. They are also in System Settings › Keyboard › Shortcuts › KWin."
+msgstr "Atalhos globais das ações do Kubik. Eles também aparecem em Configurações do Sistema › Teclado › Atalhos › KWin."
+
+msgid "Some keys were not saved because another shortcut already uses them: %1"
+msgstr "Algumas teclas não foram gravadas porque outro atalho já as usa: %1"
+
+msgid "Reset to default (%1)"
+msgstr "Voltar ao padrão (%1)"
+
+msgid "none"
+msgstr "nenhuma"
+
+msgid "Restore all defaults"
+msgstr "Restaurar todos os padrões"

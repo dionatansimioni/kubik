@@ -90,3 +90,16 @@ export function keyBindings(lang: Lang = "en"): KeyBinding[] {
     { name: "Kubik: Toggle monocle", text: t.monocle(), sequence: "Meta+M", action: { kind: "monocle" } },
   ];
 }
+
+/** Os atalhos fixos do Kubik.qml (fora da tabela acima), com a tecla padrão. */
+export const FIXED_SHORTCUTS = [
+  { name: "Kubik: Toggle tiling", key: "toggle", sequence: "Meta+Y" },
+  { name: "Kubik: Next tab", key: "nextTab", sequence: "Meta+Ctrl+Tab" },
+  { name: "Kubik: Previous tab", key: "prevTab", sequence: "Meta+Ctrl+Shift+Tab" },
+] as const;
+
+/** Todos os atalhos que o usuário pode mudar (o "Log state", de diagnóstico, fica de fora). */
+export function allShortcuts(lang: Lang = "en"): Array<{ name: string; text: string; sequence: string }> {
+  const fixed = FIXED_SHORTCUTS.map((f) => ({ name: f.name, text: shortcutText(lang, f.key), sequence: f.sequence }));
+  return [fixed[0], ...keyBindings(lang).map(({ name, text, sequence }) => ({ name, text, sequence })), fixed[1], fixed[2]];
+}
