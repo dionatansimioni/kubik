@@ -15,6 +15,8 @@
 #   sys.sh shortcut-get <ação do KWin>                                → 1,2 (ou vazio)
 #   sys.sh shortcut-set <ação do KWin> <inteiro>[,<inteiro>…]        (0 = sem tecla)
 #   sys.sh fetch <url> <arquivo|-> [<header>]
+#   sys.sh dbus-int <serviço> <caminho> <interface.método> [<texto>…]  → o inteiro devolvido
+#   sys.sh require dbus|shortcuts|fetch    (sai com 127 e a dica se faltar)
 
 has() {
     case " ${KUBIK_SYS_DISABLE:-} " in *" $1 "*) return 1 ;; esac
@@ -52,10 +54,11 @@ hint() {
     esac
 }
 
-# Faltando: missing dbus|fetch (sai com 127).
+# Faltando: missing dbus|shortcuts|fetch (sai com 127).
 missing() {
     case "$1" in
         dbus) echo "kubik-sys: falta um cliente de D-Bus (dbus-send, gdbus ou qdbus6); instale: $(hint dbus)" >&2 ;;
+        shortcuts) echo "kubik-sys: falta dbus-send ou gdbus para os atalhos (o qdbus não serve); instale: $(hint dbus)" >&2 ;;
         fetch) echo "kubik-sys: falta um programa de download (curl ou wget); instale: $(hint fetch)" >&2 ;;
     esac
     exit 127
@@ -130,6 +133,36 @@ cmd_dbus_call() {
     fi
 }
 
+cmd_dbus_int() {
+    [ $# -ge 3 ] || { echo "uso: sys.sh dbus-int <serviço> <caminho> <interface.método> [<texto>…]" >&2; exit 2; }
+    dest=$1 path=$2 method=$3
+    shift 3
+    if has dbus-send; then
+        n=$#
+        for a do set -- "$@" "string:$a"; done
+        shift "$n"
+        dbus-send --session --print-reply --dest="$dest" "$path" "$method" "$@" 2>/dev/null \
+            | sed -n 's/^ *int32 \(-\{0,1\}[0-9][0-9]*\).*/\1/p' | sed -n 1p
+    elif has gdbus; then
+        gdbus call --session --dest "$dest" --object-path "$path" --method "$method" "$@" 2>/dev/null \
+            | sed -n 's/^(\(int32 \)\{0,1\}\(-\{0,1\}[0-9][0-9]*\),)$/\2/p'
+    elif q=$(qdbus_bin); then
+        "$q" "$dest" "$path" "$method" "$@" 2>/dev/null | sed -n 's/^\(-\{0,1\}[0-9][0-9]*\)$/\1/p' | sed -n 1p
+    else
+        missing dbus
+    fi
+}
+
+cmd_require() {
+    t=$(cmd_tools)
+    case "${1:-}" in
+        dbus) case "$t" in *"dbus=none"*) missing dbus ;; esac ;;
+        shortcuts) case "$t" in *"shortcuts=none"*) missing shortcuts ;; esac ;;
+        fetch) case "$t" in *"fetch=none"*) missing fetch ;; esac ;;
+        *) echo "uso: sys.sh require dbus|shortcuts|fetch" >&2; exit 2 ;;
+    esac
+}
+
 cmd_shortcut_get() {
     [ $# -eq 1 ] || { echo "uso: sys.sh shortcut-get <ação>" >&2; exit 2; }
     check_action "$1"
@@ -145,8 +178,7 @@ cmd_shortcut_get() {
         echo
     else
         # O qdbus não manda listas como argumento: não serve para atalhos.
-        qdbus_bin >/dev/null && echo "kubik-sys: o qdbus não lê atalhos; falta dbus-send ou gdbus" >&2
-        missing dbus
+        missing shortcuts
     fi
 }
 
@@ -161,8 +193,7 @@ cmd_shortcut_set() {
         gdbus call --session --dest $KGA_DEST --object-path $KGA_PATH --method $KGA_IFACE.setForeignShortcut \
             "['kwin', '$1', 'KWin', '$1']" "[$2]" >/dev/null
     else
-        qdbus_bin >/dev/null && echo "kubik-sys: o qdbus não grava atalhos; falta dbus-send ou gdbus" >&2
-        missing dbus
+        missing shortcuts
     fi
 }
 
@@ -192,5 +223,7 @@ case "$cmd" in
     shortcut-get) cmd_shortcut_get "$@" ;;
     shortcut-set) cmd_shortcut_set "$@" ;;
     fetch) cmd_fetch "$@" ;;
-    *) echo "uso: sys.sh tools|dbus-bool|dbus-call|shortcut-get|shortcut-set|fetch …" >&2; exit 2 ;;
+    dbus-int) cmd_dbus_int "$@" ;;
+    require) cmd_require "$@" ;;
+    *) echo "uso: sys.sh tools|require|dbus-bool|dbus-call|dbus-int|shortcut-get|shortcut-set|fetch …" >&2; exit 2 ;;
 esac

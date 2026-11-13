@@ -16,10 +16,10 @@ from pathlib import Path
 from test_kwin_overlay import ROOT, kwin_env_available, needs_effects
 
 
-def run(extra=""):
+def run(extra="", scenario="install-bundle.sh"):
     out = Path(tempfile.mkdtemp(prefix="kubik-install-"))
     subprocess.run(
-        [str(ROOT / "testenv" / "run.sh"), "kubik/package", "tests/scenarios/install-bundle.sh", str(out)],
+        [str(ROOT / "testenv" / "run.sh"), "kubik/package", f"tests/scenarios/{scenario}", str(out)],
         cwd=ROOT, check=True, capture_output=True, timeout=300,
         env=dict(os.environ, KUBIK_EXTRA_PKGS=extra),
     )
@@ -90,6 +90,39 @@ class UpgradeInstallTest(unittest.TestCase):
         self.assertIn("Pronto: tudo instalado e ativo", self.log)
         self.assertNotIn("SAIR E ENTRAR", self.log)
         self.assertGreaterEqual(len(re.findall(r"\[kubik-animations\] carregado", self.log)), 2)
+
+
+
+@unittest.skipUnless(kwin_env_available(), "testenv indisponível (docker/vgem)")
+class InstallWithoutDbusSendTest(unittest.TestCase):
+    """install.sh e uninstall.sh sem o dbus-send: seguem pelo gdbus (Arch, Fedora)
+    ou pelo qdbus6 (Debian, sem gdbus), que não grava atalhos e o instalador avisa."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.out, cls.log = run(scenario="install-no-dbus-send.sh")
+        cls.gdbus = "atalhos de teclado não ajustados" not in cls.log
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.out, ignore_errors=True)
+
+    def test_script_is_installed_and_running(self):
+        self.assertIn("=== script loaded: true", self.log)
+        self.assertNotIn("falta um cliente de D-Bus", self.log)
+
+    def test_keyboard_through_gdbus_or_warning_with_qdbus(self):
+        if self.gdbus:
+            self.assertRegex(self.log, r"=== keys quicktile=\[0?\] switchwin=\[0?\] focus=\[285212690\]")
+            self.assertIn("=== active after Meta+Left: Alpha", self.log)
+            self.assertIn("=== after uninstall quicktile=[285212690] switchwin=[419430418] backup=no", self.log)
+        else:
+            self.assertIn("aviso: atalhos de teclado não ajustados", self.log)
+            self.assertIn("instale: sudo apt install dbus-bin", self.log)
+
+    def test_uninstall_stops_the_script(self):
+        self.assertIn("=== script loaded after uninstall: false", self.log)
+        self.assertIn("=== files uninstalled icon=no menu=no uninstaller=no list=[]", self.log)
 
 
 if __name__ == "__main__":

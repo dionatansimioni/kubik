@@ -93,7 +93,7 @@ ApplicationWindow {
                     showTimer.stop();
                     visible = true;
                 });
-            log("estado: instalado " + plan.installed + ", disponível " + plan.available + " (" + plan.source + "), ações " + plan.actions.join(","));
+            log("estado: instalado " + plan.installed + ", disponível " + plan.available + " (" + plan.source + "), ações " + plan.actions.join(",") + (plan.warnings.length ? ", avisos " + plan.warnings.join(",") : ""));
         });
     }
 
@@ -284,6 +284,14 @@ ApplicationWindow {
         Notice {
             visible: root.plan.missing.length > 0
             text: root.t("missing", root.logic.missingText(root.lang, root.plan.missing))
+        }
+        Notice {
+            visible: root.plan.warnings.indexOf("dbus") >= 0
+            text: root.t("warn_dbus", root.plan.hints.dbus || "")
+        }
+        Notice {
+            visible: root.plan.warnings.indexOf("fetch") >= 0
+            text: root.t("warn_fetch", root.plan.hints.fetch || "")
         }
         Notice {
             visible: root.plan.warnings.indexOf("effect") >= 0

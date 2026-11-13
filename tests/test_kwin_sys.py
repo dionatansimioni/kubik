@@ -68,6 +68,15 @@ class SysInKWinTest(unittest.TestCase):
             with self.subTest(backend=backend):
                 self.assertEqual(self.calls[disabled], "after_unload=false after_start=true")
 
+    def test_reconfigure_without_dbus_send_applies_settings(self):
+        # O que a bandeja faz ao gravar (writeCommand): o KWin relê o kwinrc.
+        after = self.log.split("=== MARK reconfigure ===")[1]
+        first = after.split("=== RECONF [dbus-send] done")[0]
+        self.assertIn("gaps 9/", first)
+        if self.backends()["dbus-send gdbus"]:
+            second = after.split("=== RECONF [dbus-send] done")[1].split("=== RECONF [dbus-send gdbus] done")[0]
+            self.assertIn("gaps 7/", second)
+
 
 if __name__ == "__main__":
     unittest.main()

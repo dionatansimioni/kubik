@@ -25,6 +25,7 @@ STUBS = {
             *isScriptLoaded*) printf 'method return time=1 sender=:1.3 -> destination=:1.9 serial=7 reply_serial=2\n   boolean false\n' ;;
             *KGlobalAccel.shortcut*Toggle*) printf 'method return time=1\n   array [\n      int32 268435545\n      int32 268435528\n   ]\n' ;;
             *KGlobalAccel.shortcut*) printf 'method return time=1\n   array [\n      int32 0\n   ]\n' ;;
+            *loadScript*) printf 'method return time=1\n   int32 7\n' ;;
             *) printf 'method return time=1\n' ;;
         esac''',
     "gdbus": r'''
@@ -33,12 +34,14 @@ STUBS = {
             *isScriptLoaded*) echo '(false,)' ;;
             *KGlobalAccel.shortcut*Toggle*) echo '([268435545, 268435528],)' ;;
             *KGlobalAccel.shortcut*) echo '(@ai [],)' ;;
+            *loadScript*) echo '(7,)' ;;
             *) echo '()' ;;
         esac''',
     "qdbus6": r'''
         case "$*" in
             *isScriptLoaded*" kubik") echo true ;;
             *isScriptLoaded*) echo false ;;
+            *loadScript*) echo 7 ;;
         esac''',
     "curl": "echo curl-ok",
     "wget": "echo wget-ok",
@@ -122,6 +125,31 @@ class SysTest(unittest.TestCase):
             "--method org.kde.kwin.Scripting.unloadScript um nome dois",
         ])
 
+    # ---- dbus-int e require ------------------------------------------------------
+
+    def test_dbus_int_same_answer_from_every_backend(self):
+        self.stub("dbus-send", "gdbus", "qdbus6")
+        for disabled in ("", "dbus-send", "dbus-send gdbus"):
+            with self.subTest(disabled=disabled):
+                r = self.sys("dbus-int", "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.loadScript",
+                             "/tmp/a b.js", "nome", env={"KUBIK_SYS_DISABLE": disabled})
+                self.assertEqual(r.stdout, "7\n")
+        self.assertIn("dbus-send --session --print-reply --dest=org.kde.KWin /Scripting "
+                      "org.kde.kwin.Scripting.loadScript string:/tmp/a b.js string:nome", self.calls())
+
+    def test_require(self):
+        self.stub("qdbus6", "wget")
+        env = self.os_release("ID=fedora\n")
+        self.assertEqual(self.sys("require", "dbus", env=env).returncode, 0)
+        self.assertEqual(self.sys("require", "fetch", env=env).returncode, 0)
+        r = self.sys("require", "shortcuts", env=env)
+        self.assertEqual(r.returncode, 127)
+        self.assertIn("falta dbus-send ou gdbus para os atalhos (o qdbus não serve)", r.stderr)
+        self.assertIn("instale: sudo dnf install dbus-tools", r.stderr)
+        r = self.sys("require", "dbus", env={**env, "KUBIK_SYS_DISABLE": "qdbus6"})
+        self.assertEqual(r.returncode, 127)
+        self.assertEqual(self.sys("require", "outra").returncode, 2)
+
     # ---- atalhos ----------------------------------------------------------------
 
     def test_shortcut_get_same_answer_from_dbus_send_and_gdbus(self):
@@ -152,7 +180,8 @@ class SysTest(unittest.TestCase):
         self.stub("qdbus6")
         r = self.sys("shortcut-get", "Kubik: Toggle tiling")
         self.assertEqual(r.returncode, 127)
-        self.assertIn("o qdbus não lê atalhos", r.stderr)
+        self.assertIn("falta dbus-send ou gdbus para os atalhos (o qdbus não serve)", r.stderr)
+        self.assertNotIn("falta um cliente de D-Bus", r.stderr)
 
     def test_bad_names_and_keys_never_reach_the_shell(self):
         self.stub("dbus-send")

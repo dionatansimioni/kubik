@@ -115,3 +115,12 @@ sleep 1
 screenshot removed
 files removed
 close_manager
+
+# Sem nenhum cliente de D-Bus nem de download (sys.sh, Lição 48): o
+# gerenciador avisa o que instalar, já antes de instalar.
+mark no_tools
+KUBIK_SYS_DISABLE="dbus-send gdbus qdbus6 qdbus-qt6 qdbus curl wget wget2" "$AI" >&2 &
+wait_opened 3
+sleep 2
+screenshot no_tools
+close_manager

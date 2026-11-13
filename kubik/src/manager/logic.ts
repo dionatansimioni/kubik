@@ -39,7 +39,9 @@ export interface Plan {
   /** Ações, na ordem dos botões (a principal por último, à direita). */
   actions: Action[];
   /** Avisos de estado. */
-  warnings: Array<"effect" | "script">;
+  /** dbus/fetch: programa faltando no sistema (sys.sh); o comando que instala fica em hints. */
+  warnings: Array<"effect" | "script" | "dbus" | "fetch">;
+  hints: { dbus: string | null; fetch: string | null };
   /** Componentes que faltam numa instalação incompleta. */
   missing: Array<"script" | "effect" | "tray">;
 }
@@ -60,18 +62,22 @@ export function plan(status: Status | null, bundled: string | null, release: Rel
   const missing: Plan["missing"] = [];
   const warnings: Plan["warnings"] = [];
   const actions: Action[] = [];
+  const tools = status?.missing ?? { dbus: null, fetch: null };
+  // Sem cliente de D-Bus, o estado "carregado" não vale: avisa o que instalar.
+  if (tools.dbus) warnings.push("dbus");
+  if (tools.fetch) warnings.push("fetch");
   if (!installed) {
     if (available) actions.push("install");
   } else {
     for (const k of ["script", "effect", "tray"] as const) if (status && !status[k]) missing.push(k);
-    if (status?.script && !status.scriptLoaded) warnings.push("script");
-    if (status?.effect && !status.effectLoaded) warnings.push("effect");
+    if (!tools.dbus && status?.script && !status.scriptLoaded) warnings.push("script");
+    if (!tools.dbus && status?.effect && !status.effectLoaded) warnings.push("effect");
     if (status?.tray) actions.push("settings");
     actions.push("remove");
     if (available && compareVersions(available, installed) > 0) actions.push("update");
     else if (missing.length && available) actions.push("repair");
   }
-  return { installed, available, source, actions, warnings, missing };
+  return { installed, available, source, actions, warnings, missing, hints: { dbus: tools.dbus, fetch: tools.fetch } };
 }
 
 /** Aspas simples de shell. */
@@ -117,6 +123,14 @@ const TEXTS = {
   warn_script: [
     "The tiling script is not running. Turn it on in System Settings › Window Management › KWin Scripts.",
     "O script de tiling não está rodando. Ative em Configurações do Sistema › Gerenciamento de janelas › Scripts do KWin.",
+  ],
+  warn_dbus: [
+    "Kubik can't talk to KWin: a D-Bus tool is missing. Install it with: %1",
+    "O Kubik não consegue falar com o KWin: falta um programa de D-Bus. Instale com: %1",
+  ],
+  warn_fetch: [
+    "Can't check GitHub for new versions: a download tool is missing. Install it with: %1",
+    "Não dá para procurar versões novas no GitHub: falta um programa de download. Instale com: %1",
   ],
   act_install: ["Install %1", "Instalar %1"],
   act_update: ["Update to %1", "Atualizar para %1"],

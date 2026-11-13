@@ -31,8 +31,8 @@ while read -r TYPE ID; do
     [ "$TYPE" = Plasma/Applet ] || kwriteconfig6 --file kwinrc --group Plugins --key "${ID}Enabled" false || true
     # Para na hora (sem isso o script seguia rodando até o próximo login).
     case "$TYPE" in
-        KWin/Script) dbus-send --session --print-reply --dest=org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "string:$ID" >/dev/null 2>&1 || true ;;
-        KWin/Effect) dbus-send --session --print-reply --dest=org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect "string:$ID" >/dev/null 2>&1 || true ;;
+        KWin/Script) sh ./sys.sh dbus-call org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "$ID" >/dev/null 2>&1 || true ;;
+        KWin/Effect) sh ./sys.sh dbus-call org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect "$ID" >/dev/null 2>&1 || true ;;
     esac
     kpackagetool6 --type="$TYPE" --remove "$ID" || true
     echo "$ID removido."
@@ -40,6 +40,7 @@ done < <(packages)
 
 rm -f "$DATA/icons/hicolor/scalable/apps/$APP_ID.svg" "$DATA/applications/$APP_ID.desktop"
 command -v kbuildsycoca6 >/dev/null && { kbuildsycoca6 >/dev/null 2>&1 || true; }
+# Antes do rm: rodando da cópia guardada, o sys.sh está em $DATA/kubik.
+sh ./sys.sh dbus-call org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true
 rm -rf "$DATA/kubik" "$DATA/plasma/plasmoids/$APP_ID.manager"
-dbus-send --session --print-reply --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true
 echo "Kubik removido."

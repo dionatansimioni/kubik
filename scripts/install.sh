@@ -8,7 +8,9 @@ cd "$(dirname "$0")"
 need() { command -v "$1" >/dev/null 2>&1 || { echo "erro: '$1' não encontrado (Plasma 6 instalado?)" >&2; exit 1; }; }
 need kpackagetool6
 need kwriteconfig6
-need dbus-send
+# O cliente de D-Bus muda de distro para distro (dbus-send, gdbus, qdbus6): o
+# sys.sh escolhe e, sem nenhum, diz o que instalar (Lição 48).
+sh ./sys.sh require dbus || exit 1
 
 NEEDS_RELOGIN=""
 TRAY_ID=""
@@ -17,7 +19,7 @@ DATA=${XDG_DATA_HOME:-$HOME/.local/share}
 APP_ID=io.github.dionatansimioni.kubik
 
 meta() { sed -n "s/.*\"$2\": *\"\([^\"]*\)\".*/\1/p" "$1/metadata.json" | head -n1; }
-kwin() { dbus-send --session --print-reply --dest=org.kde.KWin "$@" >/dev/null 2>&1; }
+kwin() { sh ./sys.sh dbus-call org.kde.KWin "$@" >/dev/null 2>&1; }
 # shellcheck source=shortcuts.sh
 source ./shortcuts.sh
 
@@ -46,14 +48,13 @@ for PKG in ./packages/*/; do
 
     # Recarrega para pegar a versão nova.
     case "$TYPE" in
-        KWin/Script) kwin /Scripting org.kde.kwin.Scripting.unloadScript "string:$ID" || true ;;
+        KWin/Script) kwin /Scripting org.kde.kwin.Scripting.unloadScript "$ID" || true ;;
         KWin/Effect)
-            kwin /Effects org.kde.kwin.Effects.unloadEffect "string:$ID" || true
-            kwin /Effects org.kde.kwin.Effects.loadEffect "string:$ID" || true
+            kwin /Effects org.kde.kwin.Effects.unloadEffect "$ID" || true
+            kwin /Effects org.kde.kwin.Effects.loadEffect "$ID" || true
             # O KWin só descobre efeitos NOVOS ao iniciar a sessão: na primeira
             # instalação, o loadEffect falha até o próximo login.
-            if ! dbus-send --session --print-reply --dest=org.kde.KWin /Effects \
-                    org.kde.kwin.Effects.isEffectLoaded "string:$ID" 2>/dev/null | grep -q "boolean true"; then
+            if [ "$(sh ./sys.sh dbus-bool org.kde.KWin /Effects org.kde.kwin.Effects.isEffectLoaded "$ID" 2>/dev/null)" != true ]; then
                 NEEDS_RELOGIN="$NEEDS_RELOGIN $ID"
             fi ;;
     esac
@@ -64,6 +65,7 @@ done
 mkdir -p "$DATA/kubik"
 install -m755 ./uninstall.sh "$DATA/kubik/uninstall.sh"
 install -m644 ./shortcuts.sh "$DATA/kubik/shortcuts.sh"
+install -m755 ./sys.sh "$DATA/kubik/sys.sh"
 printf '%s' "$INSTALLED" > "$DATA/kubik/installed.list"
 # O gerenciador é o próprio AppImage (um app Qt, com o Qt dentro): instalando
 # por ele (KUBIK_APPIMAGE, que o AppRun passa), ele se guarda aqui e a entrada

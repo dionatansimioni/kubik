@@ -64,9 +64,12 @@ class TilingInKWinTest(unittest.TestCase):
         self.assertNotIn("FORA DO TILE", diag)
         self.assertRegex(diag, r'JANELA \{"caption":"Alpha","cls":"org.qt-project.qml"')
         report = open(f"{self.out}/diag.txt", encoding="utf-8").read()
-        for section in ("sistema", "pacotes do kubik", "estado do kubik", "janelas no KWin"):
+        for section in ("sistema", "programas (sys.sh)", "pacotes do kubik", "estado do kubik", "janelas no KWin"):
             self.assertIn(f"===== {section} =====", report)
         self.assertRegex(report, r"KWin/Script kubik versão=\d+\.\d+\.\d+ ativado=true")
+        # O que a distro tem (Lição 48): toda imagem do testenv tem o dbus-send.
+        self.assertIn("dbus=dbus-send", report)
+        self.assertRegex(report, r"fetch=(curl|wget|wget2|none)")
 
     def test_single_window_fills_screen_minus_gaps(self):
         self.assertEqual(self.w["one"], {"Alpha": FULL})

@@ -46,17 +46,19 @@ describe("comandos", () => {
   });
 
   it("writeCommand grava script e efeito e avisa o KWin (os dois reconfigures)", () => {
-    const cmd = writeCommand({ ...DEFAULT_SETTINGS, animation: { duration: 400, curve: "Linear" } });
+    const cmd = writeCommand({ ...DEFAULT_SETTINGS, animation: { duration: 400, curve: "Linear" } }, SYS);
     expect(cmd).toContain("--group Script-kubik --key GapsInner '4'");
     expect(cmd).toContain("--group Effect-kubikanimations --key Duration '400'");
     expect(cmd).toContain("--group Effect-kubikanimations --key Curve 'Linear'");
-    expect(cmd).toContain("/KWin org.kde.KWin.reconfigure");
-    expect(cmd).toContain("org.kde.kwin.Effects.reconfigureEffect string:kubikanimations");
+    // O aviso ao KWin vai pelo sys.sh (o cliente de D-Bus que a distro tiver).
+    expect(cmd).toContain(`sh '${SYS}' dbus-call org.kde.KWin /KWin org.kde.KWin.reconfigure`);
+    expect(cmd).toContain(`sh '${SYS}' dbus-call org.kde.KWin /Effects org.kde.kwin.Effects.reconfigureEffect kubikanimations`);
+    expect(cmd).not.toContain("dbus-send");
   });
 
   it("nomes estranhos nunca chegam ao shell", () => {
     const evil = { ...DEFAULT_SETTINGS, exceptions: ["steam", "x'; rm -rf ~; '", "$(reboot)", "com espaço"] };
-    const cmd = writeCommand(evil);
+    const cmd = writeCommand(evil, SYS);
     expect(cmd).toContain("--key Exceptions 'steam'");
     expect(cmd).not.toContain("rm -rf");
     expect(cmd).not.toContain("reboot");

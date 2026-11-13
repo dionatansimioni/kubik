@@ -28,7 +28,7 @@ installed_version() {
     [ -n "$p" ] && meta_version "${p%/}"
 }
 loaded() {  # loaded /Scripting org.kde.kwin.Scripting.isScriptLoaded kubik
-    dbus-send --session --print-reply --dest=org.kde.KWin "$1" "$2" "string:$3" 2>/dev/null | grep -q 'boolean true'
+    [ "$(sh "$BUNDLE/sys.sh" dbus-bool org.kde.KWin "$1" "$2" "$3" 2>/dev/null)" = true ]
 }
 newer() { [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" = "$1" ] && [ "$1" != "$2" ]; }
 

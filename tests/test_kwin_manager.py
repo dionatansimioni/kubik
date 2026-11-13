@@ -35,7 +35,8 @@ class ManagerWindowTest(unittest.TestCase):
         )
         cls.log = (cls.out / "kwin.log").read_text(errors="replace")
         cls.appimage = cls.log.split("=== MARK appimage ===")[1].split("=== MARK menu ===")[0]
-        cls.menu = cls.log.split("=== MARK menu ===")[1]
+        cls.menu = cls.log.split("=== MARK menu ===")[1].split("=== MARK no_tools ===")[0]
+        cls.no_tools = cls.log.split("=== MARK no_tools ===")[1]
 
     @classmethod
     def tearDownClass(cls):
@@ -120,6 +121,10 @@ class ManagerWindowTest(unittest.TestCase):
         bad = [l for l in self.log.splitlines()
                if "qrc:/Main.qml" in l or ("kubik-manager" in l and re.search(r"Error|undefined|is not", l))]
         self.assertEqual(bad, [])
+    def test_missing_tools_are_reported_before_installing(self):
+        # Sem cliente de D-Bus nem de download: os dois avisos, com o comando da distro.
+        self.assertRegex(self.no_tools, r"\[kubik-manager\] estado: instalado null, .*avisos dbus,fetch")
+
 
 if __name__ == "__main__":
     unittest.main()

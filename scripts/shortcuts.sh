@@ -6,7 +6,8 @@
 # outra tela" e de "trocar de janela por direção": o install.sh guarda o que
 # estava lá (KUBIK_SC_BACKUP), libera e dá as teclas ao kubik; o
 # uninstall.sh devolve. A tabela do kubik tem que bater com
-# kubik/src/kwin/keys.ts (tests/test_build.py confere).
+# kubik/src/kwin/keys.ts (tests/test_build.py confere). O D-Bus vai pelo
+# sys.sh (dbus-send ou gdbus, o que a distro tiver).
 
 KUBIK_SC_BACKUP="${XDG_DATA_HOME:-$HOME/.local/share}/kubik/kde-shortcuts.backup"
 
@@ -26,18 +27,28 @@ KUBIK_KEYS=(
     "Kubik: Rotate split=268435535" "Kubik: Toggle floating=268435526" "Kubik: Toggle monocle=268435533"
 )
 
-_ga() {
-    dbus-send --session --print-reply --dest=org.kde.kglobalaccel /kglobalaccel "org.kde.KGlobalAccel.$1" "${@:2}"
-}
+# Pelo sys.sh (cliente de D-Bus da distro; Lição 48). O install.sh e o
+# uninstall.sh rodam na pasta dele (cd), que tem o sys.sh ao lado.
+KUBIK_SYS=${KUBIK_SYS:-./sys.sh}
+_sys() { sh "$KUBIK_SYS" "$@"; }
 
 # Teclas atuais de uma ação do KWin, separadas por vírgula ("" se nenhuma).
 sc_get() {
-    _ga shortcut "array:string:kwin,$1,KWin,$1" 2>/dev/null | awk '/int32/ && $2 != 0 {print $2}' | paste -sd, -
+    _sys shortcut-get "$1" 2>/dev/null
 }
 
 # Define as teclas (lista de inteiros separada por vírgula; "0" = nenhuma).
 sc_set() {
-    _ga setForeignShortcut "array:string:kwin,$1,KWin,$1" "array:int32:${2:-0}" >/dev/null 2>&1
+    _sys shortcut-set "$1" "${2:-0}" >/dev/null 2>&1
+}
+
+# Dá para ler e gravar atalhos? Sem dbus-send nem gdbus, avisa (uma vez) e não.
+sc_available() {
+    _sys dbus-call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel.allMainComponents >/dev/null 2>&1 || return 1  # sem sessão
+    if ! _sys require shortcuts 2>/dev/null; then
+        echo "aviso: atalhos de teclado não ajustados: $(_sys require shortcuts 2>&1 | sed 's/^kubik-sys: //' | tail -n1)" >&2
+        return 1
+    fi
 }
 
 # Libera as teclas do KDE (guardando as de antes) e dá as do kubik. Só na
@@ -45,8 +56,7 @@ sc_set() {
 # devolvido uma tecla ao KDE de propósito (Configurar… › Atalhos de teclado).
 # Antes de o script carregar: as ações novas do kubik pegam a tecla padrão.
 sc_free_kde() {
-    command -v dbus-send >/dev/null || return 0
-    _ga allMainComponents >/dev/null 2>&1 || return 0  # sem sessão do KWin
+    sc_available || return 0
     [ -f "$KUBIK_SC_BACKUP" ] && return 0
     mkdir -p "$(dirname "$KUBIK_SC_BACKUP")"
     for a in "${KDE_ACTIONS[@]}"; do printf '%s\t%s\n' "$a" "$(sc_get "$a")"; done > "$KUBIK_SC_BACKUP"
@@ -58,7 +68,7 @@ sc_free_kde() {
 # (CustomShortcuts no kwinrc, gravado pela bandeja) ficam como estão, mesmo
 # sem tecla.
 sc_assign_kubik() {
-    command -v dbus-send >/dev/null || return 0
+    sc_available 2>/dev/null || return 0
     local kv name key custom
     custom=",$(kreadconfig6 --file kwinrc --group Script-kubik --key CustomShortcuts 2>/dev/null),"
     for kv in "${KUBIK_KEYS[@]}"; do
@@ -70,11 +80,11 @@ sc_assign_kubik() {
 
 # Desinstalar: tira as teclas do kubik e devolve as do KDE.
 sc_restore_kde() {
-    command -v dbus-send >/dev/null || return 0
+    sc_available || return 0
     local kv a keys
     for kv in "${KUBIK_KEYS[@]}"; do
         sc_set "${kv%=*}" 0
-        _ga unregister string:kwin "string:${kv%=*}" >/dev/null 2>&1 || true
+        _sys dbus-call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel.unregister kwin "${kv%=*}" >/dev/null 2>&1 || true
     done
     [ -f "$KUBIK_SC_BACKUP" ] || return 0
     while IFS=$'\t' read -r a keys; do

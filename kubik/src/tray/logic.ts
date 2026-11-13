@@ -142,15 +142,14 @@ export function kwinrcValues(s: Settings): Record<(typeof KEYS)[number], string>
  * Grava tudo no kwinrc e avisa o KWin: o reconfigure faz o script reler
  * (Options.configChanged); o efeito só relê com o reconfigureEffect dele.
  */
-export function writeCommand(s: Settings): string {
+export function writeCommand(s: Settings, sysPath: SysPath): string {
   const v = kwinrcValues(s);
   const kw = (group: string, key: string, value: string) =>
     `kwriteconfig6 --file kwinrc --group ${group} --key ${key} ${q(value)}`;
   const cmds = KEYS.map((k) => kw(SCRIPT_GROUP, k, v[k]));
   cmds.push(kw(EFFECT_GROUP, "Duration", v.AnimDuration), kw(EFFECT_GROUP, "Curve", v.AnimCurve));
-  const dbus = "dbus-send --session --print-reply --dest=org.kde.KWin";
-  cmds.push(`${dbus} /KWin org.kde.KWin.reconfigure >/dev/null`);
-  cmds.push(`${dbus} /Effects org.kde.kwin.Effects.reconfigureEffect string:${EFFECT_ID} >/dev/null`);
+  cmds.push(`${sys(sysPath, "dbus-call", "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure")} >/dev/null`);
+  cmds.push(`${sys(sysPath, "dbus-call", "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.reconfigureEffect", EFFECT_ID)} >/dev/null`);
   return cmds.join(" && ");
 }
 

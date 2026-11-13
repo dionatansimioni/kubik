@@ -26,3 +26,14 @@ for d in "" "dbus-send" "dbus-send gdbus"; do
     b=$(sh $S dbus-bool org.kde.KWin /Scripting org.kde.kwin.Scripting.isScriptLoaded kubik 2>/dev/null)
     echo "=== CALL [$d] after_unload=$a after_start=$b" >&2
 done
+
+# Gravar a configuração e mandar o KWin reler (o que a bandeja faz) sem o
+# dbus-send: o Kubik aplica os gaps novos.
+mark reconfigure
+kwriteconfig6 --file kwinrc --group Script-kubik --key GapsInner 9
+for d in "dbus-send" "dbus-send gdbus"; do
+    KUBIK_SYS_DISABLE="$d" sh $S dbus-call org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null
+    sleep 1
+    echo "=== RECONF [$d] done" >&2
+    kwriteconfig6 --file kwinrc --group Script-kubik --key GapsInner 7
+done

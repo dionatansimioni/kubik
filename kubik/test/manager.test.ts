@@ -11,6 +11,27 @@ const full = (v: string, loaded = true): Status => ({
 const none: Status = { script: null, effect: null, tray: null, scriptLoaded: false, effectLoaded: false, missing: NOTHING_MISSING };
 const rel = (v: string) => ({ version: v, url: `https://github.com/x/kubik-${v}.tar.gz`, page: "" });
 
+describe("gerenciador: programas faltando (sys.sh)", () => {
+  const without = (s: Status, m: Partial<Status["missing"]>): Status => ({ ...s, missing: { ...NOTHING_MISSING, ...m } });
+
+  it("sem cliente de D-Bus: avisa com o comando, e não diz \"script parado\"", () => {
+    const p = plan(without(full("0.13.0", false), { dbus: "sudo dnf install dbus-tools" }), null, null);
+    expect(p.warnings).toEqual(["dbus"]);
+    expect(p.hints.dbus).toBe("sudo dnf install dbus-tools");
+    expect(tr("pt", "warn_dbus", p.hints.dbus!)).toContain("Instale com: sudo dnf install dbus-tools");
+  });
+
+  it("antes de instalar (pelo sys.sh do pacote do AppImage) já avisa", () => {
+    expect(plan(without(none, { dbus: "sudo apt install dbus-bin" }), "0.13.0", null).warnings).toEqual(["dbus"]);
+  });
+
+  it("sem download: avisa que não dá para procurar versões no GitHub", () => {
+    const p = plan(without(full("0.13.0"), { fetch: "sudo apt install wget" }), null, null);
+    expect(p.warnings).toEqual(["fetch"]);
+    expect(tr("en", "warn_fetch", p.hints.fetch!)).toContain("Install it with: sudo apt install wget");
+  });
+});
+
 describe("gerenciador: o que oferecer", () => {
   it("nada instalado, aberto pelo AppImage: instalar a versão que veio junto", () => {
     expect(plan(none, "0.11.0", null)).toMatchObject({ installed: null, available: "0.11.0", source: "bundle", actions: ["install"] });

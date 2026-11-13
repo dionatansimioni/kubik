@@ -12,7 +12,11 @@ set -uo pipefail
 OUT=${1:-kubik-diagnostico-$(date +%Y%m%d-%H%M%S).txt}
 STAMP="kubik-diag-$$-$(date +%s)"
 START=$(date '+%Y-%m-%d %H:%M:%S')
-kwin() { dbus-send --session --print-reply --dest=org.kde.KWin "$@"; }
+# O cliente de D-Bus da distro (Lição 48): o sys.sh ao lado (no .tar.gz e na
+# cópia guardada) ou o da bandeja instalada.
+SYS=$(dirname "$0")/sys.sh
+[ -f "$SYS" ] || SYS=${XDG_DATA_HOME:-$HOME/.local/share}/plasma/plasmoids/io.github.dionatansimioni.kubik/contents/code/sys.sh
+sys() { sh "$SYS" "$@"; }
 
 section() { printf '\n===== %s =====\n' "$1"; }
 
@@ -27,6 +31,9 @@ section() { printf '\n===== %s =====\n' "$1"; }
     section "telas"
     kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -E 'Output|Geometry|Scale|enabled|disabled'
 
+    section "programas (sys.sh)"
+    if [ -f "$SYS" ]; then sys tools; else echo "sys.sh não encontrado ($SYS)"; fi
+
     section "pacotes do kubik"
     for t in KWin/Script KWin/Effect; do
         LC_ALL=C kpackagetool6 --type="$t" --list 2>/dev/null | grep -i kubik | while read -r id; do
@@ -38,17 +45,22 @@ section() { printf '\n===== %s =====\n' "$1"; }
         done
     done
     printf 'efeito kubikanimations carregado: '
-    kwin /Effects org.kde.kwin.Effects.isEffectLoaded string:kubikanimations 2>/dev/null | awk '/boolean/ {print $2}'
+    sys dbus-bool org.kde.KWin /Effects org.kde.kwin.Effects.isEffectLoaded kubikanimations 2>&1
     echo "efeitos ativos:"
-    kwin /Effects org.freedesktop.DBus.Properties.Get string:org.kde.kwin.Effects string:activeEffects 2>/dev/null \
-        | grep -o '"[^"]*"' | tr '\n' ' '; echo
+    # Propriedade (Get com dois textos): pelo dbus-send, se houver.
+    if command -v dbus-send >/dev/null 2>&1; then
+        dbus-send --session --print-reply --dest=org.kde.KWin /Effects org.freedesktop.DBus.Properties.Get \
+            string:org.kde.kwin.Effects string:activeEffects 2>/dev/null | grep -o '"[^"]*"' | tr '\n' ' '; echo
+    else
+        sys dbus-call org.kde.KWin /Effects org.freedesktop.DBus.Properties.Get org.kde.kwin.Effects activeEffects >/dev/null 2>&1 \
+            && echo "(lista só com o dbus-send)" || echo "(indisponível)"
+    fi
     echo "scripts (Plugins no kwinrc):"
     sed -n '/^\[Plugins\]/,/^\[/p' "${XDG_CONFIG_HOME:-$HOME/.config}/kwinrc" 2>/dev/null | grep -i -E 'Enabled' | head -40
 } > "$OUT" 2>&1
 
 # Estado do kubik e lista de janelas: vão para o journal, marcados com $STAMP.
-dbus-send --session --print-reply --dest=org.kde.kglobalaccel /component/kwin \
-    org.kde.kglobalaccel.Component.invokeShortcut "string:Kubik: Log state" >/dev/null 2>&1
+sys dbus-call org.kde.kglobalaccel /component/kwin org.kde.kglobalaccel.Component.invokeShortcut "Kubik: Log state" >/dev/null 2>&1
 JS=$(mktemp --suffix=.js)
 cat > "$JS" <<JSEOF
 const tag = "$STAMP";
@@ -70,11 +82,11 @@ for (const w of workspace.stackingOrder) {
     }));
 }
 JSEOF
-id=$(kwin /Scripting org.kde.kwin.Scripting.loadScript "string:$JS" "string:$STAMP" 2>/dev/null | awk '/int32/ {print $2}')
+id=$(sys dbus-int org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$JS" "$STAMP" 2>/dev/null)
 if [ -n "$id" ]; then
-    kwin "/Scripting/Script$id" org.kde.kwin.Script.run >/dev/null 2>&1
+    sys dbus-call org.kde.KWin "/Scripting/Script$id" org.kde.kwin.Script.run >/dev/null 2>&1
     sleep 1
-    kwin /Scripting org.kde.kwin.Scripting.unloadScript "string:$STAMP" >/dev/null 2>&1
+    sys dbus-call org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "$STAMP" >/dev/null 2>&1
 fi
 rm -f "$JS"
 sleep 1

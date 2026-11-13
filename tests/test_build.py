@@ -276,13 +276,22 @@ class ShellScriptsTest(unittest.TestCase):
                 if "kpackagetool6" in code and "Path" in code:
                     self.assertRegex(line, r"LC_ALL=C [^|]*kpackagetool6", f"{f}: {line.strip()}")
 
-    def test_scripts_do_not_require_qdbus(self):
-        # qdbus6 não existe em várias distros (ex.: Plasma 6.8 do usuário); use dbus-send.
-        for name in ("install.sh", "uninstall.sh", "diagnose.sh"):
+    def test_scripts_call_dbus_only_through_sys_sh(self):
+        # O cliente de D-Bus muda de distro para distro (Lição 48): os scripts
+        # chamam o sys.sh, nunca dbus-send/gdbus/qdbus direto. Exceção: o
+        # diagnose.sh lê uma propriedade pelo dbus-send, depois de conferir
+        # que ele existe (command -v).
+        direct = re.compile(r"(?<![\w-])(dbus-send|gdbus|qdbus6?|qdbus-qt6)(\s|$)")
+        for name in ("install.sh", "uninstall.sh", "shortcuts.sh", "diagnose.sh", "appimage/AppRun"):
             with self.subTest(script=name):
                 src = (ROOT / "scripts" / name).read_text(encoding="utf-8")
-                self.assertNotIn("qdbus", src)
-                self.assertIn("dbus-send", src)
+                code = [l for l in src.splitlines() if not l.lstrip().startswith("#")]
+                calls = [l.strip() for l in code if direct.search(l) and "command -v dbus-send" not in l]
+                if name == "diagnose.sh":
+                    self.assertIn("if command -v dbus-send >/dev/null 2>&1; then", src)
+                    calls = [l for l in calls if not l.startswith("dbus-send --session --print-reply --dest=org.kde.KWin /Effects")]
+                self.assertEqual(calls, [])
+                self.assertIn("sys.sh", src)
 
 
 class ShortcutTableTest(unittest.TestCase):

@@ -86,7 +86,7 @@ Item {
         console.warn("[kubik-tray] " + msg);
     }
 
-    // ---- comandos (kreadconfig6 / kwriteconfig6 / dbus-send) ------------------
+    // ---- comandos (kreadconfig6 / kwriteconfig6 / sys.sh) ---------------------
 
     P5Support.DataSource {
         id: exec
@@ -125,7 +125,7 @@ Item {
         exec.run(logic.readCommand(), (code, stdout) => {
             const settings = logic.parseRead(stdout);
             const c = logic.toTrayConfig(settings);
-            lastWritten = logic.writeCommand(settings);
+            lastWritten = logic.writeCommand(settings, sysPath);
             syncing = true;
             for (const k in c)
                 cfg[k] = c[k];
@@ -142,7 +142,7 @@ Item {
 
         interval: 250
         onTriggered: {
-            const cmd = root.logic.writeCommand(root.logic.toSettings(root.trayConfig()));
+            const cmd = root.logic.writeCommand(root.logic.toSettings(root.trayConfig()), root.sysPath);
             if (cmd === root.lastWritten)
                 return;
             root.lastWritten = cmd;
