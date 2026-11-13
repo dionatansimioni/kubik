@@ -35,6 +35,14 @@ def parse(log):
     return [(m.group(1), int(m.group(2))) for m in re.finditer(r"=== MEM (\w+) rss=(\d+)", log)]
 
 
+def growth_per_cycle(on, off):
+    """Mediana, por ciclo, do crescimento de (com − sem) entre medidas vizinhas dos ciclos."""
+    diff = [(int(p[5:]), a - b) for (p, a), (_, b) in zip(on, off) if p.startswith("cycle")]
+    steps = sorted((d2 - d1) / (c2 - c1) for (c1, d1), (c2, d2) in zip(diff, diff[1:]))
+    n = len(steps)
+    return (steps[n // 2] + steps[(n - 1) // 2]) / 2
+
+
 def run(out, kwinrc=""):
     subprocess.run(
         [str(ROOT / "testenv" / "run.sh"), "kubik/package", "tests/scenarios/memory.sh", out],
@@ -77,12 +85,12 @@ class MemoryTest(unittest.TestCase):
 
     @classmethod
     def extra_growth_kb(cls):
-        """Quanto a diferença com/sem cresce por ciclo: mediana das 3 primeiras
-        medidas depois do aquecimento (ciclos 4, 8, 12) contra a das 3 últimas.
-        A mediana ignora picos soltos do KWin (um ciclo com +9 MB que volta)."""
-        diff = [a - b for (_, a), (_, b) in zip(cls.on, cls.off)]
-        first, last = sorted(diff[1:4])[1], sorted(diff[-3:])[1]
-        return (last - first) / (CYCLES - 8)
+        """Quanto a diferença com/sem cresce por ciclo: a MEDIANA do crescimento
+        entre medidas vizinhas (a cada 4 ciclos, depois do aquecimento). Um
+        vazamento cresce em todo intervalo; um degrau solto do KWin (+9 MB de
+        uma vez, que às vezes fica até o fim) cai num intervalo só e é ignorado.
+        A versão anterior comparava o começo com o fim e reprovava o degrau."""
+        return growth_per_cycle(cls.on, cls.off)
 
     def test_both_runs_measured(self):
         self.assertIn("=== KUBIK loaded=1", self.log_on)
@@ -118,6 +126,25 @@ class MemoryTest(unittest.TestCase):
 
     def test_footprint_is_small(self):
         self.assertLess(self.footprint_kb() / 1024, MAX_FOOTPRINT_MB, f"com: {self.on}\nsem: {self.off}")
+
+
+
+class GrowthCalcTest(unittest.TestCase):
+    """O cálculo do crescimento, com as medidas reais que já apareceram."""
+
+    OFF = [("start", 225540), ("cycle4", 229288), ("cycle8", 229552), ("cycle12", 229392), ("cycle16", 229520),
+           ("cycle20", 229776), ("cycle24", 229724), ("cycle28", 229800), ("end", 229800)]
+
+    def test_a_single_step_is_not_a_leak(self):
+        # Fedora, release da 0.12.4: estável até o ciclo 24, +9 MB no 28, até o fim.
+        on = [("start", 234364), ("cycle4", 241732), ("cycle8", 242088), ("cycle12", 242012), ("cycle16", 241584),
+              ("cycle20", 241936), ("cycle24", 242428), ("cycle28", 251548), ("end", 251548)]
+        self.assertLess(growth_per_cycle(on, self.OFF), MAX_GROWTH_KB_PER_CYCLE)
+
+    def test_a_steady_leak_is_caught(self):
+        # 300 kB a mais por ciclo, todo ciclo.
+        on = [(p, kb + 12000 + (int(p[5:]) * 300 if p.startswith("cycle") else 0)) for p, kb in self.OFF]
+        self.assertGreater(growth_per_cycle(on, self.OFF), MAX_GROWTH_KB_PER_CYCLE)
 
 
 if __name__ == "__main__":
