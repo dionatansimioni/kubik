@@ -35,6 +35,7 @@ PlasmoidItem {
     readonly property bool windowed: Plasmoid.formFactor === PlasmaCore.Types.Planar
     property var status: null       // logic.Status
     property var update: null       // logic.Release mais novo que o instalado
+    property string lastStatusLine: ""
     // "", "updating", "updated", "failed"
     property string managerState: ""
     property string updatedTo: ""
@@ -78,23 +79,27 @@ PlasmoidItem {
         property var quiet: ({})
 
         // quiet: falha esperada (sem rede, etc.), não vai ao log como erro.
+        // O mesmo comando de novo enquanto o primeiro roda (ex.: reler o estado
+        // ao abrir o popup) não roda outra vez: o callback entra na fila dele.
         function run(cmd, cb, isQuiet) {
-            callbacks[cmd] = cb;
+            const pending = callbacks[cmd];
+            callbacks[cmd] = (pending || []).concat(cb ? [cb] : []);
             quiet[cmd] = !!isQuiet;
-            connectSource(cmd);
+            if (!pending)
+                connectSource(cmd);
         }
 
         engine: "executable"
         connectedSources: []
         onNewData: (source, data) => {
-            const cb = callbacks[source];
+            const cbs = callbacks[source] || [];
             const isQuiet = quiet[source];
             delete callbacks[source];
             delete quiet[source];
             disconnectSource(source);
             if (data["exit code"] !== 0 && !isQuiet)
                 root.log("comando falhou (" + data["exit code"] + "): " + data.stderr);
-            if (cb)
+            for (const cb of cbs)
                 cb(data["exit code"], data.stdout);
         }
     }
@@ -171,7 +176,10 @@ PlasmoidItem {
     function refreshStatus(then) {
         exec.run(logic.statusCommand(), (code, stdout) => {
             status = logic.parseStatus(stdout);
-            log("estado: script " + status.script + (status.scriptLoaded ? " (ativo)" : " (parado)") + ", efeito " + status.effect + (status.effectLoaded ? " (ativo)" : " (parado)") + ", bandeja " + status.tray);
+            const line = "estado: script " + status.script + (status.scriptLoaded ? " (ativo)" : " (parado)") + ", efeito " + status.effect + (status.effectLoaded ? " (ativo)" : " (parado)") + ", bandeja " + status.tray;
+            if (line !== lastStatusLine)
+                log(line);
+            lastStatusLine = line;
             if (then)
                 then();
         });
@@ -209,6 +217,22 @@ PlasmoidItem {
                 }
             });
         });
+    }
+
+    // O estado é uma foto: lido no meio de uma instalação (o install.sh
+    // descarrega o script antes de carregar o novo, e o Plasma recarrega a
+    // bandeja nesse meio-tempo), ficava "parado" para sempre. Relê ao abrir o
+    // popup e, enquanto o script estiver instalado mas parado, a cada 5 s.
+    onExpandedChanged: () => {
+        if (root.expanded && managerState !== "updating")
+            refreshStatus();
+    }
+
+    Timer {
+        interval: 5000
+        repeat: true
+        running: !!root.status && !!root.status.script && !root.status.scriptLoaded && root.managerState !== "updating"
+        onTriggered: root.refreshStatus()
     }
 
     // Na janela (o usuário abriu o gerenciador) sempre verifica; na bandeja,

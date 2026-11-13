@@ -169,6 +169,14 @@ class TrayUpdateTest(unittest.TestCase):
         if not OLD_KWIN:  # no Debian, o clique em "Atualizar" erra o botão (needs_popup_clicks)
             self.assertNotIn("TIMEOUT", self.log)
 
+    def test_notices_when_the_script_comes_back(self):
+        # O estado lido com o script fora do ar (meio de uma instalação) não
+        # fica preso: a bandeja reconfere e passa a "ativo" sem reabrir.
+        before, _, after = self.log.partition("=== MARK script_back")
+        self.assertRegex(before, r"\[kubik-tray\] estado: script \d+\.\d+\.\d+ \(parado\)")
+        self.assertRegex(after.split("=== MARK update")[0],
+                         r"\[kubik-tray\] estado: script \d+\.\d+\.\d+ \(ativo\)")
+
     @needs_popup_clicks
     def test_update_button_installs_the_new_release(self):
         self.assertIn("[kubik-tray] atualizado para 99.0.0", self.log)

@@ -12,8 +12,18 @@ placed() {
         grep -q "PLACED-$i" /out/kwin.log && break
     done
 }
+# A bandeja abre com o script descarregado, como no meio de uma instalação
+# (o install.sh descarrega antes de carregar a versão nova): ela vê "parado" e,
+# quando o script volta, tem que perceber sozinha.
+dbus-send --session --print-reply --dest=org.kde.KWin /Scripting \
+    org.kde.kwin.Scripting.unloadScript string:kubik >/dev/null
 plasmoidviewer -a io.github.dionatansimioni.kubik -f planar -s 420x560 >&2 2>&1 &
 placed Plasmoidviewer
+wait_log "(parado), efeito"
+mark script_back
+dbus-send --session --print-reply --dest=org.kde.KWin /Scripting \
+    org.kde.kwin.Scripting.start >/dev/null
+wait_log "(ativo), efeito"
 wait_log "[kubik-tray] nova versão: 99.0.0"
 sleep 2
 screenshot manager
