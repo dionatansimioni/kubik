@@ -243,7 +243,7 @@ class KubikBuildTest(unittest.TestCase):
 class ShellScriptsTest(unittest.TestCase):
     SCRIPTS = [ROOT / "scripts" / n for n in ("install.sh", "uninstall.sh", "release.sh", "diagnose.sh", "shortcuts.sh",
                                               "appimage.sh", "appimage/AppRun", "manager-app.sh",
-                                              "manager-app/collect.sh")]
+                                              "manager-app/collect.sh", "sys.sh")]
 
     def test_bash_syntax(self):
         for s in self.SCRIPTS:
