@@ -27,6 +27,11 @@ Item {
     property var shell: null
     readonly property var logic: loadLogic()
     readonly property var cfg: Plasmoid.configuration
+    // scripts/sys.sh, que vem dentro do pacote: escolhe o cliente de D-Bus e o
+    // de download que a distro tiver (docs/DESIGN.md, Lição 48).
+    readonly property string sysPath: decodeURIComponent(Qt.resolvedUrl("../code/sys.sh").toString().replace(/^file:\/\//, ""))
+    // O que falta no sistema (logic.Status.missing), com o comando que instala.
+    readonly property var missing: status ? status.missing : ({})
     // Até ler o kwinrc, nada é gravado (senão os padrões da bandeja apagariam
     // o que o usuário já tinha).
     property bool loaded: false
@@ -186,9 +191,12 @@ Item {
     }
 
     function refreshStatus(then) {
-        exec.run(logic.statusCommand(), (code, stdout) => {
+        exec.run(logic.statusCommand(sysPath), (code, stdout) => {
             status = logic.parseStatus(stdout);
-            const line = "estado: script " + status.script + (status.scriptLoaded ? " (ativo)" : " (parado)") + ", efeito " + status.effect + (status.effectLoaded ? " (ativo)" : " (parado)") + ", bandeja " + status.tray;
+            let line = "estado: script " + status.script + (status.scriptLoaded ? " (ativo)" : " (parado)") + ", efeito " + status.effect + (status.effectLoaded ? " (ativo)" : " (parado)") + ", bandeja " + status.tray;
+            const m = status.missing;
+            if (m.dbus || m.shortcuts || m.fetch)
+                line += "; falta: " + [m.dbus ? "D-Bus (" + m.dbus + ")" : "", m.shortcuts && !m.dbus ? "atalhos (" + m.shortcuts + ")" : "", m.fetch ? "download (" + m.fetch + ")" : ""].filter(x => x).join(", ");
             if (line !== lastStatusLine)
                 log(line);
             lastStatusLine = line;
@@ -200,7 +208,7 @@ Item {
     function checkUpdates() {
         if (managerState === "updating")
             return;
-        exec.run(logic.releasesCommand(), (code, stdout) => {
+        exec.run(logic.releasesCommand(sysPath), (code, stdout) => {
             const current = logic.installedVersion(status);
             update = logic.newerRelease(stdout, current);
             if (update)
@@ -216,7 +224,7 @@ Item {
         const target = update.version;
         managerState = "updating";
         log("atualizando para " + target);
-        exec.run(logic.updateCommand(update), (code, stdout) => {
+        exec.run(logic.updateCommand(update, sysPath), (code, stdout) => {
             refreshStatus(() => {
                 if (code === 0 && logic.installedVersion(status) === target) {
                     managerState = "updated";
@@ -246,7 +254,7 @@ Item {
     Timer {
         interval: 5000
         repeat: true
-        running: !!root.status && !!root.status.script && !root.status.scriptLoaded && root.managerState !== "updating"
+        running: !!root.status && !root.missing.dbus && !!root.status.script && !root.status.scriptLoaded && root.managerState !== "updating"
         onTriggered: root.refreshStatus()
     }
 
@@ -443,19 +451,33 @@ Item {
                     Layout.topMargin: Kirigami.Units.smallSpacing
                 }
 
-                // Avisos do estado (componente parado).
+                // Avisos do estado: programa faltando no sistema, componente parado.
+                Kirigami.InlineMessage {
+                    objectName: "dbusMissing"
+                    Layout.fillWidth: true
+                    type: Kirigami.MessageType.Error
+                    visible: !!root.missing.dbus
+                    text: i18n("Kubik can't talk to KWin: a D-Bus tool is missing. Install it with: %1", root.missing.dbus || "")
+                }
+                Kirigami.InlineMessage {
+                    objectName: "fetchMissing"
+                    Layout.fillWidth: true
+                    type: Kirigami.MessageType.Information
+                    visible: !!root.missing.fetch && (root.windowed || root.cfg.checkUpdates)
+                    text: i18n("Can't check for new versions: a download tool is missing. Install it with: %1", root.missing.fetch || "")
+                }
                 Kirigami.InlineMessage {
                     objectName: "effectWarning"
                     Layout.fillWidth: true
                     type: Kirigami.MessageType.Warning
-                    visible: !!root.status && !!root.status.effect && !root.status.effectLoaded
+                    visible: !!root.status && !root.missing.dbus && !!root.status.effect && !root.status.effectLoaded
                     text: i18n("Animations start after you log out and back in.")
                 }
                 Kirigami.InlineMessage {
                     objectName: "scriptWarning"
                     Layout.fillWidth: true
                     type: Kirigami.MessageType.Warning
-                    visible: !!root.status && !!root.status.script && !root.status.scriptLoaded
+                    visible: !!root.status && !root.missing.dbus && !!root.status.script && !root.status.scriptLoaded
                     text: i18n("The tiling script is not running. Turn it on in System Settings › Window Management › KWin Scripts.")
                 }
 

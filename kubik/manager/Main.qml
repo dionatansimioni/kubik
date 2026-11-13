@@ -86,7 +86,7 @@ ApplicationWindow {
     }
 
     function refresh() {
-        exec(logic.statusCommand(), (code, stdout) => {
+        exec(logic.statusCommand(logic.sysPath(bundleDir)), (code, stdout) => {
             status = logic.parseStatus(stdout);
             if (!visible)
                 Qt.callLater(() => {
@@ -98,7 +98,7 @@ ApplicationWindow {
     }
 
     function checkReleases() {
-        exec(logic.releasesCommand(), (code, stdout) => {
+        exec(logic.releasesCommand(logic.sysPath(bundleDir)), (code, stdout) => {
             release = logic.newerRelease(stdout, null);
             checked = true;
             log("GitHub: " + (release ? release.version : "nada"));

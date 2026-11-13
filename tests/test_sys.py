@@ -184,6 +184,7 @@ class SysTest(unittest.TestCase):
             'ID=arch\n': "sudo pacman -S dbus",
             'ID=endeavouros\nID_LIKE=arch\n': "sudo pacman -S dbus",
             'ID=opensuse-tumbleweed\nID_LIKE="opensuse suse"\n': "sudo zypper install dbus-1-tools",
+            'ID=gentoo\n': "dbus-send",
         }
         for release, hint in cases.items():
             with self.subTest(release=release):
@@ -191,6 +192,18 @@ class SysTest(unittest.TestCase):
                 self.assertEqual(r.returncode, 127)
                 self.assertIn("kubik-sys: falta um cliente de D-Bus", r.stderr)
                 self.assertIn("instale: " + hint, r.stderr)
+
+    def test_tools_gives_the_hint_for_what_is_missing(self):
+        self.stub("qdbus6")  # chamadas simples sim, atalhos não; sem download
+        out = self.sys("tools", env=self.os_release("ID=fedora\n")).stdout
+        self.assertIn("dbus=qdbus6", out)
+        self.assertIn("shortcuts=none", out)
+        self.assertIn("dbus_hint=sudo dnf install dbus-tools", out)
+        self.assertIn("fetch=none", out)
+        self.assertIn("fetch_hint=sudo dnf install curl", out)
+        self.stub("dbus-send", "curl")
+        out = self.sys("tools").stdout
+        self.assertNotIn("_hint=", out)
 
     def test_missing_downloader_says_what_to_install(self):
         r = self.sys("fetch", "https://x", "-", env=self.os_release("ID=debian\n"))

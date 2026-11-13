@@ -242,5 +242,51 @@ class TrayReloadTest(unittest.TestCase):
         self.assertNotIn("falha ao carregar Tray.qml", self.log)
 
 
+@unittest.skipUnless(kwin_env_available() and plasma_available(), "testenv com Plasma indisponível")
+class TrayMissingToolsTest(unittest.TestCase):
+    """Programas faltando (sys.sh): a bandeja segue pelo próximo cliente ou avisa o que instalar."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.out = Path(tempfile.mkdtemp(prefix="kubik-tray-tools-"))
+        subprocess.run(
+            [str(ROOT / "testenv" / "run.sh"), "kubik/package", "tests/scenarios/tray-tools.sh", str(cls.out)],
+            cwd=ROOT, check=True, capture_output=True, timeout=400,
+            env=dict(os.environ, KUBIK_EXTRA_PKGS="kubik/effect kubik/tray",
+                     KUBIK_KWINRC="Script-kubik/Exceptions=org.kde.plasmoidviewer,plasmoidviewer"),
+        )
+        cls.log = (cls.out / "kwin.log").read_text(errors="replace")
+        part = lambda a, b: cls.log.split(f"=== MARK {a} ===")[1].split(f"=== MARK {b} ===")[0]
+        cls.no_dbus_send, cls.nothing = part("no_dbus_send", "nothing"), part("nothing", "done")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.out, ignore_errors=True)
+
+    def test_without_dbus_send_uses_the_next_client(self):
+        # Arch: gdbus; Debian (sem gdbus): qdbus6. O estado sai igual.
+        self.assertRegex(self.no_dbus_send, r"\[kubik-tray\] estado: script (\d+\.\d+\.\d+) \(ativo\), efeito \1 \((ativo|parado)\), bandeja \1")
+        self.assertNotIn("falta: D-Bus", self.no_dbus_send)
+
+    def test_without_any_client_says_what_to_install(self):
+        hint = "sudo apt install dbus-bin" if OLD_KWIN else "sudo pacman -S dbus"
+        self.assertIn(f"falta: D-Bus ({hint})", self.nothing)
+        self.assertIn("download (", self.nothing)
+
+    @needs_pixels
+    def test_warning_is_shown_instead_of_script_stopped(self):
+        # O aviso de erro (vermelho) aparece no popup; o "script parado" não.
+        img = Ppm(self.out / "nothing.ppm")
+        reds = sum(1 for y in range(40, 600, 4) for x in range(820, 1240, 4)
+                   if (lambda p: p[0] > 180 and p[1] < 110 and p[2] < 110)(img.getpixel((x, y))))
+        self.assertGreater(reds, 10)
+
+    def test_no_qml_errors(self):
+        applet = [l for l in self.log.splitlines()
+                  if "io.github.dionatansimioni.kubik" in l and re.search(r"Error|error|is not|undefined", l)
+                  and not (OLD_KWIN and SIGNALWATCHER_63 in l)]
+        self.assertEqual(applet, [])
+
+
 if __name__ == "__main__":
     unittest.main()

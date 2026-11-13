@@ -219,44 +219,84 @@ export interface Status {
   tray: string | null;
   scriptLoaded: boolean;
   effectLoaded: boolean;
+  /**
+   * O que falta no sistema (scripts/sys.sh tools), com o comando que instala:
+   * dbus = nenhum cliente de D-Bus (sem ele, o estado acima não vale);
+   * shortcuts = nenhum que grave atalhos (o qdbus não serve);
+   * fetch = nenhum programa de download (sem procurar versões novas).
+   */
+  missing: { dbus: string | null; shortcuts: string | null; fetch: string | null };
+}
+
+/**
+ * Onde está o scripts/sys.sh: um caminho (citado aqui) ou uma expressão de
+ * shell pronta ({ shell }), como a do pacote da bandeja instalado.
+ */
+export type SysPath = string | { shell: string };
+
+/** O sys.sh da bandeja instalada (o gerenciador usa quando não tem pacote junto). */
+export const INSTALLED_SYS: SysPath = {
+  shell: `"\${XDG_DATA_HOME:-$HOME/.local/share}/plasma/plasmoids/io.github.dionatansimioni.kubik/contents/code/sys.sh"`,
+};
+
+/** Chama o sys.sh com `sh`, sem depender do bit de execução. */
+function sys(sysPath: SysPath, ...args: string[]): string {
+  return ["sh", typeof sysPath === "string" ? q(sysPath) : sysPath.shell, ...args].join(" ");
 }
 
 /**
  * Comando que imprime "chave=valor" do estado: a versão de cada componente
  * (do metadata.json no Path que o kpackagetool6 mostra; LC_ALL=C porque em
- * pt-BR o rótulo vira "Caminho") e se o script e o
- * efeito estão carregados no KWin agora.
+ * pt-BR o rótulo vira "Caminho"), o que o sys.sh achou no sistema e se o
+ * script e o efeito estão carregados no KWin agora.
  */
-export function statusCommand(): string {
+export function statusCommand(sysPath: SysPath): string {
   const version = COMPONENTS.map(
     (c) =>
       `p=$(LC_ALL=C LANGUAGE= kpackagetool6 --type=${c.type} --show ${c.id} 2>/dev/null | sed -n 's/^ *Path *: *//p'); ` +
       `v=""; [ -n "$p" ] && v=$(sed -n 's/.*"Version": *"\\([^"]*\\)".*/\\1/p' "\${p%/}/metadata.json" 2>/dev/null | head -n1); ` +
       `echo "${c.key}=$v"`,
   );
-  const dbus = "dbus-send --session --print-reply --dest=org.kde.KWin";
   const loaded = (key: string, path: string, method: string, id: string) =>
-    `echo "${key}=$(${dbus} ${path} ${method} string:${id} 2>/dev/null | grep -c 'boolean true')"`;
+    `echo "${key}=$(${sys(sysPath, "dbus-bool", "org.kde.KWin", path, method, id)} 2>/dev/null)"`;
   return [
     ...version,
+    `${sys(sysPath, "tools")} 2>/dev/null`,
     loaded("scriptLoaded", "/Scripting", "org.kde.kwin.Scripting.isScriptLoaded", "kubik"),
     loaded("effectLoaded", "/Effects", "org.kde.kwin.Effects.isEffectLoaded", EFFECT_ID),
   ].join("; ");
 }
 
-export function parseStatus(stdout: string): Status {
+function keyValues(stdout: string): Record<string, string> {
   const v: Record<string, string> = {};
   for (const line of String(stdout || "").split("\n")) {
     const i = line.indexOf("=");
-    if (i > 0) v[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+    if (i > 0 && !line.includes("\t")) v[line.slice(0, i).trim()] = line.slice(i + 1).trim();
   }
+  return v;
+}
+
+/** O que falta, pela saída do `sys.sh tools` (as outras linhas são ignoradas). */
+export function parseMissing(stdout: string): Status["missing"] {
+  const v = keyValues(stdout);
+  const dbusHint = v.dbus_hint || "dbus-send";
+  return {
+    dbus: v.dbus === "none" ? dbusHint : null,
+    shortcuts: v.shortcuts === "none" ? dbusHint : null,
+    fetch: v.fetch === "none" ? v.fetch_hint || "curl" : null,
+  };
+}
+
+export function parseStatus(stdout: string): Status {
+  const v = keyValues(stdout);
   const ver = (k: string) => (isVersion(v[k] ?? "") ? v[k] : null);
   return {
     script: ver("script"),
     effect: ver("effect"),
     tray: ver("tray"),
-    scriptLoaded: v.scriptLoaded === "1",
-    effectLoaded: v.effectLoaded === "1",
+    scriptLoaded: v.scriptLoaded === "true",
+    effectLoaded: v.effectLoaded === "true",
+    missing: parseMissing(stdout),
   };
 }
 
@@ -284,20 +324,8 @@ export function compareVersions(a: string, b: string): number {
  * Lista os releases do GitHub. KUBIK_RELEASES_URL troca o endereço (o
  * testenv aponta para um servidor local). Sem rede: saída vazia, sem erro.
  */
-export function releasesCommand(): string {
-  return `${download(`"\${KUBIK_RELEASES_URL:-${RELEASES_URL}}"`, "-", 20, "Accept: application/vnd.github+json")} 2>/dev/null || true`;
-}
-
-/**
- * Baixa `url` (já citado para o shell) para `out` ("-" = saída padrão) com o
- * curl ou, sem ele, com o wget: o Debian não instala o curl por padrão, só o
- * wget. Os dois falham (saída ≠ 0) com erro HTTP.
- */
-function download(url: string, out: string, seconds: number, header?: string): string {
-  const o = out === "-" ? "-" : `"${out}"`;
-  const curl = `curl -fsSL --max-time ${seconds}${header ? ` -H '${header}'` : ""} -o ${o} ${url}`;
-  const wget = `wget -q -T ${seconds}${header ? ` --header='${header}'` : ""} -O ${o} ${url}`;
-  return `{ if command -v curl >/dev/null 2>&1; then ${curl}; else ${wget}; fi; }`;
+export function releasesCommand(sysPath: SysPath): string {
+  return `KUBIK_FETCH_TIMEOUT=20 ${sys(sysPath, "fetch", `"\${KUBIK_RELEASES_URL:-${RELEASES_URL}}"`, "-", q("Accept: application/vnd.github+json"))} 2>/dev/null || true`;
 }
 
 export interface Release {
@@ -346,17 +374,17 @@ export function newerRelease(json: string, current: string | null): Release | nu
 }
 
 /** Baixa o .tar.gz do release e roda o install.sh dele (o mesmo da instalação manual). */
-export function updateCommand(r: Release): string {
+export function updateCommand(r: Release, sysPath: SysPath): string {
   if (!isSafeUrl(r.url) || !isVersion(r.version)) throw new Error(`release inválido: ${r.version} ${r.url}`);
   // Com o AppImage, ele mesmo instala (e guarda a si próprio como o gerenciador).
   if (r.appimage && isSafeUrl(r.appimage))
     return (
-      `d=$(mktemp -d) && ${download(q(r.appimage), "$d/Kubik.AppImage", 600)} && ` +
+      `d=$(mktemp -d) && ${sys(sysPath, "fetch", q(r.appimage), '"$d/Kubik.AppImage"')} && ` +
       `chmod +x "$d/Kubik.AppImage" && "$d/Kubik.AppImage" --install --yes; ` +
       `r=$?; rm -rf "$d"; exit $r`
     );
   return (
-    `d=$(mktemp -d) && ${download(q(r.url), "$d/kubik.tar.gz", 600)} && ` +
+    `d=$(mktemp -d) && ${sys(sysPath, "fetch", q(r.url), '"$d/kubik.tar.gz"')} && ` +
     `tar xzf "$d/kubik.tar.gz" -C "$d" && "$d/kubik-${r.version}/install.sh"; ` +
     `r=$?; rm -rf "$d"; exit $r`
   );
@@ -388,15 +416,15 @@ function capitalize(s: string): string {
 /** Chave no kwinrc ([Script-kubik]) com as ações que o usuário personalizou. */
 export const CUSTOM_SHORTCUTS_KEY = "CustomShortcuts";
 
-const KGA = "dbus-send --session --print-reply --dest=org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel";
-const actionId = (name: string) => `"array:string:kwin,${name},KWin,${name}"`;
-
-/** Lê as teclas atuais: uma linha "nome<TAB>inteiros,separados" por ação. */
-export function shortcutsReadCommand(names: readonly string[]): string {
-  return names
-    .filter(isShortcutName)
-    .map((n) => `echo "${n}\t$(${KGA}.shortcut ${actionId(n)} 2>/dev/null | awk '/int32/ && $2 != 0 {print $2}' | paste -sd, -)"`)
-    .join("; ");
+/**
+ * Lê as teclas atuais: o `sys.sh tools` (para saber se dá para ler) e uma
+ * linha "nome<TAB>inteiros,separados" por ação.
+ */
+export function shortcutsReadCommand(names: readonly string[], sysPath: SysPath): string {
+  return [
+    `${sys(sysPath, "tools")} 2>/dev/null`,
+    ...names.filter(isShortcutName).map((n) => `printf '%s\\t%s\\n' ${q(n)} "$(${sys(sysPath, "shortcut-get", q(n))} 2>/dev/null)"`),
+  ].join("; ");
 }
 
 /** Interpreta o shortcutsReadCommand: nome → tecla ("" sem tecla). Vale a primeira tecla. */
@@ -415,13 +443,17 @@ export function parseShortcuts(stdout: string): Record<string, string> {
  * Grava as teclas mudadas (code 0 = sem tecla) e a lista das ações
  * personalizadas (o install.sh não mexe nelas numa atualização).
  */
-export function shortcutsWriteCommand(changes: ReadonlyArray<{ name: string; code: number }>, custom: readonly string[]): string {
+export function shortcutsWriteCommand(
+  changes: ReadonlyArray<{ name: string; code: number }>,
+  custom: readonly string[],
+  sysPath: SysPath,
+): string {
   const sets = changes
     .filter((c) => isShortcutName(c.name))
-    .map((c) => `${KGA}.setForeignShortcut ${actionId(c.name)} "array:int32:${Math.max(0, Math.floor(c.code)) || 0}" >/dev/null`);
+    .map((c) => sys(sysPath, "shortcut-set", q(c.name), String(Math.max(0, Math.floor(c.code)) || 0)));
   const names = custom.filter(isShortcutName);
   const rc = names.length
-    ? `kwriteconfig6 --file kwinrc --group ${SCRIPT_GROUP} --key ${CUSTOM_SHORTCUTS_KEY} '${names.join(",")}'`
+    ? `kwriteconfig6 --file kwinrc --group ${SCRIPT_GROUP} --key ${CUSTOM_SHORTCUTS_KEY} ${q(names.join(","))}`
     : `kwriteconfig6 --file kwinrc --group ${SCRIPT_GROUP} --key ${CUSTOM_SHORTCUTS_KEY} --delete`;
   return [...sets, rc].join("; ");
 }

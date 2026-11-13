@@ -4,10 +4,11 @@ import {
 } from "../src/manager/logic";
 import type { Status } from "../src/tray/logic";
 
+const NOTHING_MISSING = { dbus: null, shortcuts: null, fetch: null };
 const full = (v: string, loaded = true): Status => ({
-  script: v, effect: v, tray: v, scriptLoaded: loaded, effectLoaded: loaded,
+  script: v, effect: v, tray: v, scriptLoaded: loaded, effectLoaded: loaded, missing: NOTHING_MISSING,
 });
-const none: Status = { script: null, effect: null, tray: null, scriptLoaded: false, effectLoaded: false };
+const none: Status = { script: null, effect: null, tray: null, scriptLoaded: false, effectLoaded: false, missing: NOTHING_MISSING };
 const rel = (v: string) => ({ version: v, url: `https://github.com/x/kubik-${v}.tar.gz`, page: "" });
 
 describe("gerenciador: o que oferecer", () => {
@@ -57,6 +58,10 @@ describe("gerenciador: comandos", () => {
   it("instalar do pacote do AppImage ou do GitHub", () => {
     expect(installCommand("bundle", "/tmp/.mount_Kubik/kubik-0.12.0", null)).toBe("bash '/tmp/.mount_Kubik/kubik-0.12.0/install.sh'");
     expect(installCommand("github", "", rel("0.13.0"))).toContain("'https://github.com/x/kubik-0.13.0.tar.gz'");
+    // O download vai pelo sys.sh: o do pacote junto ou, sem ele, o da bandeja instalada.
+    expect(installCommand("github", "/tmp/.mount_K/kubik-0.12.0", rel("0.13.0"))).toContain("sh '/tmp/.mount_K/kubik-0.12.0/sys.sh' fetch ");
+    expect(installCommand("github", "", rel("0.13.0")))
+      .toContain('sh "${XDG_DATA_HOME:-$HOME/.local/share}/plasma/plasmoids/io.github.dionatansimioni.kubik/contents/code/sys.sh" fetch ');
     expect(() => installCommand(null, "", null)).toThrow();
     expect(() => installCommand("bundle", "", null)).toThrow();
   });

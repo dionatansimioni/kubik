@@ -5,3 +5,4 @@ effect/contents/code/main.js
 tray/contents/code/logic.js
 tray/contents/locale/
 tray/contents/ui/Tray.qml
+tray/contents/code/sys.sh

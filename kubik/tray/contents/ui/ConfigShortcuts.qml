@@ -18,6 +18,9 @@ KCM.SimpleKCM {
 
     readonly property var logic: Logic.KubikTray
     readonly property var rows: logic.shortcutRows(Qt.locale().name)
+    readonly property string sysPath: decodeURIComponent(Qt.resolvedUrl("../code/sys.sh").toString().replace(/^file:\/\//, ""))
+    // Sem dbus-send nem gdbus (o qdbus não serve para atalhos): o comando que instala.
+    property string missing: ""
     // name → tecla ("Meta+Y"), como está no kglobalaccel.
     property var saved: ({})
     // name → tecla escolhida aqui e ainda não aplicada.
@@ -47,8 +50,11 @@ KCM.SimpleKCM {
     }
 
     function reload(then) {
-        exec.run(logic.shortcutsReadCommand(rows.map(r => r.name)), (code, stdout) => {
+        exec.run(logic.shortcutsReadCommand(rows.map(r => r.name), sysPath), (code, stdout) => {
             saved = logic.parseShortcuts(stdout);
+            missing = logic.parseMissing(stdout).shortcuts || "";
+            if (missing)
+                log("atalhos: falta dbus-send ou gdbus (" + missing + ")");
             log("atalhos lidos: " + rows.map(r => r.name.replace("Kubik: ", "") + "=" + (saved[r.name] || "-")).join(", "));
             if (then)
                 then();
@@ -66,7 +72,7 @@ KCM.SimpleKCM {
             return;
         const custom = rows.filter(r => logic.keyCode(current(r.name)) !== logic.keyCode(r.sequence)).map(r => r.name);
         const wanted = Object.assign({}, edits);
-        exec.run(logic.shortcutsWriteCommand(changes, custom), () => {
+        exec.run(logic.shortcutsWriteCommand(changes, custom, sysPath), () => {
             edits = {};
             reload(() => {
                 refused = changes.filter(c => logic.keyCode(saved[c.name] || "") !== c.code).map(c => c.name);
@@ -109,6 +115,14 @@ KCM.SimpleKCM {
             wrapMode: Text.Wrap
             text: i18n("Global shortcuts for Kubik's actions. They are also in System Settings › Keyboard › Shortcuts › KWin.")
             opacity: 0.8
+        }
+
+        Kirigami.InlineMessage {
+            objectName: "shortcutsMissing"
+            Layout.fillWidth: true
+            type: Kirigami.MessageType.Error
+            visible: page.missing !== ""
+            text: i18n("Shortcuts can't be read or changed: a D-Bus tool is missing. Install it with: %1", page.missing)
         }
 
         Kirigami.InlineMessage {

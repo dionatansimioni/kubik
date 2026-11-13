@@ -167,3 +167,12 @@ msgstr "nenhuma"
 
 msgid "Restore all defaults"
 msgstr "Restaurar todos os padrões"
+
+msgid "Kubik can't talk to KWin: a D-Bus tool is missing. Install it with: %1"
+msgstr "O Kubik não consegue falar com o KWin: falta um programa de D-Bus. Instale com: %1"
+
+msgid "Can't check for new versions: a download tool is missing. Install it with: %1"
+msgstr "Não dá para procurar versões novas: falta um programa de download. Instale com: %1"
+
+msgid "Shortcuts can't be read or changed: a D-Bus tool is missing. Install it with: %1"
+msgstr "Não dá para ler nem mudar os atalhos: falta um programa de D-Bus. Instale com: %1"

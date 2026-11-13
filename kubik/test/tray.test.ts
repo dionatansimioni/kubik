@@ -4,8 +4,10 @@ import {
   KEYS, RELEASES_URL, compareVersions, inList, installedVersion, isValidName, kwinrcValues, newerRelease,
   openApps, otherExceptions, parseRead, parseStatus, readCommand, releasesCommand, statusCommand, statusText,
   toSettings, toTrayConfig, toggleInList, updateCommand, writeCommand,
-  keyCode, keyText, shortcutRows, shortcutsReadCommand, parseShortcuts, shortcutsWriteCommand,
+  keyCode, keyText, shortcutRows, shortcutsReadCommand, parseShortcuts, shortcutsWriteCommand, parseMissing,
 } from "../src/tray/logic";
+
+const SYS = "/home/u/.local/share/plasma/plasmoids/io.github.dionatansimioni.kubik/contents/code/sys.sh";
 import { keyBindings } from "../src/kwin/keys";
 
 describe("bandeja: ida e volta pelo kwinrc", () => {
@@ -148,23 +150,21 @@ describe("gerenciador", () => {
     const bad = rel("kubik-v1.0.0");
     bad.assets[1].browser_download_url = "https://evil/'; rm -rf ~; '.tar.gz";
     expect(newerRelease(JSON.stringify([bad]), "0.9.0")).toBeNull();
-    expect(() => updateCommand({ version: "1.0.0", url: "https://x/a b", page: "" })).toThrow();
+    expect(() => updateCommand({ version: "1.0.0", url: "https://x/a b", page: "" }, SYS)).toThrow();
   });
 
-  it("updateCommand baixa, extrai e roda o install.sh da versão", () => {
-    const cmd = updateCommand({ version: "0.10.0", url: "https://github.com/a/kubik-0.10.0.tar.gz", page: "" });
-    expect(cmd).toContain("curl -fsSL --max-time 600 -o \"$d/kubik.tar.gz\" 'https://github.com/a/kubik-0.10.0.tar.gz'");
+  it("updateCommand baixa (pelo sys.sh), extrai e roda o install.sh da versão", () => {
+    const cmd = updateCommand({ version: "0.10.0", url: "https://github.com/a/kubik-0.10.0.tar.gz", page: "" }, SYS);
+    expect(cmd).toContain(`sh '${SYS}' fetch 'https://github.com/a/kubik-0.10.0.tar.gz' "$d/kubik.tar.gz"`);
     expect(cmd).toContain("\"$d/kubik-0.10.0/install.sh\"");
     expect(cmd).toMatch(/rm -rf "\$d"; exit \$r$/);
   });
 
-  it("sem curl (Debian padrão), baixa com o wget", () => {
-    const cmd = updateCommand({ version: "0.10.0", url: "https://github.com/a/kubik-0.10.0.tar.gz", page: "" });
-    expect(cmd).toContain("if command -v curl >/dev/null 2>&1; then curl ");
-    expect(cmd).toContain("else wget -q -T 600 -O \"$d/kubik.tar.gz\" 'https://github.com/a/kubik-0.10.0.tar.gz'; fi;");
-    const list = releasesCommand();
-    expect(list).toContain("wget -q -T 20 --header='Accept: application/vnd.github+json' -O - ");
+  it("o download (curl, wget…) fica com o sys.sh; a lista de versões em 20 s", () => {
+    const list = releasesCommand(SYS);
+    expect(list).toMatch(new RegExp(`^KUBIK_FETCH_TIMEOUT=20 sh '${SYS}' fetch "\\$\\{KUBIK_RELEASES_URL:-[^"]+\\}" - 'Accept: application/vnd.github\\+json'`));
     expect(list).toMatch(/\|\| true$/);
+    expect(list).not.toMatch(/curl|wget/);
   });
 
   it("com o AppImage anexado, atualiza por ele (que também guarda o gerenciador)", () => {
@@ -172,8 +172,8 @@ describe("gerenciador", () => {
     r.assets.push({ name: "Kubik-0.12.0-x86_64.AppImage", browser_download_url: "https://github.com/a/Kubik-0.12.0-x86_64.AppImage" });
     const found = newerRelease(JSON.stringify([r]), "0.11.0");
     expect(found?.appimage).toBe("https://github.com/a/Kubik-0.12.0-x86_64.AppImage");
-    const cmd = updateCommand(found!);
-    expect(cmd).toContain("-o \"$d/Kubik.AppImage\" 'https://github.com/a/Kubik-0.12.0-x86_64.AppImage'");
+    const cmd = updateCommand(found!, SYS);
+    expect(cmd).toContain(`fetch 'https://github.com/a/Kubik-0.12.0-x86_64.AppImage' "$d/Kubik.AppImage"`);
     expect(cmd).toContain('"$d/Kubik.AppImage" --install --yes');
     expect(cmd).toMatch(/rm -rf "\$d"; exit \$r$/);
     // AppImage com endereço estranho: fica o .tar.gz.
@@ -182,28 +182,48 @@ describe("gerenciador", () => {
   });
 
   it("releasesCommand usa a API do GitHub (ou KUBIK_RELEASES_URL) e nunca falha", () => {
-    const cmd = releasesCommand();
+    const cmd = releasesCommand(SYS);
     expect(cmd).toContain(`\${KUBIK_RELEASES_URL:-${RELEASES_URL}}`);
     expect(RELEASES_URL).toBe("https://api.github.com/repos/dionatansimioni/kubik/releases?per_page=20");
     expect(cmd).toMatch(/\|\| true$/);
   });
 
   it("estado: versões e o que está carregado", () => {
-    const s = parseStatus("script=0.10.0\neffect=0.10.0\ntray=\nscriptLoaded=1\neffectLoaded=0\n");
-    expect(s).toEqual({ script: "0.10.0", effect: "0.10.0", tray: null, scriptLoaded: true, effectLoaded: false });
+    const s = parseStatus("script=0.10.0\neffect=0.10.0\ntray=\ndbus=dbus-send\nshortcuts=dbus-send\nfetch=curl\nscriptLoaded=true\neffectLoaded=false\n");
+    expect(s).toEqual({
+      script: "0.10.0", effect: "0.10.0", tray: null, scriptLoaded: true, effectLoaded: false,
+      missing: { dbus: null, shortcuts: null, fetch: null },
+    });
     expect(installedVersion(s)).toBe("0.10.0");
     expect(installedVersion(parseStatus("tray=0.9.0"))).toBe("0.9.0");
     expect(installedVersion(parseStatus(""))).toBeNull();
-    const cmd = statusCommand();
+    const cmd = statusCommand(SYS);
     for (const id of ["KWin/Script --show kubik ", "KWin/Effect --show kubikanimations ", "Plasma/Applet --show io.github.dionatansimioni.kubik "])
       expect(cmd).toContain(`--type=${id}`);
-    expect(cmd).toContain("isEffectLoaded string:kubikanimations");
+    expect(cmd).toContain(`sh '${SYS}' dbus-bool org.kde.KWin /Effects org.kde.kwin.Effects.isEffectLoaded kubikanimations`);
+    expect(cmd).toContain(`sh '${SYS}' tools`);
+    expect(cmd).not.toContain("dbus-send");
+  });
+
+  it("estado: o que falta no sistema, com o comando que instala", () => {
+    const s = parseStatus("script=0.13.0\ndbus=none\nshortcuts=none\ndbus_hint=sudo dnf install dbus-tools\nfetch=none\nfetch_hint=sudo dnf install curl\nscriptLoaded=\n");
+    expect(s.missing).toEqual({ dbus: "sudo dnf install dbus-tools", shortcuts: "sudo dnf install dbus-tools", fetch: "sudo dnf install curl" });
+    expect(s.scriptLoaded).toBe(false);
+    // Só o qdbus: o estado vale, os atalhos não.
+    expect(parseMissing("dbus=qdbus6\nshortcuts=none\ndbus_hint=sudo apt install dbus-bin\nfetch=wget\n"))
+      .toEqual({ dbus: null, shortcuts: "sudo apt install dbus-bin", fetch: null });
+    // sys.sh antigo ou ausente (nada de "dbus="): não acusa falta.
+    expect(parseMissing("script=0.13.0\n")).toEqual({ dbus: null, shortcuts: null, fetch: null });
+  });
+
+  it("estado: caminho do sys.sh com espaço e aspas vai citado", () => {
+    expect(statusCommand("/home/a b/it's/sys.sh")).toContain(`sh '/home/a b/it'\\''s/sys.sh' tools`);
   });
 
   it("estado: lê a saída do kpackagetool6 em inglês (em pt-BR o rótulo vira \"Caminho\")", () => {
-    const calls = statusCommand().split("kpackagetool6").slice(1);
+    const calls = statusCommand(SYS).split("kpackagetool6").slice(1);
     expect(calls).toHaveLength(3);
-    for (const before of statusCommand().split("kpackagetool6").slice(0, -1))
+    for (const before of statusCommand(SYS).split("kpackagetool6").slice(0, -1))
       expect(before.endsWith("LC_ALL=C LANGUAGE= ")).toBe(true);
   });
 });
@@ -249,8 +269,9 @@ describe("atalhos de teclado: a página", () => {
   });
 
   it("lê do kglobalaccel e interpreta (a primeira tecla vale)", () => {
-    const cmd = shortcutsReadCommand(["Kubik: Toggle tiling", "Kubik: Move Left", "x'; rm -rf ~"]);
-    expect(cmd).toContain(`org.kde.KGlobalAccel.shortcut "array:string:kwin,Kubik: Toggle tiling,KWin,Kubik: Toggle tiling"`);
+    const cmd = shortcutsReadCommand(["Kubik: Toggle tiling", "Kubik: Move Left", "x'; rm -rf ~"], SYS);
+    expect(cmd).toContain(`printf '%s\\t%s\\n' 'Kubik: Toggle tiling' "$(sh '${SYS}' shortcut-get 'Kubik: Toggle tiling' 2>/dev/null)"`);
+    expect(cmd).toMatch(new RegExp(`^sh '${SYS}' tools`));
     expect(cmd).toContain("Kubik: Move Left");
     expect(cmd).not.toContain("rm -rf");
     expect(parseShortcuts("Kubik: Toggle tiling\t268435545,123\nKubik: Move Left\t\n")).toEqual({
@@ -261,10 +282,10 @@ describe("atalhos de teclado: a página", () => {
 
   it("grava as mudadas e a lista das personalizadas", () => {
     const cmd = shortcutsWriteCommand([{ name: "Kubik: Toggle tiling", code: keyCode("Meta+H") }, { name: "Kubik: Move Up", code: 0 }],
-      ["Kubik: Toggle tiling", "Kubik: Move Up"]);
-    expect(cmd).toContain(`setForeignShortcut "array:string:kwin,Kubik: Toggle tiling,KWin,Kubik: Toggle tiling" "array:int32:${0x10000000 + 0x48}"`);
-    expect(cmd).toContain(`"array:int32:0"`);
+      ["Kubik: Toggle tiling", "Kubik: Move Up"], SYS);
+    expect(cmd).toContain(`sh '${SYS}' shortcut-set 'Kubik: Toggle tiling' ${0x10000000 + 0x48}`);
+    expect(cmd).toContain(`sh '${SYS}' shortcut-set 'Kubik: Move Up' 0`);
     expect(cmd).toContain("--key CustomShortcuts 'Kubik: Toggle tiling,Kubik: Move Up'");
-    expect(shortcutsWriteCommand([], [])).toContain("--key CustomShortcuts --delete");
+    expect(shortcutsWriteCommand([], [], SYS)).toContain("--key CustomShortcuts --delete");
   });
 });

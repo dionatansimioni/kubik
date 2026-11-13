@@ -7,8 +7,10 @@
  * Os textos ficam aqui, em inglês e português (o app não usa o i18n do KDE).
  */
 import {
+  INSTALLED_SYS,
   type Release,
   type Status,
+  type SysPath,
   compareVersions,
   DATA_DIR,
   installedVersion,
@@ -21,6 +23,11 @@ import {
 } from "../tray/logic";
 
 export { compareVersions, newerRelease, parseStatus, releasesCommand, statusCommand };
+
+/** O sys.sh do pacote que vem no AppImage ou, sem ele, o da bandeja instalada. */
+export function sysPath(bundleDir: string): SysPath {
+  return bundleDir ? `${bundleDir}/sys.sh` : INSTALLED_SYS;
+}
 
 export type Action = "install" | "update" | "repair" | "remove" | "settings";
 
@@ -74,7 +81,7 @@ function q(s: string): string {
 
 /** Instalar/atualizar/reparar: do pacote que vem no AppImage ou do release do GitHub. */
 export function installCommand(source: Plan["source"], bundleDir: string, release: Release | null): string {
-  if (source === "github" && release) return updateCommand(release);
+  if (source === "github" && release) return updateCommand(release, sysPath(bundleDir));
   if (source === "bundle" && bundleDir) return `bash ${q(`${bundleDir}/install.sh`)}`;
   throw new Error("nada para instalar");
 }

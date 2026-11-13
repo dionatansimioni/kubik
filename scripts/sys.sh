@@ -1,6 +1,6 @@
 #!/bin/sh
 # Auxiliar do Kubik para as ferramentas do sistema que mudam de distro para
-# distro (ver docs/PLANO-SYS.md): o cliente de D-Bus e o de download. Cada
+# distro (ver docs/DESIGN.md, Lição 48): o cliente de D-Bus e o de download. Cada
 # subcomando tenta os programas em ordem e devolve a saída sempre no mesmo
 # formato. Faltando todos: código 127 e, no stderr,
 # "kubik-sys: falta <o quê>; instale: <comando>".
@@ -35,28 +35,28 @@ distro() {
     (. "$f"; echo "${ID:-} ${ID_LIKE:-}")
 }
 
-# Comando para instalar o que falta: missing dbus|fetch
+# Comando que instala o que falta, na distro atual: hint dbus|fetch
+hint() {
+    d=" $(distro) "
+    case "$1:$d" in
+        dbus:*" fedora "*|dbus:*" rhel "*) echo "sudo dnf install dbus-tools" ;;
+        dbus:*" debian "*|dbus:*" ubuntu "*) echo "sudo apt install dbus-bin" ;;
+        dbus:*" arch "*) echo "sudo pacman -S dbus" ;;
+        dbus:*" opensuse"*|dbus:*" suse "*) echo "sudo zypper install dbus-1-tools" ;;
+        dbus:*) echo "dbus-send" ;;
+        fetch:*" fedora "*|fetch:*" rhel "*) echo "sudo dnf install curl" ;;
+        fetch:*" debian "*|fetch:*" ubuntu "*) echo "sudo apt install wget" ;;
+        fetch:*" arch "*) echo "sudo pacman -S curl" ;;
+        fetch:*" opensuse"*|fetch:*" suse "*) echo "sudo zypper install curl" ;;
+        fetch:*) echo "curl" ;;
+    esac
+}
+
+# Faltando: missing dbus|fetch (sai com 127).
 missing() {
-    d=$(distro)
     case "$1" in
-        dbus)
-            case " $d " in
-                *" fedora "*|*" rhel "*) hint="sudo dnf install dbus-tools" ;;
-                *" debian "*|*" ubuntu "*) hint="sudo apt install dbus-bin" ;;
-                *" arch "*) hint="sudo pacman -S dbus" ;;
-                *" opensuse"*|*" suse "*) hint="sudo zypper install dbus-1-tools" ;;
-                *) hint="o pacote que traz o dbus-send" ;;
-            esac
-            echo "kubik-sys: falta um cliente de D-Bus (dbus-send, gdbus ou qdbus6); instale: $hint" >&2 ;;
-        fetch)
-            case " $d " in
-                *" fedora "*|*" rhel "*) hint="sudo dnf install curl" ;;
-                *" debian "*|*" ubuntu "*) hint="sudo apt install wget" ;;
-                *" arch "*) hint="sudo pacman -S curl" ;;
-                *" opensuse"*|*" suse "*) hint="sudo zypper install curl" ;;
-                *) hint="curl ou wget" ;;
-            esac
-            echo "kubik-sys: falta um programa de download (curl ou wget); instale: $hint" >&2 ;;
+        dbus) echo "kubik-sys: falta um cliente de D-Bus (dbus-send, gdbus ou qdbus6); instale: $(hint dbus)" >&2 ;;
+        fetch) echo "kubik-sys: falta um programa de download (curl ou wget); instale: $(hint fetch)" >&2 ;;
     esac
     exit 127
 }
@@ -88,11 +88,11 @@ cmd_tools() {
     else echo "dbus=none"; fi
     if has dbus-send; then echo "shortcuts=dbus-send"
     elif has gdbus; then echo "shortcuts=gdbus"
-    else echo "shortcuts=none"; fi
+    else echo "shortcuts=none"; echo "dbus_hint=$(hint dbus)"; fi
     if has curl; then echo "fetch=curl"
     elif has wget; then echo "fetch=wget"
     elif has wget2; then echo "fetch=wget2"
-    else echo "fetch=none"; fi
+    else echo "fetch=none"; echo "fetch_hint=$(hint fetch)"; fi
 }
 
 cmd_dbus_bool() {

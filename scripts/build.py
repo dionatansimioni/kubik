@@ -101,6 +101,8 @@ def build_tarball(pkgs, plugin_id: str, version: str, out: Path):
         for script in ("install.sh", "uninstall.sh", "diagnose.sh"):
             add(tar, (SCRIPTS / script).read_bytes(), script, 0o755)
         add(tar, (SCRIPTS / "shortcuts.sh").read_bytes(), "shortcuts.sh", 0o644)
+        # Cliente de D-Bus e de download da distro (docs/DESIGN.md, Lição 48).
+        add(tar, (SCRIPTS / "sys.sh").read_bytes(), "sys.sh", 0o755)
         # Ícone do app e entrada do menu (o install.sh põe em ~/.local/share).
         add(tar, (ASSETS / "kubik.svg").read_bytes(), f"share/{APP_ID}.svg", 0o644)
         add(tar, (ASSETS / f"{APP_ID}.desktop").read_bytes(), f"share/{APP_ID}.desktop", 0o644)
