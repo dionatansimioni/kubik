@@ -25,7 +25,7 @@ TAB1, TAB2 = (690, 950), (990, 1250)
 
 def internal_windows(log):
     """Quantas vezes o KWin abriu (mapeou) um overlay do kubik."""
-    return log.count("flutuante '': janela interna do KWin")
+    return log.count("flutuante 'kubik-overlay': janela interna do KWin")
 
 
 @unittest.skipUnless(kwin_env_available(), "testenv indisponível (docker/vgem)")

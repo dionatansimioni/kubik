@@ -43,6 +43,7 @@ export class FakeWindow implements KWinWindow {
   /** false nas janelas internas do KWin (overlays de scripts). */
   wantsInput = true;
   skipTaskbar = false;
+  skipPager = false;
   opacity = 1;
   maximizeMode = 0;
   /** Como o KWin: 1 = vertical, 2 = horizontal, 3 = as duas. */

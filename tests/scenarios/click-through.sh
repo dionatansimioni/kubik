@@ -39,3 +39,10 @@ click 321 400
 click 959 400
 clicks after_drag Alpha
 clicks after_drag Beta
+
+# Visão geral (KWin < 6.8): ela só esconde janelas com skipSwitcher, e os
+# overlays do Kubik apareciam vazios em toda área de trabalho. Cria mais uma
+# área de trabalho, como no relato, e lista os overlays com as três marcas.
+dbus-send --session --print-reply --dest=org.kde.KWin /VirtualDesktopManager org.kde.KWin.VirtualDesktopManager.createDesktop uint32:1 string:Extra >/dev/null
+sleep 1
+kwin_eval 'const o = workspace.stackingOrder.filter(w => w.caption === "kubik-overlay"); console.warn("=== OVERLAYS " + o.length + " " + o.map(w => [w.skipSwitcher, w.skipPager, w.skipTaskbar].join("/")).join(" ") + " desktops=" + workspace.desktops.length)'

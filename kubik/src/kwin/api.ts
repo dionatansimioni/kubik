@@ -42,12 +42,14 @@ export interface KWinWindow {
   readonly fullScreen: boolean;
   /** Em todos os desktops (no KWin 6, `desktops` fica vazio). */
   readonly onAllDesktops: boolean;
-  /** Fora do Alt+Tab. Junto com resourceClass vazio, indica janela interna do KWin. */
-  readonly skipSwitcher: boolean;
+  /** Fora do Alt+Tab (e da Visão geral). Junto com resourceClass vazio, indica janela interna do KWin. */
+  skipSwitcher: boolean;
   /** false nas janelas internas do KWin (overlays de scripts), em qualquer versão. */
   readonly wantsInput?: boolean;
   /** Fora da barra de tarefas. Junto com skipSwitcher: janela auxiliar oculta. */
-  readonly skipTaskbar: boolean;
+  skipTaskbar: boolean;
+  /** Fora do pager (miniaturas das áreas de trabalho). */
+  skipPager?: boolean;
   /** 0 = invisível (ex.: xwaylandvideobridge). */
   readonly opacity: number;
   /** true enquanto o usuário move / redimensiona a janela com o mouse. */

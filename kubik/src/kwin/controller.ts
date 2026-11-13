@@ -35,7 +35,7 @@ interface DropTarget {
 }
 
 const SIDE_NAMES: Record<Side, string> = { left: "à esquerda de", right: "à direita de", up: "acima de", down: "para baixo de" };
-import { DEFAULT_FLOATING_CLASSES, floatReason, isInternalWindow } from "./rules";
+import { DEFAULT_FLOATING_CLASSES, floatReason, isInternalWindow, isOwnOverlay } from "./rules";
 import { DEFAULT_SETTINGS, type Settings, describeSettings } from "./settings";
 
 /**
@@ -649,6 +649,13 @@ export class Controller {
   private track(w: KWinWindow): void {
     const id = idOf(w);
     if (this.tracked.has(id)) return;
+    // Até o KWin 6.7, as janelas internas não vêm fora das listas: a Visão
+    // geral mostrava os overlays do Kubik (vazios) em toda área de trabalho.
+    if (isOwnOverlay(w) && !(w.skipSwitcher && w.skipPager && w.skipTaskbar)) {
+      w.skipSwitcher = true;
+      w.skipPager = true;
+      w.skipTaskbar = true;
+    }
     const onChange = () => {
       const t = this.tracked.get(id);
       // Durante um arrasto a tela da janela muda a cada passo; quem decide é o drop.

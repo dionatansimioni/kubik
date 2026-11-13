@@ -56,6 +56,14 @@ class ClickThroughInKWinTest(unittest.TestCase):
         self.assertEqual(len(self.clicks("after_drag", "Alpha")), 3)
         self.assertEqual(len(self.clicks("after_drag", "Beta")), 3)
 
+    def test_overlays_stay_out_of_overview_pager_and_taskbar(self):
+        # Borda, prévia, fantasma e (com pilha) barra de abas: todos marcados.
+        m = re.search(r"=== OVERLAYS (\d+) (.*) desktops=(\d+)", self.log)
+        self.assertIsNotNone(m, "cenário não listou os overlays")
+        self.assertGreaterEqual(int(m.group(1)), 3)
+        self.assertEqual(m.group(3), "2")
+        self.assertEqual(set(m.group(2).split()), {"true/true/true"})
+
 
 if __name__ == "__main__":
     unittest.main()

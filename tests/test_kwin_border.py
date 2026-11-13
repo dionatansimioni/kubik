@@ -78,7 +78,7 @@ class BorderInKWinTest(unittest.TestCase):
         # A borda aparece e some várias vezes no cenário, mas o overlay é aberto
         # uma vez só (reabrir dispara a animação de abrir janela do usuário).
         # Overlays: prévia, prévia-fantasma e borda.
-        self.assertEqual(self.log.count("flutuante '': janela interna do KWin"), 3)
+        self.assertEqual(self.log.count("flutuante 'kubik-overlay': janela interna do KWin"), 3)
 
     def test_overlay_is_not_tiled(self):
         self.assertEqual(set(self.w["alone"]), {"Alpha"})

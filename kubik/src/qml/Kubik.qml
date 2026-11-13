@@ -118,6 +118,10 @@ Item {
         Window {
             id: previewWindow
 
+            // Reconhecido pelo controlador (rules.ts, OVERLAY_CAPTION), que o
+            // tira da Visão geral, do pager e da barra de tarefas.
+            title: "kubik-overlay"
+
             property bool ghost: false
             // O drop empilha: ícone de pilha e faixa de abas no topo.
             property bool stack: false
@@ -180,6 +184,10 @@ Item {
             property bool shown: false
             readonly property alias content: borderContent
 
+            // Reconhecido pelo controlador (rules.ts, OVERLAY_CAPTION), que o
+            // tira da Visão geral, do pager e da barra de tarefas.
+            title: "kubik-overlay"
+
             // O mouse atravessa o overlay. O KWin só lê a flag no 6.7+; até o
             // 6.6 o hitTest dele lê a propriedade outputOnly (da Plasma::Dialog)
             // por nome. Garantia: ver DESIGN, Lição 43.
@@ -210,6 +218,10 @@ Item {
 
         Window {
             id: tabBar
+
+            // Reconhecido pelo controlador (rules.ts, OVERLAY_CAPTION), que o
+            // tira da Visão geral, do pager e da barra de tarefas.
+            title: "kubik-overlay"
 
             property var tabs: []
             property bool shown: false

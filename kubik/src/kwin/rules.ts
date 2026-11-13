@@ -29,6 +29,14 @@ export function isInternalWindow(w: KWinWindow): boolean {
   return !w.resourceClass && (w.skipSwitcher || w.wantsInput === false);
 }
 
+/** Título das janelas de overlay do Kubik (borda, prévia, fantasma, abas): Kubik.qml. */
+export const OVERLAY_CAPTION = "kubik-overlay";
+
+/** Um overlay do próprio Kubik (e não de outro script, nem um app com esse título). */
+export function isOwnOverlay(w: KWinWindow): boolean {
+  return w.caption === OVERLAY_CAPTION && isInternalWindow(w);
+}
+
 /**
  * Motivo para a janela NÃO entrar no tiling, ou null se ela deve entrar.
  * Devolver o motivo (em vez de um booleano) deixa o log explicável.

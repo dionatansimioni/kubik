@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { rect } from "../src/core/rect";
 import { Controller, DEFAULT_CONFIG } from "../src/kwin/controller";
 import { DEFAULT_SETTINGS } from "../src/kwin/settings";
+import { OVERLAY_CAPTION } from "../src/kwin/rules";
 import {
   DESK_1, DESK_2, FakeWindow, FakeWorkspace, SCREEN_A, SCREEN_B, fakeHost,
 } from "./fake-kwin";
@@ -308,6 +309,28 @@ describe("Controller", () => {
         expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
       });
     }
+
+    // Regressão (Debian 13, KWin 6.3): a Visão geral mostrava os overlays do
+    // Kubik (vazios, com o ícone) em toda área de trabalho; ela só esconde
+    // janelas com skipSwitcher, que o KWin só liga nas internas a partir do 6.8.
+    it("os overlays do Kubik saem da Visão geral, do pager e da barra de tarefas", () => {
+      const o = win(OVERLAY_CAPTION);
+      o.resourceClass = "";
+      o.wantsInput = false;
+      ws.open(o);
+      expect([o.skipSwitcher, o.skipPager, o.skipTaskbar]).toEqual([true, true, true]);
+    });
+
+    it("overlays de outros scripts e janelas normais ficam como estão", () => {
+      const other = win("overlay de outro script");
+      other.resourceClass = "";
+      other.wantsInput = false;
+      const app = win(OVERLAY_CAPTION); // um app com esse título não é overlay
+      ws.open(other);
+      ws.open(app);
+      expect([other.skipSwitcher, other.skipPager, other.skipTaskbar]).toEqual([false, false, false]);
+      expect([app.skipSwitcher, app.skipPager, app.skipTaskbar]).toEqual([false, false, false]);
+    });
 
     it("o log explica o motivo", () => {
       const f = win("Salvar como");

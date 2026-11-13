@@ -45,7 +45,7 @@ class MouseInKWinTest(unittest.TestCase):
                            f"sem prévia sobre o destino: {before} -> {during}")
 
     def test_preview_is_not_tiled(self):
-        self.assertIn("flutuante '': janela interna do KWin", self.log)
+        self.assertIn("flutuante 'kubik-overlay': janela interna do KWin", self.log)
         self.assertEqual(set(self.w["swapped"]), {"Alpha", "Beta"})
 
     def test_dragging_the_divider_resizes_both(self):
