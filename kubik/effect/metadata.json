@@ -8,7 +8,7 @@
         "Description[pt_BR]": "Anima as janelas deslizando e redimensionando quando o kubik reorganiza o layout.",
         "Category": "Window Management",
         "Icon": "io.github.dionatansimioni.kubik",
-        "Version": "0.13.0",
+        "Version": "0.13.1",
         "License": "GPL-3.0-or-later",
         "Website": "https://github.com/dionatansimioni/kubik",
         "EnabledByDefault": false

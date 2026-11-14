@@ -26,9 +26,20 @@ needs_popup_clicks = unittest.skipIf(OLD_KWIN, "cliques calibrados no popup do P
 SIGNALWATCHER_63 = "ShortcutWatcher.qml:7:1: DBus.SignalWatcher is not a type"
 
 
+def plasmashell_available():
+    """O plasmashell de verdade (painel com bandeja): as três imagens têm."""
+    return os.environ.get("KUBIK_TESTENV", "arch") in ("arch", "debian", "fedora")
+
+
 def plasma_available():
-    """As imagens do Arch e do Debian têm o Plasma (plasmoidviewer); a do Fedora tem só o KWin."""
+    """Testes da bandeja no plasmoidviewer: Arch e Debian (no Fedora, só o TrayReloadTest, no plasmashell)."""
     return os.environ.get("KUBIK_TESTENV", "arch") in ("arch", "debian")
+
+
+def tray_icon_pixels(path):
+    """Pixels escuros (o cubo) na área do ícone do Kubik, à esquerda da seta da bandeja."""
+    im = Ppm(path)
+    return sum(1 for x in range(1036, 1066) for y in range(758, 786) if max(im.getpixel((x, y))[:3]) < 90)
 
 
 @unittest.skipUnless(kwin_env_available() and plasma_available(), "testenv com Plasma indisponível")
@@ -206,7 +217,7 @@ class TrayUpdateTest(unittest.TestCase):
         self.assertNotIn("comando falhou", self.log)
 
 
-@unittest.skipUnless(kwin_env_available() and plasma_available(), "testenv com Plasma indisponível")
+@unittest.skipUnless(kwin_env_available() and plasmashell_available(), "testenv com Plasma indisponível")
 class TrayReloadTest(unittest.TestCase):
     """Atualizar com o plasmashell rodando: a bandeja recriada roda o código novo."""
 
@@ -233,6 +244,13 @@ class TrayReloadTest(unittest.TestCase):
         after = self.log.partition("=== MARK reinstall")[2]
         self.assertIn("bandeja 99.0.0", after)
         self.assertIn("[kubik-tray] CODIGO-NOVO", after)
+
+    @needs_pixels
+    def test_icon_shows_in_the_panel(self):
+        # Na 0.12.4 e na 0.13.0, o plasmashell iniciava com o applet carregado
+        # (log certo) e nenhum ícone na bandeja (Lição 49).
+        self.assertGreater(tray_icon_pixels(self.out / "panel.ppm"), 40)
+        self.assertGreater(tray_icon_pixels(self.out / "panel-new.ppm"), 40)
 
     def test_no_qml_errors(self):
         applet = [l for l in self.log.splitlines()

@@ -6,6 +6,8 @@ source /work/testenv/lib.sh
 plasmashell >&2 2>&1 &
 wait_log "[kubik-tray] estado:" 60
 sleep 3
+# O ícone no painel (Lição 49: sem representação ao criar, a bandeja o descartava).
+screenshot panel
 mark reinstall
 src=$(kpackagetool6 -t Plasma/Applet --show io.github.dionatansimioni.kubik | sed -n 's/^ *Path *: *//p')
 new=/tmp/newtray; rm -rf $new; cp -r "${src%/}" $new
@@ -14,4 +16,5 @@ sed -i 's|^    Component.onCompleted: {|&\n        console.warn("[kubik-tray] CO
 kpackagetool6 -t Plasma/Applet -u $new >&2 2>&1
 wait_log "bandeja 99.0.0" 30
 sleep 3
+screenshot panel-new
 mark done

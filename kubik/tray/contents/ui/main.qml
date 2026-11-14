@@ -6,7 +6,13 @@
 // nunca muda (o cache dele é inofensivo): carrega o código real (Tray.qml,
 // gerado de src/qml/Tray.qml) por uma URL única a cada carga e liga a ele o
 // que é do PlasmoidItem.
+//
+// As representações existem desde o início (Lição 49): com
+// compactRepresentation nula ao criar o applet, a bandeja do Plasma o
+// descarta e o ícone some, mesmo depois de o Tray.qml carregar. Cada uma é um
+// Loader com o componente do Tray.qml, repassando as dicas de tamanho.
 import QtQuick
+import QtQuick.Layouts
 import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 
@@ -20,8 +26,16 @@ PlasmoidItem {
     Plasmoid.contextualActions: impl ? impl.actions : []
     toolTipMainText: "Kubik"
     toolTipSubText: impl ? impl.tooltipText : ""
-    compactRepresentation: impl ? impl.compact : null
-    fullRepresentation: impl ? impl.full : null
+    compactRepresentation: Loader {
+        sourceComponent: shell.impl ? shell.impl.compact : null
+    }
+    fullRepresentation: Loader {
+        sourceComponent: shell.impl ? shell.impl.full : null
+        Layout.minimumWidth: item ? item.Layout.minimumWidth : 0
+        Layout.minimumHeight: item ? item.Layout.minimumHeight : 0
+        Layout.preferredWidth: item ? item.Layout.preferredWidth : -1
+        Layout.preferredHeight: item ? item.Layout.preferredHeight : -1
+    }
 
     Loader {
         id: loader
