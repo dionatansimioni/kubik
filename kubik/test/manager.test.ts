@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionText, installCommand, langOf, missingText, plan, removeCommand, settingsCommand, tr,
+  actionText, installCommand, langOf, logoutCommand, missingText, plan, removeCommand, restartPanelCommand, settingsCommand, tr,
 } from "../src/manager/logic";
 import type { Status } from "../src/tray/logic";
 
 const NOTHING_MISSING = { dbus: null, shortcuts: null, fetch: null };
 const full = (v: string, loaded = true): Status => ({
-  script: v, effect: v, tray: v, scriptLoaded: loaded, effectLoaded: loaded, missing: NOTHING_MISSING,
+  script: v, effect: v, tray: v, scriptLoaded: loaded, effectLoaded: loaded, missing: NOTHING_MISSING, plasmaRestart: false,
 });
-const none: Status = { script: null, effect: null, tray: null, scriptLoaded: false, effectLoaded: false, missing: NOTHING_MISSING };
+const none: Status = { script: null, effect: null, tray: null, scriptLoaded: false, effectLoaded: false, missing: NOTHING_MISSING, plasmaRestart: false };
 const rel = (v: string) => ({ version: v, url: `https://github.com/x/kubik-${v}.tar.gz`, page: "" });
 
 describe("gerenciador: programas faltando (sys.sh)", () => {
@@ -73,6 +73,12 @@ describe("gerenciador: o que oferecer", () => {
     expect(plan({ ...full("0.11.0"), effectLoaded: false }, null, null).warnings).toEqual(["effect"]);
     expect(plan({ ...full("0.11.0"), scriptLoaded: false }, null, null).warnings).toEqual(["script"]);
   });
+
+  it("aviso: reiniciar o painel ou a sessão depois de atualizar a bandeja", () => {
+    expect(plan({ ...full("0.13.2"), plasmaRestart: true }, null, null).warnings).toEqual(["restart"]);
+    // Sem o Kubik instalado (removido depois de atualizar), não pede nada.
+    expect(plan({ ...none, plasmaRestart: true }, "0.13.2", null).warnings).toEqual([]);
+  });
 });
 
 describe("gerenciador: comandos", () => {
@@ -97,6 +103,12 @@ describe("gerenciador: comandos", () => {
 
   it("caminho com aspas não escapa do shell", () => {
     expect(installCommand("bundle", "/tmp/a'b", null)).toBe("bash '/tmp/a'\\''b/install.sh'");
+  });
+
+  it("reiniciar o painel e encerrar a sessão pelo sys.sh", () => {
+    expect(restartPanelCommand("/b/kubik-0.13.2")).toBe("sh '/b/kubik-0.13.2/sys.sh' plasma-restart >/dev/null 2>&1");
+    expect(logoutCommand("/b/kubik-0.13.2")).toBe("sh '/b/kubik-0.13.2/sys.sh' logout >/dev/null 2>&1");
+    expect(logoutCommand("")).toContain("plasmoids/io.github.dionatansimioni.kubik/contents/code/sys.sh\" logout");
   });
 
   it("configurações abre a bandeja numa janela, sem esperar", () => {

@@ -5,6 +5,7 @@ import {
   openApps, otherExceptions, parseRead, parseStatus, readCommand, releasesCommand, statusCommand, statusText,
   toSettings, toTrayConfig, toggleInList, updateCommand, writeCommand,
   keyCode, keyText, shortcutRows, shortcutsReadCommand, parseShortcuts, shortcutsWriteCommand, parseMissing,
+  restartPanelCommand, logoutCommand,
 } from "../src/tray/logic";
 
 const SYS = "/home/u/.local/share/plasma/plasmoids/io.github.dionatansimioni.kubik/contents/code/sys.sh";
@@ -194,7 +195,7 @@ describe("gerenciador", () => {
     const s = parseStatus("script=0.10.0\neffect=0.10.0\ntray=\ndbus=dbus-send\nshortcuts=dbus-send\nfetch=curl\nscriptLoaded=true\neffectLoaded=false\n");
     expect(s).toEqual({
       script: "0.10.0", effect: "0.10.0", tray: null, scriptLoaded: true, effectLoaded: false,
-      missing: { dbus: null, shortcuts: null, fetch: null },
+      missing: { dbus: null, shortcuts: null, fetch: null }, plasmaRestart: false,
     });
     expect(installedVersion(s)).toBe("0.10.0");
     expect(installedVersion(parseStatus("tray=0.9.0"))).toBe("0.9.0");
@@ -205,6 +206,16 @@ describe("gerenciador", () => {
     expect(cmd).toContain(`sh '${SYS}' dbus-bool org.kde.KWin /Effects org.kde.kwin.Effects.isEffectLoaded kubikanimations`);
     expect(cmd).toContain(`sh '${SYS}' tools`);
     expect(cmd).not.toContain("dbus-send");
+    expect(cmd).toContain(`sh '${SYS}' session-pending`);
+  });
+
+  it("estado: painel a reiniciar (sys.sh session-pending; Lição 50)", () => {
+    expect(parseStatus("script=0.13.2\nplasmaRestart=true\n").plasmaRestart).toBe(true);
+    expect(parseStatus("script=0.13.2\nplasmaRestart=false\n").plasmaRestart).toBe(false);
+    // sys.sh antigo (sem a linha): não pede nada.
+    expect(parseStatus("script=0.13.2\n").plasmaRestart).toBe(false);
+    expect(restartPanelCommand(SYS)).toBe(`sh '${SYS}' plasma-restart >/dev/null 2>&1`);
+    expect(logoutCommand(SYS)).toBe(`sh '${SYS}' logout >/dev/null 2>&1`);
   });
 
   it("estado: o que falta no sistema, com o comando que instala", () => {

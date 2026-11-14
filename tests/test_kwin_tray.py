@@ -252,6 +252,27 @@ class TrayReloadTest(unittest.TestCase):
         self.assertGreater(tray_icon_pixels(self.out / "panel.ppm"), 40)
         self.assertGreater(tray_icon_pixels(self.out / "panel-new.ppm"), 40)
 
+    def test_restart_panel_clears_the_pending_request(self):
+        # Lição 50: o pedido vale enquanto o mesmo plasmashell roda.
+        restart = self.log.partition("=== MARK restart ===")[2]
+        pending = re.findall(r"=== PENDING plasmaRestart=(\w+)", restart)
+        self.assertEqual(pending, ["true", "false"])
+        before = re.search(r"=== PLASMA before (\d+)", restart).group(1)
+        after = re.search(r"=== PLASMA after (\d+)", restart).group(1)
+        self.assertNotEqual(before, after)
+
+    @needs_popup_clicks
+    def test_popup_offers_to_restart_the_panel(self):
+        restart = self.log.partition("=== MARK restart ===")[2]
+        self.assertIn("; reiniciar o painel ou a sessão", restart)
+        # O botão do popup reinicia o painel (a bandeja roda dentro dele).
+        self.assertIn("[kubik-tray] reiniciar o painel", restart)
+        self.assertNotIn("=== CLICK MISSED", restart)
+
+    @needs_pixels
+    def test_icon_comes_back_after_restarting_the_panel(self):
+        self.assertGreater(tray_icon_pixels(self.out / "panel-restarted.ppm"), 40)
+
     def test_no_qml_errors(self):
         applet = [l for l in self.log.splitlines()
                   if "io.github.dionatansimioni.kubik" in l and re.search(r"Error|error|is not|undefined", l)

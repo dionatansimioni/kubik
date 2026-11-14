@@ -19,6 +19,14 @@ DATA=${XDG_DATA_HOME:-$HOME/.local/share}
 APP_ID=io.github.dionatansimioni.kubik
 
 meta() { sed -n "s/.*\"$2\": *\"\([^\"]*\)\".*/\1/p" "$1/metadata.json" | head -n1; }
+# Versão instalada de um pacote (vazio: não instalado). LC_ALL=C: em pt-BR o
+# kpackagetool6 escreve "Caminho".
+installed_version() {
+    local p
+    p=$(LC_ALL=C LANGUAGE= kpackagetool6 --type="$1" --show "$2" 2>/dev/null | sed -n 's/^ *Path *: *//p')
+    [ -n "$p" ] && meta "${p%/}" Version
+}
+TRAY_CHANGED=""
 kwin() { sh ./sys.sh dbus-call org.kde.KWin "$@" >/dev/null 2>&1; }
 # shellcheck source=shortcuts.sh
 source ./shortcuts.sh
@@ -33,6 +41,7 @@ for PKG in ./packages/*/; do
     TYPE=$(meta "$PKG" KPackageStructure)
     [ -n "$ID" ] && [ -n "$TYPE" ] || { echo "erro: metadata.json inválido em $PKG" >&2; exit 1; }
     INSTALLED="$INSTALLED$TYPE $ID"$'\n'
+    OLD=$(installed_version "$TYPE" "$ID" || true)
 
     if kpackagetool6 --type="$TYPE" --show "$ID" >/dev/null 2>&1; then
         echo "Atualizando $ID para $VERSION…"
@@ -43,7 +52,9 @@ for PKG in ./packages/*/; do
     fi
     # O ícone da bandeja não é plugin do KWin: a bandeja do Plasma o mostra
     # sozinha (EnabledByDefault + X-Plasma-NotificationAreaCategory).
-    [ "$TYPE" = Plasma/Applet ] && { TRAY_ID=$ID; continue; }
+    # O plasmashell guarda o QML antigo em memória: bandeja nova ou de outra
+    # versão só vale inteira com o painel reiniciado (Lição 50).
+    [ "$TYPE" = Plasma/Applet ] && { TRAY_ID=$ID; [ "$OLD" != "$VERSION" ] && TRAY_CHANGED=1; continue; }
     kwriteconfig6 --file kwinrc --group Plugins --key "${ID}Enabled" true
 
     # Recarrega para pegar a versão nova.
@@ -109,7 +120,12 @@ else
 fi
 if [ -n "${TRAY_ID:-}" ]; then
     echo "Ícone na bandeja: clique para ligar/desligar e ajustar; botão direito › Configurar Kubik…"
-    echo "  (Se ele não aparecer ou não atualizar: systemctl --user restart plasma-plasmashell)"
+    # A bandeja e o gerenciador mostram o aviso, com botões, até reiniciar.
+    if [ -n "$TRAY_CHANGED" ]; then
+        sh ./sys.sh session-mark || true
+        echo "  Para concluir, reinicie o painel (ele some por 2 ou 3 segundos) ou saia e entre na sessão:"
+        echo "  systemctl --user restart plasma-plasmashell"
+    fi
 fi
 if [ -x "$MANAGER" ]; then
     echo "Menu: \"Kubik\" abre o gerenciador (atualizar, reparar, remover, configurações)."

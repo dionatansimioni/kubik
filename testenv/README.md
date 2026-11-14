@@ -51,7 +51,7 @@ O `run.sh` instala o `.kwinscript` gerado pelo `scripts/build.py`, ou seja, o me
 | `QT_QUICK_BACKEND=software` | As janelas QtQuick internas do KWin (nossos overlays) não conseguem alocar buffers OpenGL no vgem. |
 | `QT_FORCE_STDERR_LOGGING=1` | Sem isso o Qt manda os logs para o journald, que não existe no container, e `console.log` some. |
 | `KWIN_WAYLAND_NO_PERMISSION_CHECKS=1` | Libera o protocolo de entrada simulada (`org_kde_kwin_fake_input`) para o `fakeinput.py`. |
-| `plasma-breeze` na imagem Fedora | Sem a decoração Breeze, as alças de redimensionar não se estendem para fora da janela, e o arrasto da divisa não pega. O Fedora KDE do usuário tem Breeze. |
+| `plasma-breeze` e `procps-ng` na imagem Fedora | Sem a decoração Breeze, as alças de redimensionar não se estendem para fora da janela, e o arrasto da divisa não pega. O Fedora KDE do usuário tem Breeze. O `procps-ng` (pgrep) é usado pelos cenários; o `sys.sh` funciona sem ele (Lição 50). |
 | `plasma-workspace`, `plasma-desktop` e `plasma-sdk` nas três imagens | O ícone da bandeja roda no `plasmoidviewer` (precisa da contêiner `org.kde.desktopcontainment` do plasma-desktop) e usa módulos QML do plasma-workspace (D-Bus, barra de tarefas). No Fedora roda só o `TrayReloadTest` (o painel do plasmashell, com o ícone na bandeja: Lição 49); os outros testes da bandeja têm cliques calibrados no Arch. |
 | `KWIN_EFFECTS_FORCE_ANIMATIONS=1` (menos no Debian) | Com renderização por software (llvmpipe), o KWin desativa animações e nenhum efeito em JavaScript carrega. |
 | `KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1` | Libera a API D-Bus `ScreenShot2` para o `screenshot.py`. |

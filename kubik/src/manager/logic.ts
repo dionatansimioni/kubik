@@ -8,6 +8,8 @@
  */
 import {
   INSTALLED_SYS,
+  logoutCommand as trayLogoutCommand,
+  restartPanelCommand as trayRestartPanelCommand,
   type Release,
   type Status,
   type SysPath,
@@ -40,7 +42,8 @@ export interface Plan {
   actions: Action[];
   /** Avisos de estado. */
   /** dbus/fetch: programa faltando no sistema (sys.sh); o comando que instala fica em hints. */
-  warnings: Array<"effect" | "script" | "dbus" | "fetch">;
+  /** restart: a bandeja mudou com este plasmashell rodando (reiniciar o painel ou a sessão). */
+  warnings: Array<"effect" | "script" | "dbus" | "fetch" | "restart">;
   hints: { dbus: string | null; fetch: string | null };
   /** Componentes que faltam numa instalação incompleta. */
   missing: Array<"script" | "effect" | "tray">;
@@ -72,6 +75,7 @@ export function plan(status: Status | null, bundled: string | null, release: Rel
     for (const k of ["script", "effect", "tray"] as const) if (status && !status[k]) missing.push(k);
     if (!tools.dbus && status?.script && !status.scriptLoaded) warnings.push("script");
     if (!tools.dbus && status?.effect && !status.effectLoaded) warnings.push("effect");
+    if (status?.plasmaRestart) warnings.push("restart");
     if (status?.tray) actions.push("settings");
     actions.push("remove");
     if (available && compareVersions(available, installed) > 0) actions.push("update");
@@ -99,6 +103,16 @@ export function removeCommand(bundleDir: string): string {
   return `if [ -f ${stored} ]; then bash ${stored}; else ${fallback}; fi`;
 }
 
+/** Reiniciar o painel (plasmashell), pelo sys.sh do pacote junto ou o da bandeja. */
+export function restartPanelCommand(bundleDir: string): string {
+  return trayRestartPanelCommand(sysPath(bundleDir));
+}
+
+/** Abrir a tela de encerrar a sessão do KDE. */
+export function logoutCommand(bundleDir: string): string {
+  return trayLogoutCommand(sysPath(bundleDir));
+}
+
 /** Configurações: a bandeja numa janela (plasmawindowed), ao lado do gerenciador. */
 export function settingsCommand(): string {
   return "setsid plasmawindowed io.github.dionatansimioni.kubik >/dev/null 2>&1 < /dev/null &";
@@ -120,6 +134,12 @@ const TEXTS = {
   part_effect: ["the animations", "as animações"],
   part_tray: ["the tray icon", "o ícone da bandeja"],
   warn_effect: ["Animations start after you log out and back in.", "As animações começam depois que você sair e entrar na sessão."],
+  warn_restart: [
+    "To finish updating Kubik, restart the panel (it disappears for 2 or 3 seconds) or log out and back in.",
+    "Para concluir a atualização do Kubik, reinicie o painel (ele some da tela por 2 ou 3 segundos) ou saia e entre na sessão.",
+  ],
+  restartPanel: ["Restart panel", "Reiniciar o painel"],
+  logout: ["Log out", "Encerrar a sessão"],
   warn_script: [
     "The tiling script is not running. Turn it on in System Settings › Window Management › KWin Scripts.",
     "O script de tiling não está rodando. Ative em Configurações do Sistema › Gerenciamento de janelas › Scripts do KWin.",

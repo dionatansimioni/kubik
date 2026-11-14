@@ -116,11 +116,58 @@ screenshot removed
 files removed
 close_manager
 
+# Com o painel rodando (Lição 50): a bandeja nova só vale inteira com o
+# plasmashell reiniciado. Instalar pede para reiniciar o painel ou a sessão; o
+# botão reinicia o plasmashell e o aviso some.
+mark restart
+plasmashell >/dev/null 2>&1 &
+for i in $(seq 40); do pgrep -x plasmashell >/dev/null && break; sleep 0.5; done
+sleep 4
+echo "=== PLASMA before $(pgrep -x plasmashell)" >&2
+n=$(grep -ac "\[kubik-manager\] botões" /out/kwin.log)
+"$AI" >&2 &
+wait_opened 3 || exit 1
+# Os botões desta janela (a última linha ainda é a da fase anterior).
+for i in $(seq 60); do [ "$(grep -ac "\[kubik-manager\] botões" /out/kwin.log)" -gt "$n" ] && break; sleep 0.5; done
+mgr_click install
+wait_log "[kubik-manager] concluído: install" 60
+wait_button restartPanel
+sleep 1
+screenshot restart_offered
+mgr_click logout
+wait_log "[kubik-manager] encerrar a sessão" 10
+# A tela de saída do KDE (ksmserver-logout-greeter) cobre tudo: fotografa e fecha.
+sleep 3
+screenshot logout_prompt
+echo "=== GREETER $(pgrep -f logout-greeter >/dev/null && echo yes || echo no)" >&2
+pkill -f logout-greeter
+sleep 1
+mgr_click restartPanel
+wait_log "[kubik-manager] reiniciar o painel" 10
+for i in $(seq 40); do
+    p=$(pgrep -x plasmashell)
+    [ -n "$p" ] && ! grep -aq "=== PLASMA before $p\$" /out/kwin.log && break
+    sleep 0.5
+done
+echo "=== PLASMA after $(pgrep -x plasmashell)" >&2
+# O aviso some quando o estado é relido (4 s depois do clique).
+for i in $(seq 30); do
+    grep -a "\[kubik-manager\] botões" /out/kwin.log | tail -n1 | grep -q " restartPanel=" || break
+    sleep 0.5
+done
+sleep 1
+screenshot restarted
+close_manager
+pkill -x plasmashell
+# A fase seguinte começa sem nada instalado.
+bash "$DATA/kubik/uninstall.sh" >/dev/null 2>&1
+sleep 1
+
 # Sem nenhum cliente de D-Bus nem de download (sys.sh, Lição 48): o
 # gerenciador avisa o que instalar, já antes de instalar.
 mark no_tools
 KUBIK_SYS_DISABLE="dbus-send gdbus qdbus6 qdbus-qt6 qdbus curl wget wget2" "$AI" >&2 &
-wait_opened 3
+wait_opened 4
 sleep 2
 screenshot no_tools
 close_manager

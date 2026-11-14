@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import textwrap
+import time
 import unittest
 from pathlib import Path
 
@@ -243,6 +244,86 @@ class SysTest(unittest.TestCase):
         self.assertEqual(self.sys().returncode, 2)
         self.assertEqual(self.sys("dbus-bool", "só um").returncode, 2)
 
+
+    # ---- reiniciar o painel ou a sessão (Lição 50) --------------------------------
+
+    def plasma(self, pid):
+        """Um pgrep falso que acha o plasmashell com esse PID (None: não roda)."""
+        f = self.bin / "pgrep"
+        f.write_text(f'#!/bin/sh\necho "pgrep $*" >> "{self.log}"\n' + (f"echo {pid}\n" if pid else "exit 1\n"))
+        f.chmod(0o755)
+        for tool in ("id", "cat", "rm", "mkdir"):
+            if not (self.bin / tool).exists():
+                (self.bin / tool).symlink_to(shutil.which(tool))
+        return {"XDG_RUNTIME_DIR": str(self.dir / "run")}
+
+    def test_session_mark_lasts_while_the_same_plasmashell_runs(self):
+        env = self.plasma(4242)
+        (self.dir / "run").mkdir()
+        self.assertEqual(self.sys("session-pending", env=env).stdout, "plasmaRestart=false\n")
+        self.assertEqual(self.sys("session-mark", env=env).returncode, 0)
+        self.assertEqual((self.dir / "run" / "kubik-plasma-restart").read_text(), "4242\n")
+        self.assertEqual(self.sys("session-pending", env=env).stdout, "plasmaRestart=true\n")
+        # Painel reiniciado (outro PID): o pedido some, e o arquivo também.
+        env = self.plasma(5555)
+        self.assertEqual(self.sys("session-pending", env=env).stdout, "plasmaRestart=false\n")
+        self.assertFalse((self.dir / "run" / "kubik-plasma-restart").exists())
+        self.assertTrue(any(c.startswith("pgrep -u ") and c.endswith(" -x plasmashell") for c in self.calls()))
+
+    def test_without_pgrep_reads_proc(self):
+        env = self.plasma(None)
+        (self.bin / "pgrep").unlink()
+        proc = self.dir / "proc"
+        for pid, comm in ((17, "kwin_wayland"), (4242, "plasmashell"), (99, "plasmashell-x")):
+            (proc / str(pid)).mkdir(parents=True)
+            (proc / str(pid) / "comm").write_text(comm + "\n")
+        env["KUBIK_PROC"] = str(proc)
+        self.assertEqual(self.sys("session-mark", env=env).returncode, 0)
+        self.assertEqual((self.dir / "run" / "kubik-plasma-restart").read_text(), "4242\n")
+        self.assertEqual(self.sys("session-pending", env=env).stdout, "plasmaRestart=true\n")
+
+    def test_session_mark_without_plasmashell_does_nothing(self):
+        env = self.plasma(None)
+        self.assertEqual(self.sys("session-mark", env=env).returncode, 0)
+        self.assertFalse((self.dir / "run" / "kubik-plasma-restart").exists())
+        self.assertEqual(self.sys("session-pending", env=env).stdout, "plasmaRestart=false\n")
+
+    def test_plasma_restart_uses_the_systemd_service(self):
+        env = self.plasma(4242)
+        f = self.bin / "systemctl"
+        f.write_text(f'#!/bin/sh\necho "systemctl $*" >> "{self.log}"\n')
+        f.chmod(0o755)
+        self.assertEqual(self.sys("plasma-restart", env=env).returncode, 0)
+        self.assertEqual([c for c in self.calls() if c.startswith("systemctl")], [
+            "systemctl --user -q is-active plasma-plasmashell.service",
+            "systemctl --user --no-block restart plasma-plasmashell.service",
+        ])
+
+    def test_plasma_restart_without_systemd_stops_and_starts_it_detached(self):
+        env = self.plasma(4242)
+        f = self.bin / "setsid"
+        f.write_text(f'#!/bin/sh\nshift 2; echo "setsid $*" >> "{self.log}"\n')
+        f.chmod(0o755)
+        self.assertEqual(self.sys("plasma-restart", env=env).returncode, 0)
+        for _ in range(50):
+            if any(c.startswith("setsid") for c in self.calls()):
+                break
+            time.sleep(0.05)
+        detached = [c for c in self.calls() if c.startswith("setsid")]
+        self.assertEqual(len(detached), 1)
+        self.assertIn("kill 4242", detached[0])
+        self.assertTrue(detached[0].endswith("exec plasmashell"), detached[0])
+
+    def test_logout_opens_the_kde_logout_prompt(self):
+        self.stub("dbus-send", "gdbus")
+        self.assertEqual(self.sys("logout").returncode, 0)
+        self.assertEqual(self.sys("logout", env={"KUBIK_SYS_DISABLE": "dbus-send"}).returncode, 0)
+        self.assertEqual(self.calls(), [
+            "dbus-send --session --print-reply --dest=org.kde.LogoutPrompt /LogoutPrompt "
+            "org.kde.LogoutPrompt.promptLogout",
+            "gdbus call --session --dest org.kde.LogoutPrompt --object-path /LogoutPrompt "
+            "--method org.kde.LogoutPrompt.promptLogout",
+        ])
 
 if __name__ == "__main__":
     unittest.main()

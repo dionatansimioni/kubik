@@ -195,6 +195,8 @@ Item {
             status = logic.parseStatus(stdout);
             let line = "estado: script " + status.script + (status.scriptLoaded ? " (ativo)" : " (parado)") + ", efeito " + status.effect + (status.effectLoaded ? " (ativo)" : " (parado)") + ", bandeja " + status.tray;
             const m = status.missing;
+            if (status.plasmaRestart)
+                line += "; reiniciar o painel ou a sessão";
             if (m.dbus || m.shortcuts || m.fetch)
                 line += "; falta: " + [m.dbus ? "D-Bus (" + m.dbus + ")" : "", m.shortcuts && !m.dbus ? "atalhos (" + m.shortcuts + ")" : "", m.fetch ? "download (" + m.fetch + ")" : ""].filter(x => x).join(", ");
             if (line !== lastStatusLine)
@@ -203,6 +205,17 @@ Item {
             if (then)
                 then();
         });
+    }
+
+    // Concluir a atualização (Lição 50). O sys.sh reinicia o plasmashell num
+    // processo à parte: esta bandeja morre junto com o painel.
+    function restartPanel() {
+        log("reiniciar o painel");
+        exec.run(logic.restartPanelCommand(sysPath), null);
+    }
+    function logout() {
+        log("encerrar a sessão");
+        exec.run(logic.logoutCommand(sysPath), null);
     }
 
     function checkUpdates() {
@@ -467,11 +480,37 @@ Item {
                     text: i18n("Can't check for new versions: a download tool is missing. Install it with: %1", root.missing.fetch || "")
                 }
                 Kirigami.InlineMessage {
+                    objectName: "restartNotice"
+                    Layout.fillWidth: true
+                    type: Kirigami.MessageType.Warning
+                    visible: !!root.status && root.status.plasmaRestart
+                    text: i18n("To finish updating Kubik, restart the panel (it disappears for 2 or 3 seconds) or log out and back in.")
+                    actions: [
+                        Kirigami.Action {
+                            text: i18n("Restart panel")
+                            icon.name: "view-refresh"
+                            onTriggered: root.restartPanel()
+                        },
+                        Kirigami.Action {
+                            text: i18n("Log out")
+                            icon.name: "system-log-out"
+                            onTriggered: root.logout()
+                        }
+                    ]
+                }
+                Kirigami.InlineMessage {
                     objectName: "effectWarning"
                     Layout.fillWidth: true
                     type: Kirigami.MessageType.Warning
                     visible: !!root.status && !root.missing.dbus && !!root.status.effect && !root.status.effectLoaded
                     text: i18n("Animations start after you log out and back in.")
+                    actions: [
+                        Kirigami.Action {
+                            text: i18n("Log out")
+                            icon.name: "system-log-out"
+                            onTriggered: root.logout()
+                        }
+                    ]
                 }
                 Kirigami.InlineMessage {
                     objectName: "scriptWarning"

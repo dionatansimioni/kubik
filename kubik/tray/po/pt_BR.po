@@ -176,3 +176,12 @@ msgstr "Não dá para procurar versões novas: falta um programa de download. In
 
 msgid "Shortcuts can't be read or changed: a D-Bus tool is missing. Install it with: %1"
 msgstr "Não dá para ler nem mudar os atalhos: falta um programa de D-Bus. Instale com: %1"
+
+msgid "To finish updating Kubik, restart the panel (it disappears for 2 or 3 seconds) or log out and back in."
+msgstr "Para concluir a atualização do Kubik, reinicie o painel (ele some da tela por 2 ou 3 segundos) ou saia e entre na sessão."
+
+msgid "Restart panel"
+msgstr "Reiniciar o painel"
+
+msgid "Log out"
+msgstr "Encerrar a sessão"

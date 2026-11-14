@@ -131,6 +131,23 @@ ApplicationWindow {
         });
     }
 
+    // Concluir a atualização (Lição 50): reiniciar o painel ou encerrar a sessão.
+    function restartPanel() {
+        log("reiniciar o painel");
+        exec(logic.restartPanelCommand(bundleDir), () => restartCheck.start());
+    }
+    function logout() {
+        log("encerrar a sessão");
+        exec(logic.logoutCommand(bundleDir), null);
+    }
+    // O plasmashell novo leva uns segundos para subir: só então o aviso some.
+    Timer {
+        id: restartCheck
+
+        interval: 4000
+        onTriggered: root.refresh()
+    }
+
     function trigger(action) {
         if (action === "settings") {
             exec(logic.settingsCommand(), null);
@@ -152,7 +169,7 @@ ApplicationWindow {
                 parts.push(b.act + "=" + Math.round(p.x) + "," + Math.round(p.y));
             }
         }
-        for (const b of [confirmButton, cancelButton])
+        for (const b of [confirmButton, cancelButton, restartPanelButton, logoutButton])
             if (b.visible) {
                 const p = b.mapToItem(null, b.width / 2, b.height / 2);
                 parts.push(b.objectName + "=" + Math.round(p.x) + "," + Math.round(p.y));
@@ -300,6 +317,41 @@ ApplicationWindow {
         Notice {
             visible: root.plan.warnings.indexOf("script") >= 0
             text: root.t("warn_script")
+        }
+        Notice {
+            objectName: "restartNotice"
+            visible: root.plan.warnings.indexOf("restart") >= 0
+            text: root.t("warn_restart")
+        }
+        // Concluir: reiniciar o painel (só quando a bandeja mudou) ou a sessão
+        // (também para as animações, que o KWin só descobre no login).
+        RowLayout {
+            Layout.fillWidth: true
+            // Pela condição, não pelo visible dos botões (dentro de um pai
+            // invisível, eles também ficam invisíveis: nunca apareceria).
+            visible: root.busy === "" && !root.confirming && (root.plan.warnings.indexOf("restart") >= 0 || root.plan.warnings.indexOf("effect") >= 0)
+
+            Item {
+                Layout.fillWidth: true
+            }
+            Button {
+                id: restartPanelButton
+
+                objectName: "restartPanel"
+                visible: root.busy === "" && root.plan.warnings.indexOf("restart") >= 0
+                icon.name: "view-refresh"
+                text: root.t("restartPanel")
+                onClicked: root.restartPanel()
+            }
+            Button {
+                id: logoutButton
+
+                objectName: "logout"
+                visible: root.busy === "" && !root.confirming && (root.plan.warnings.indexOf("restart") >= 0 || root.plan.warnings.indexOf("effect") >= 0)
+                icon.name: "system-log-out"
+                text: root.t("logout")
+                onClicked: root.logout()
+            }
         }
         Label {
             Layout.fillWidth: true

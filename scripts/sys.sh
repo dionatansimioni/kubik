@@ -17,6 +17,10 @@
 #   sys.sh fetch <url> <arquivo|-> [<header>]
 #   sys.sh dbus-int <serviço> <caminho> <interface.método> [<texto>…]  → o inteiro devolvido
 #   sys.sh require dbus|shortcuts|fetch    (sai com 127 e a dica se faltar)
+#   sys.sh session-mark        anota que o painel precisa reiniciar (Lição 50)
+#   sys.sh session-pending     → plasmaRestart=true|false
+#   sys.sh plasma-restart      reinicia o plasmashell (o painel some por 2 a 3 s)
+#   sys.sh logout              abre a tela de encerrar a sessão do KDE
 
 has() {
     case " ${KUBIK_SYS_DISABLE:-} " in *" $1 "*) return 1 ;; esac
@@ -214,6 +218,66 @@ cmd_fetch() {
     fi
 }
 
+# ---- reiniciar o painel ou a sessão (Lição 50) -------------------------------
+# O plasmashell guarda o QML da bandeja em memória: depois de atualizá-la, o
+# código novo só vale inteiro com o painel reiniciado. O install.sh anota o PID
+# do plasmashell no XDG_RUNTIME_DIR (o login seguinte o esvazia); o pedido vale
+# enquanto esse plasmashell estiver rodando.
+
+mark_file() {
+    echo "${XDG_RUNTIME_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}}/kubik-plasma-restart"
+}
+
+# PID do plasmashell deste usuário. Sem o pgrep (procps), lê o /proc
+# (KUBIK_PROC: outro /proc, nos testes).
+plasma_pid() {
+    if has pgrep; then
+        pgrep -u "$(id -u)" -x plasmashell 2>/dev/null | sed -n 1p
+        return
+    fi
+    for d in "${KUBIK_PROC:-/proc}"/[0-9]*; do
+        [ -O "$d" ] && [ "$(cat "$d/comm" 2>/dev/null)" = plasmashell ] && { echo "${d##*/}"; return; }
+    done
+}
+
+cmd_session_mark() {
+    p=$(plasma_pid)
+    [ -n "$p" ] || return 0
+    f=$(mark_file)
+    mkdir -p "${f%/*}" && echo "$p" > "$f"
+}
+
+cmd_session_pending() {
+    f=$(mark_file)
+    r=false
+    if [ -f "$f" ]; then
+        p=$(plasma_pid)
+        if [ -n "$p" ] && [ "$(cat "$f" 2>/dev/null)" = "$p" ]; then r=true; else rm -f "$f"; fi
+    fi
+    echo "plasmaRestart=$r"
+}
+
+cmd_plasma_restart() {
+    if has systemctl && systemctl --user -q is-active plasma-plasmashell.service 2>/dev/null; then
+        systemctl --user --no-block restart plasma-plasmashell.service
+        return
+    fi
+    # Sem o serviço do systemd: encerra e abre de novo num processo à parte
+    # (quem chama pode ser a própria bandeja, que morre junto com o painel).
+    p=$(plasma_pid)
+    case "$p" in ""|*[!0-9]*) p=0 ;; esac
+    script="[ $p -gt 0 ] && kill $p 2>/dev/null; i=0; while [ $p -gt 0 ] && kill -0 $p 2>/dev/null && [ \$i -lt 50 ]; do sleep 0.2; i=\$((i + 1)); done; exec plasmashell"
+    if has setsid; then
+        setsid sh -c "$script" </dev/null >/dev/null 2>&1 &
+    else
+        nohup sh -c "$script" </dev/null >/dev/null 2>&1 &
+    fi
+}
+
+cmd_logout() {
+    cmd_dbus_call org.kde.LogoutPrompt /LogoutPrompt org.kde.LogoutPrompt.promptLogout
+}
+
 cmd="${1:-}"
 [ $# -gt 0 ] && shift
 case "$cmd" in
@@ -225,5 +289,9 @@ case "$cmd" in
     fetch) cmd_fetch "$@" ;;
     dbus-int) cmd_dbus_int "$@" ;;
     require) cmd_require "$@" ;;
-    *) echo "uso: sys.sh tools|require|dbus-bool|dbus-call|dbus-int|shortcut-get|shortcut-set|fetch …" >&2; exit 2 ;;
+    session-mark) cmd_session_mark ;;
+    session-pending) cmd_session_pending ;;
+    plasma-restart) cmd_plasma_restart ;;
+    logout) cmd_logout ;;
+    *) echo "uso: sys.sh tools|require|dbus-bool|dbus-call|dbus-int|shortcut-get|shortcut-set|fetch|session-mark|session-pending|plasma-restart|logout …" >&2; exit 2 ;;
 esac

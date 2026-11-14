@@ -35,7 +35,8 @@ class ManagerWindowTest(unittest.TestCase):
         )
         cls.log = (cls.out / "kwin.log").read_text(errors="replace")
         cls.appimage = cls.log.split("=== MARK appimage ===")[1].split("=== MARK menu ===")[0]
-        cls.menu = cls.log.split("=== MARK menu ===")[1].split("=== MARK no_tools ===")[0]
+        cls.menu = cls.log.split("=== MARK menu ===")[1].split("=== MARK restart ===")[0]
+        cls.restart = cls.log.split("=== MARK restart ===")[1].split("=== MARK no_tools ===")[0]
         cls.no_tools = cls.log.split("=== MARK no_tools ===")[1]
 
     @classmethod
@@ -81,7 +82,9 @@ class ManagerWindowTest(unittest.TestCase):
         # escreve "Caminho"; 0.12.0 ficava em "instalado null").
         self.assertRegex(self.appimage, r"concluído: install[\s\S]*estado: instalado \d+\.\d+\.\d+")
         last = re.findall(r"\[kubik-manager\] botões(.*)", self.appimage)[-1]
-        self.assertEqual(re.findall(r" (\w+)=", last), ["settings", "remove"])
+        # O efeito novo só ativa no próximo login: oferece encerrar a sessão (Lição 50).
+        self.assertRegex(self.appimage, r"concluído: install[\s\S]*avisos effect")
+        self.assertEqual(re.findall(r" (\w+)=", last), ["settings", "remove", "logout"])
 
     def test_menu_entry_opens_the_installed_manager(self):
         self.assertIn('=== EXEC "/home/tester/.local/share/kubik/Kubik.AppImage"', self.menu)
@@ -95,7 +98,7 @@ class ManagerWindowTest(unittest.TestCase):
     def test_offers_and_installs_the_github_update(self):
         self.assertIn("[kubik-manager] GitHub: 99.0.0", self.menu)
         offered = [l for l in re.findall(r"\[kubik-manager\] botões(.*)", self.menu) if " update=" in l][0]
-        self.assertEqual(re.findall(r" (\w+)=", offered), ["settings", "remove", "update"])
+        self.assertEqual(re.findall(r" (\w+)=", offered), ["settings", "remove", "update", "logout"])
         self.assertIn("ação: update 99.0.0 (github)", self.menu)
         # Pelo AppImage do release, que também troca o gerenciador guardado.
         self.assertIn("=== MANAGER is 99.0.0", self.menu)
@@ -121,6 +124,23 @@ class ManagerWindowTest(unittest.TestCase):
         bad = [l for l in self.log.splitlines()
                if "qrc:/Main.qml" in l or ("kubik-manager" in l and re.search(r"Error|undefined|is not", l))]
         self.assertEqual(bad, [])
+    def test_after_installing_offers_to_restart_the_panel_or_log_out(self):
+        # Com o plasmashell rodando, o install.sh pede para reiniciar (Lição 50).
+        self.assertRegex(self.restart, r"concluído: install[\s\S]*estado: instalado \d+\.\d+\.\d+, .*avisos [\w,]*restart")
+        offered = [l for l in re.findall(r"\[kubik-manager\] botões(.*)", self.restart) if " restartPanel=" in l][0]
+        self.assertEqual(re.findall(r" (\w+)=", offered), ["settings", "remove", "restartPanel", "logout"])
+        self.assertIn("[kubik-manager] encerrar a sessão", self.restart)
+        # Abre a tela de saída do KDE de verdade (activada pelo D-Bus).
+        self.assertIn("Successfully activated service 'org.kde.LogoutPrompt'", self.restart)
+        self.assertIn("[kubik-manager] reiniciar o painel", self.restart)
+        # O plasmashell foi reiniciado (outro PID), e o aviso sumiu.
+        before = re.search(r"=== PLASMA before (\d+)", self.restart).group(1)
+        after = re.search(r"=== PLASMA after (\d+)", self.restart).group(1)
+        self.assertNotEqual(before, after)
+        last = re.findall(r"\[kubik-manager\] botões(.*)", self.restart)[-1]
+        self.assertNotIn("restartPanel", re.findall(r" (\w+)=", last))
+        self.assertNotRegex(self.restart.split("reiniciar o painel")[-1], r"avisos [\w,]*restart")
+
     def test_missing_tools_are_reported_before_installing(self):
         # Sem cliente de D-Bus nem de download: os dois avisos, com o comando da distro.
         self.assertRegex(self.no_tools, r"\[kubik-manager\] estado: instalado null, .*avisos dbus,fetch")

@@ -225,6 +225,12 @@ export interface Status {
    * fetch = nenhum programa de download (sem procurar versões novas).
    */
   missing: { dbus: string | null; shortcuts: string | null; fetch: string | null };
+  /**
+   * A bandeja foi instalada ou atualizada com este plasmashell rodando, que
+   * guarda o QML antigo em memória: para concluir, reiniciar o painel ou a
+   * sessão (sys.sh session-pending; Lição 50).
+   */
+  plasmaRestart: boolean;
 }
 
 /**
@@ -263,6 +269,7 @@ export function statusCommand(sysPath: SysPath): string {
     `${sys(sysPath, "tools")} 2>/dev/null`,
     loaded("scriptLoaded", "/Scripting", "org.kde.kwin.Scripting.isScriptLoaded", "kubik"),
     loaded("effectLoaded", "/Effects", "org.kde.kwin.Effects.isEffectLoaded", EFFECT_ID),
+    `${sys(sysPath, "session-pending")} 2>/dev/null`,
   ].join("; ");
 }
 
@@ -296,7 +303,21 @@ export function parseStatus(stdout: string): Status {
     scriptLoaded: v.scriptLoaded === "true",
     effectLoaded: v.effectLoaded === "true",
     missing: parseMissing(stdout),
+    plasmaRestart: v.plasmaRestart === "true",
   };
+}
+
+/**
+ * Reinicia o plasmashell (o painel some por 2 a 3 s). Desligado do processo
+ * que chama: a bandeja roda dentro do plasmashell.
+ */
+export function restartPanelCommand(sysPath: SysPath): string {
+  return `${sys(sysPath, "plasma-restart")} >/dev/null 2>&1`;
+}
+
+/** Abre a tela de encerrar a sessão do KDE. */
+export function logoutCommand(sysPath: SysPath): string {
+  return `${sys(sysPath, "logout")} >/dev/null 2>&1`;
 }
 
 /** A versão "do Kubik": a do script (o principal) ou, sem ele, a da bandeja. */
