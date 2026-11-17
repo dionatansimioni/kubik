@@ -1,4 +1,4 @@
-import { type Rect, inset, sameRect } from "../core/rect";
+import { type Rect, contains, inset, intersects, sameRect, subtract } from "../core/rect";
 
 /** Espera antes de conferir se uma janela saiu do tile (mudanças assentarem). */
 const ENFORCE_DELAY_MS = 250;
@@ -59,6 +59,13 @@ export const DEFAULT_CONFIG: Config = {
  * redesenhada (com a animação padrão de 250 ms: 300 ms).
  */
 const BORDER_SETTLE_EXTRA_MS = 50;
+
+/**
+ * Faixa (px, da beira para dentro) onde a borda desenha: o traço de 3 px e a
+ * curva dos cantos (raio 10 no Kubik.qml). Uma janela por cima que não toca
+ * essa faixa (ex.: um menu no meio da janela) não corta a borda.
+ */
+const BORDER_BAND = 10;
 
 /** Segurar a janela arrastada parada sobre outra por este tempo empilha as duas. */
 const HOLD_TO_STACK_MS = 800;
@@ -131,6 +138,8 @@ export class Controller {
   private readonly unsubscribe: Array<() => void> = [];
   /** Última borda enviada ao QML (para não repetir) e de qual janela. */
   private borderRect: Rect | null = null;
+  /** Os pedaços dela à vista (JSON; "null": inteira). */
+  private borderParts = "null";
   private borderOwner: string | null = null;
   /** Geração do timer de "assentou" (só o último vale). */
   private borderGen = 0;
@@ -159,7 +168,8 @@ export class Controller {
         this.noteFocus(idOf(w));
         this.tabActivated(idOf(w));
       }
-      this.updateBorder();
+      // Ativar traz a janela para a frente: muda o que fica coberto.
+      this.coversChanged();
     };
     ws.windowAdded.connect(onAdded);
     ws.windowRemoved.connect(onRemoved);
@@ -490,7 +500,11 @@ export class Controller {
       const current = this.host.workspace.currentDesktop.id;
       for (const [key, tree] of this.trees) {
         if (tree.size < 2 || this.monocle.has(key) || this.places.get(key)!.desktop.id !== current) continue;
-        for (const st of tree.stacks(this.area(key), this.config.gaps, this.minsOf(tree)))
+        for (const st of tree.stacks(this.area(key), this.config.gaps, this.minsOf(tree))) {
+          // Um menu (ou outra janela) por cima da barra: ela some até ele
+          // fechar. Recortada, ainda pegaria os cliques do menu (Lição 51).
+          const top = this.tracked.get(st.active)?.window;
+          if (top && this.coversOf(top).some((c) => intersects(c, st.bar))) continue;
           bars.push({
             rect: st.bar,
             tabs: st.ids.map((id) => {
@@ -498,6 +512,7 @@ export class Controller {
               return { id, caption: w?.caption ?? "", active: id === st.active, icon: w?.icon };
             }),
           });
+        }
       }
     }
     // O ícone (QIcon) não serializa; a classe do app basta para notar mudanças.
@@ -547,7 +562,40 @@ export class Controller {
       if (!moving) this.settleBorder();
       return;
     }
-    this.showBorder(r, id);
+    // Menus e outras janelas acima da janela em foco cobrem a borda: o KWin
+    // põe os overlays acima de tudo (Lição 51), então ela leva os buracos.
+    const band = inset(r, BORDER_BAND);
+    const holes = this.coversOf(w).filter((c) => intersects(c, r) && !contains(band, c));
+    const parts = holes.length
+      ? subtract(r, holes).map((p) => ({ x: p.x - r.x, y: p.y - r.y, width: p.width, height: p.height }))
+      : null;
+    this.showBorder(r, id, parts);
+  }
+
+  /**
+   * O que está à vista acima de `w` no empilhamento: menus, dicas, painéis,
+   * notificações, janelas "manter acima" ou flutuantes por cima. Fora: os
+   * overlays (do Kubik e de outros scripts), janelas no tiling (no lugar, não
+   * se sobrepõem; animando, a borda e as abas já esperam), a janela que o
+   * usuário está arrastando e a que está fechando.
+   */
+  private coversOf(w: KWinWindow): Rect[] {
+    const order = this.host.workspace.stackingOrder;
+    const id = idOf(w);
+    const i = order.findIndex((o) => idOf(o) === id);
+    if (i < 0) return [];
+    const current = this.host.workspace.currentDesktop.id;
+    const out: Rect[] = [];
+    for (const o of order.slice(i + 1)) {
+      if (isInternalWindow(o) || o.minimized || o.opacity === 0 || o.move || o.resize) continue;
+      if (!o.onAllDesktops && !o.desktops.some((d) => d.id === current)) continue;
+      // Sem registro: está fechando (o KWin emite windowRemoved com ela
+      // ainda no stackingOrder). No tiling: não cobre.
+      const t = this.tracked.get(idOf(o));
+      if (!t || t.key !== null) continue;
+      out.push(copy(o.frameGeometry));
+    }
+    return out;
   }
 
   /** Redesenha a borda quando a janela parar de mudar (reinicia a cada mudança). */
@@ -558,12 +606,14 @@ export class Controller {
     });
   }
 
-  private showBorder(r: Rect | null, owner: string | null): void {
+  private showBorder(r: Rect | null, owner: string | null, parts: Rect[] | null = null): void {
     const same = r === null ? this.borderRect === null : this.borderRect !== null && sameRect(r, this.borderRect);
+    const partsJson = r === null ? "null" : JSON.stringify(parts);
     this.borderOwner = owner;
-    if (same) return;
+    if (same && partsJson === this.borderParts) return;
     this.borderRect = r ? copy(r) : null;
-    this.host.border(r);
+    this.borderParts = partsJson;
+    this.host.border(r, r === null ? null : parts);
   }
 
   /** Janelas "de verdade" à vista: diálogos, overlays e janelas ocultas não. */
@@ -675,7 +725,7 @@ export class Controller {
     };
     const signals = [w.minimizedChanged, w.fullScreenChanged, w.desktopsChanged, w.outputChanged];
     for (const s of signals) s.connect(onChange);
-    const onBorder = () => this.updateBorder();
+    const onBorder = () => this.coversChanged();
     const borderSignals = [w.minimizedChanged, w.fullScreenChanged, w.maximizedChanged];
     for (const s of borderSignals) s.connect(onBorder);
     const onCaption = () => this.publishTabs();
@@ -707,7 +757,13 @@ export class Controller {
     };
     this.tracked.set(id, t);
     this.refresh(t, true);
+    this.coversChanged();
+  }
+
+  /** Uma janela abriu, fechou, mudou de lugar ou foi minimizada: refaz o que ela cobre. */
+  private coversChanged(): void {
     this.updateBorder();
+    this.publishTabs();
   }
 
   private untrack(w: KWinWindow): void {
@@ -722,7 +778,7 @@ export class Controller {
       this.host.preview(null);
     }
     this.removeFromTree(t);
-    this.updateBorder();
+    this.coversChanged();
   }
 
   /**
@@ -897,8 +953,8 @@ export class Controller {
    * janela ao tile; se o app insistir, ela vira flutuante.
    */
   private geometryChanged(id: string): void {
-    const active = this.host.workspace.activeWindow;
-    if (active && idOf(active) === id) this.updateBorder();
+    // Qualquer janela: ela pode cobrir (ou deixar de cobrir) a borda e as abas.
+    this.coversChanged();
     const t = this.tracked.get(id);
     if (!t || !this.deviates(t) || t.checkPending) return;
     t.checkPending = true;

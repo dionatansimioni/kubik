@@ -13,6 +13,7 @@ let logs: string[];
 let previews: Array<import("../src/core/rect").Rect | null>;
 let ghosts: Array<import("../src/core/rect").Rect | null>;
 let borders: Array<import("../src/core/rect").Rect | null>;
+let borderParts: Array<Array<import("../src/core/rect").Rect> | null>;
 let tabs: Array<import("../src/kwin/api").TabBar[]>;
 let stackHints: boolean[];
 let tick: (upTo?: number) => void;
@@ -28,6 +29,7 @@ beforeEach(() => {
   previews = h.previews;
   ghosts = h.ghosts;
   borders = h.borders;
+  borderParts = h.borderParts;
   tabs = h.tabs;
   stackHints = h.stackHints;
   tick = h.tick;
@@ -924,6 +926,94 @@ describe("Controller", () => {
       expect(last()).toEqual(around(rect(4, 4, 1272, 792)));
     });
 
+    describe("menus e janelas por cima (Lição 51)", () => {
+      /** Menu do app em foco: abre no topo do empilhamento, sem foco. */
+      const menu = (r: import("../src/core/rect").Rect) => ws.openPopup(new FakeWindow("", SCREEN_A, DESK_1, r));
+      const lastParts = () => borderParts[borderParts.length - 1];
+
+      it("um menu cruzando a beira corta a borda onde passa, sem esconder o resto", () => {
+        ws.open(win("a"));
+        ws.open(win("b")); // 642,4 634×792: borda 639,1 640×798
+        tick(300);
+        const m = menu(rect(493, 240, 300, 200));
+        expect(last()).toEqual(rect(639, 1, 640, 798));
+        // Relativos à borda: acima, abaixo e à direita do menu.
+        expect(lastParts()).toEqual([rect(0, 0, 640, 239), rect(0, 439, 640, 359), rect(154, 239, 486, 200)]);
+        ws.close(m);
+        expect(last()).toEqual(rect(639, 1, 640, 798));
+        expect(lastParts()).toBeNull();
+      });
+
+      it("trocar só os buracos não pisca a borda (nunca passa por nenhuma)", () => {
+        ws.open(win("a"));
+        ws.open(win("b"));
+        tick(300);
+        expect(last()).not.toBeNull();
+        const n = borders.length;
+        const m = menu(rect(493, 240, 300, 200));
+        m.appSets(rect(493, 300, 300, 200)); // um submenu reposicionado
+        ws.close(m);
+        expect(borders.slice(n)).not.toContain(null);
+      });
+
+      it("um menu no meio da janela, longe da beira, não muda nada", () => {
+        ws.open(win("a"));
+        ws.open(win("b"));
+        tick(300);
+        expect(last()).not.toBeNull();
+        const n = borders.length;
+        menu(rect(800, 300, 200, 150));
+        expect(borders.length).toBe(n);
+      });
+
+      it("janelas abaixo da janela em foco, minimizadas ou de outro desktop não cortam", () => {
+        ws.open(win("a"));
+        const b = ws.open(win("b"));
+        tick(300);
+        const f = new FakeWindow("float", SCREEN_A, DESK_1, rect(500, 200, 300, 200));
+        f.dialog = true; // flutuante, sobre a beira da b
+        ws.open(f);
+        ws.activate(b); // a b sobe acima do diálogo
+        expect(last()).toEqual(rect(639, 1, 640, 798));
+        expect(lastParts()).toBeNull();
+        const other = ws.openPopup(new FakeWindow("", SCREEN_A, DESK_2, rect(493, 240, 300, 200)));
+        expect(lastParts()).toBeNull();
+        ws.close(other);
+        const m = menu(rect(493, 240, 300, 200));
+        expect(lastParts()).not.toBeNull();
+        m.minimized = true;
+        expect(last()).toEqual(rect(639, 1, 640, 798));
+        expect(lastParts()).toBeNull();
+      });
+
+      it("uma janela flutuante ativada por cima corta a borda da que ganhou o foco depois sem subir", () => {
+        ws.open(win("a"));
+        const b = ws.open(win("b"));
+        const f = new FakeWindow("float", SCREEN_A, DESK_1, rect(500, 200, 300, 200));
+        f.dialog = true;
+        ws.open(f);
+        tick(300);
+        // O foco volta para a b sem trazê-la para a frente (ex.: foco segue o mouse).
+        ws.stackingOrder = [...ws.stackingOrder.filter((x) => x !== b && x !== f), b, f];
+        (ws as unknown as { _active: FakeWindow })._active = b;
+        ws.windowActivated.emit(b);
+        expect(last()).toEqual(rect(639, 1, 640, 798));
+        expect(lastParts()).not.toBeNull();
+      });
+
+      it("os overlays (do Kubik e de outros scripts) nunca cortam", () => {
+        ws.open(win("a"));
+        ws.open(win("b"));
+        tick(300);
+        expect(last()).not.toBeNull();
+        const o = new FakeWindow(OVERLAY_CAPTION, SCREEN_A, DESK_1, rect(0, 0, 1280, 800));
+        o.resourceClass = "";
+        o.wantsInput = false;
+        ws.openPopup(o);
+        expect(lastParts()).toBeNull();
+      });
+    });
+
     it("muda de janela junto com o foco, na hora", () => {
       const a = ws.open(win("a"));
       ws.open(win("b"));
@@ -1069,6 +1159,24 @@ describe("Controller", () => {
           ],
         },
       ]);
+    });
+
+    it("um menu por cima da barra de abas a esconde até fechar (senão a barra pegaria os cliques dele)", () => {
+      const { a } = stackOnB();
+      ws.activate(a);
+      expect(lastTabs()).toHaveLength(1);
+      // Menu da a, cruzando para a barra da pilha (642,4 634×32).
+      const m = ws.openPopup(new FakeWindow("", SCREEN_A, DESK_1, rect(500, 10, 300, 200)));
+      expect(lastTabs()).toEqual([]);
+      ws.close(m);
+      expect(lastTabs()).toHaveLength(1);
+    });
+
+    it("um menu longe da barra de abas não a esconde", () => {
+      stackOnB();
+      const n = tabs.length;
+      ws.openPopup(new FakeWindow("", SCREEN_A, DESK_1, rect(700, 300, 200, 200)));
+      expect(tabs.length).toBe(n);
     });
 
     it("segurar sobre outra janela por 800 ms vira empilhar, com aviso na prévia", () => {

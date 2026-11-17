@@ -126,8 +126,12 @@ export interface Host {
    * `stack`: o drop empilha (a prévia ganha uma faixa de abas no topo).
    */
   preview(rect: Rect | null, ghost?: Rect | null, stack?: boolean): void;
-  /** Borda de destaque (cor de destaque do sistema) em `rect`, ou nenhuma. */
-  border(rect: Rect | null): void;
+  /**
+   * Borda de destaque (cor de destaque do sistema) em `rect`, ou nenhuma.
+   * `parts`: os pedaços à vista, relativos a `rect` (o resto fica sob menus e
+   * outras janelas acima da janela em foco); null ou ausente: a borda inteira.
+   */
+  border(rect: Rect | null, parts?: Rect[] | null): void;
   /** As barras de abas à vista agora (lista vazia: nenhuma). */
   tabs(bars: TabBar[]): void;
 }

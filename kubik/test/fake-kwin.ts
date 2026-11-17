@@ -241,11 +241,28 @@ export class FakeWorkspace implements Workspace {
     this.windowAdded.emit(w);
     return w;
   }
-  close(w: FakeWindow): void {
-    this.stackingOrder = this.stackingOrder.filter((x) => x !== w);
-    this.windowRemoved.emit(w);
+  /**
+   * Abre um menu (xdg_popup) como no testenv: entra no topo do empilhamento
+   * e chega pelo windowAdded, sem ser ativado (o foco fica com o app).
+   */
+  openPopup(w: FakeWindow): FakeWindow {
+    w.normalWindow = false;
+    w.transient = true;
+    this.stackingOrder.push(w);
+    this.windowAdded.emit(w);
+    return w;
   }
+  /**
+   * Como no KWin 6 real (achado no testenv, Lição 51): windowRemoved chega
+   * com a janela AINDA no stackingOrder; ela sai de lá logo depois.
+   */
+  close(w: FakeWindow): void {
+    this.windowRemoved.emit(w);
+    this.stackingOrder = this.stackingOrder.filter((x) => x !== w);
+  }
+  /** Como o Workspace::activateWindow do KWin: ativar traz para a frente. */
   activate(w: FakeWindow | null): void {
+    if (w && this.stackingOrder.includes(w)) this.stackingOrder = [...this.stackingOrder.filter((x) => x !== w), w];
     this._active = w;
     this.windowActivated.emit(w);
   }
@@ -258,6 +275,7 @@ export function fakeHost(ws: FakeWorkspace) {
   const ghosts: Array<Rect | null> = [];
   const stackHints: boolean[] = [];
   const borders: Array<Rect | null> = [];
+  const borderParts: Array<Rect[] | null> = [];
   const tabs: TabBar[][] = [];
   const timers: Array<{ ms: number; fn: () => void }> = [];
   const areas: Record<string, Rect> = {
@@ -274,7 +292,10 @@ export function fakeHost(ws: FakeWorkspace) {
       stackHints.push(stack);
     },
     later: (ms, fn) => timers.push({ ms, fn }),
-    border: (rect) => borders.push(rect),
+    border: (rect, parts = null) => {
+      borders.push(rect);
+      borderParts.push(parts);
+    },
     tabs: (bars) => tabs.push(bars),
   };
   /** Dispara os timers de até `upTo` ms (como se esse tempo tivesse passado). */
@@ -283,5 +304,5 @@ export function fakeHost(ws: FakeWorkspace) {
     timers.splice(0, timers.length, ...timers.filter((t) => t.ms > upTo));
     for (const t of due) t.fn();
   };
-  return { host, logs, previews, ghosts, stackHints, borders, tabs, tick };
+  return { host, logs, previews, ghosts, stackHints, borders, borderParts, tabs, tick };
 }

@@ -181,8 +181,14 @@ Item {
         id: borderComponent
 
         Window {
+            id: borderWindow
+
             property bool shown: false
             readonly property alias content: borderContent
+            // Os pedaços à vista, relativos à borda (null: inteira). O KWin
+            // põe os overlays acima até dos menus (Lição 51): onde um menu ou
+            // outra janela acima da janela em foco passa, a borda não desenha.
+            property var parts: null
 
             // Reconhecido pelo controlador (rules.ts, OVERLAY_CAPTION), que o
             // tira da Visão geral, do pager e da barra de tarefas.
@@ -201,13 +207,38 @@ Item {
             FadingItem {
                 id: borderContent
 
+                // Cada pedaço recorta (clip) a mesma borda inteira. O raio e
+                // o traço casam com BORDER_BAND no controller.ts.
+                Repeater {
+                    model: borderWindow.parts ? borderWindow.parts : [{
+                            x: 0,
+                            y: 0,
+                            width: borderWindow.width,
+                            height: borderWindow.height
+                        }]
 
-                Rectangle {
-                    anchors.fill: parent
-                    color: "transparent"
-                    radius: 10
-                    border.width: 3
-                    border.color: pal.highlight
+                    Item {
+                        id: piece
+
+                        required property var modelData
+
+                        x: modelData.x
+                        y: modelData.y
+                        width: modelData.width
+                        height: modelData.height
+                        clip: true
+
+                        Rectangle {
+                            x: -piece.x
+                            y: -piece.y
+                            width: borderWindow.width
+                            height: borderWindow.height
+                            color: "transparent"
+                            radius: 10
+                            border.width: 3
+                            border.color: pal.highlight
+                        }
+                    }
                 }
             }
         }
@@ -392,9 +423,15 @@ Item {
     }
 
     // O controlador só mostra a borda com a janela parada (nunca a persegue):
-    // cada borda nova surge com fade.
-    function showBorder(r) {
-        place(borderWin, r, true);
+    // cada borda nova surge com fade. Só os pedaços mudando (um menu abriu ou
+    // fechou por cima), ela fica onde está, sem fade.
+    function showBorder(r, parts) {
+        if (!borderWin)
+            return;
+        const same = r && borderWin.shown && borderWin.x === r.x && borderWin.y === r.y && borderWin.width === Math.max(1, r.width) && borderWin.height === Math.max(1, r.height);
+        borderWin.parts = r && parts ? parts : null;
+        if (!same)
+            place(borderWin, r, true);
     }
 
     Component {
