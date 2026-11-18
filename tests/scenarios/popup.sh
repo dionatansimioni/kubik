@@ -30,3 +30,19 @@ screenshot tabs_menu
 click 750 150
 sleep 1
 screenshot tabs_closed
+
+# Como um app em Flatpak (relato com o Obsidian): o KWin não acha o
+# executável (apagado depois de abrir), e o menu chega sem classe, fora do
+# Alt+Tab e sem foco, igual a um overlay; só o pid o separa.
+for w in Alpha Beta Gamma; do kill "$(cat /tmp/window-$w.pid)" 2>/dev/null; done
+sleep 1
+open_window Epsilon 400x300 "#8b2f2f"
+mkdir -p /tmp/sandbox && cp "$QML_BIN" /tmp/sandbox/qml
+/tmp/sandbox/qml /work/testenv/clients/window.qml -- Delta 400x300 "#2f6b2f" popup=-150,200,300x200 >/tmp/window-Delta.log 2>&1 &
+sleep 0.5
+rm -f /tmp/sandbox/qml
+wait_window Delta
+click 960 600
+sleep 1
+kwin_eval 'workspace.stackingOrder.forEach(w => { if (w.popupWindow) console.warn("=== POPUP flatpak " + w.frameGeometry.x + "," + w.frameGeometry.y + " " + w.frameGeometry.width + "x" + w.frameGeometry.height + " class=" + JSON.stringify(w.resourceClass) + " pid=" + (w.pid > 0)); })'
+screenshot flatpak_menu

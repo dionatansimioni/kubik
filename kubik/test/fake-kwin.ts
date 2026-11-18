@@ -42,6 +42,8 @@ export class FakeWindow implements KWinWindow {
   skipSwitcher = false;
   /** false nas janelas internas do KWin (overlays de scripts). */
   wantsInput = true;
+  /** Processo do app; -1 nas janelas internas do KWin. */
+  pid = 1000 + nextId;
   skipTaskbar = false;
   skipPager = false;
   opacity = 1;

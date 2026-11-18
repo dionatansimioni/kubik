@@ -293,11 +293,11 @@ describe("Controller", () => {
       ["classe da lista padrão", (w) => (w.resourceClass = "org.kde.krunner")],
       // Regressão: a borda do protótipo (janela interna do KWin) entrou no
       // tiling e empurrou as janelas do usuário para a metade direita.
-      ["janela interna do KWin (overlay)", (w) => { w.resourceClass = ""; w.skipSwitcher = true; }],
+      ["janela interna do KWin (overlay)", (w) => { w.resourceClass = ""; w.skipSwitcher = true; w.pid = -1; }],
       // Regressão: no KWin 6.3 (Debian 13) as janelas internas não vêm fora
       // do Alt+Tab; o Kubik punha os próprios overlays (borda, prévias) no
       // tiling. O que elas têm em toda versão: sem classe e sem aceitar foco.
-      ["janela interna do KWin 6.3 (overlay, ainda no Alt+Tab)", (w) => { w.resourceClass = ""; w.wantsInput = false; }],
+      ["janela interna do KWin 6.3 (overlay, ainda no Alt+Tab)", (w) => { w.resourceClass = ""; w.wantsInput = false; w.pid = -1; }],
     ];
     for (const [name, setup] of cases) {
       it(name, () => {
@@ -319,6 +319,7 @@ describe("Controller", () => {
       const o = win(OVERLAY_CAPTION);
       o.resourceClass = "";
       o.wantsInput = false;
+      o.pid = -1;
       ws.open(o);
       expect([o.skipSwitcher, o.skipPager, o.skipTaskbar]).toEqual([true, true, true]);
     });
@@ -327,6 +328,7 @@ describe("Controller", () => {
       const other = win("overlay de outro script");
       other.resourceClass = "";
       other.wantsInput = false;
+      other.pid = -1;
       const app = win(OVERLAY_CAPTION); // um app com esse título não é overlay
       ws.open(other);
       ws.open(app);
@@ -1001,6 +1003,21 @@ describe("Controller", () => {
         expect(lastParts()).not.toBeNull();
       });
 
+      it("o menu de um Flatpak (sem classe e sem foco, como um overlay, mas com pid) corta", () => {
+        // O Obsidian em Flatpak: o KWin não acha o executável, e o menu (sem
+        // app_id) chega sem classe; menus nunca aceitam foco (relato, 0.13.3).
+        ws.open(win("a"));
+        ws.open(win("b"));
+        tick(300);
+        const m = new FakeWindow("", SCREEN_A, DESK_1, rect(493, 240, 300, 200));
+        m.resourceClass = "";
+        m.wantsInput = false;
+        m.skipSwitcher = true;
+        m.pid = 4242;
+        ws.openPopup(m);
+        expect(lastParts()).toEqual([rect(0, 0, 640, 239), rect(0, 439, 640, 359), rect(154, 239, 486, 200)]);
+      });
+
       it("os overlays (do Kubik e de outros scripts) nunca cortam", () => {
         ws.open(win("a"));
         ws.open(win("b"));
@@ -1009,6 +1026,7 @@ describe("Controller", () => {
         const o = new FakeWindow(OVERLAY_CAPTION, SCREEN_A, DESK_1, rect(0, 0, 1280, 800));
         o.resourceClass = "";
         o.wantsInput = false;
+        o.pid = -1; // janelas internas do KWin
         ws.openPopup(o);
         expect(lastParts()).toBeNull();
       });

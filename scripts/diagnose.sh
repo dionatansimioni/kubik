@@ -71,7 +71,8 @@ for (const w of workspace.stackingOrder) {
     console.warn(tag + " JANELA " + JSON.stringify({
         caption: w.caption, cls: w.resourceClass, name: w.resourceName, pid: w.pid,
         wayland: !w.x11, normal: w.normalWindow, dialog: w.dialog, utility: w.utility,
-        transient: w.transient, special: w.specialWindow, skipSwitcher: w.skipSwitcher,
+        transient: w.transient, special: w.specialWindow, popup: w.popupWindow,
+        wantsInput: w.wantsInput, skipSwitcher: w.skipSwitcher,
         skipTaskbar: w.skipTaskbar, hidden: w.hidden, minimized: w.minimized,
         visible: w.visible, opacity: w.opacity, fullScreen: w.fullScreen, maximize: w.maximizeMode,
         allDesktops: w.onAllDesktops, desktops: (w.desktops || []).map(d => d.id),

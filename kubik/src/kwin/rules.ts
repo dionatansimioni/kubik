@@ -23,10 +23,13 @@ export const DEFAULT_FLOATING_CLASSES = [
 /**
  * Overlays do próprio KWin/scripts (bordas, prévias): sem classe e fora do
  * Alt+Tab. No KWin 6.3 elas ainda aparecem no Alt+Tab; o que têm em toda
- * versão é não aceitar foco (wantsInput false).
+ * versão é não aceitar foco (wantsInput false). E não são de nenhum processo
+ * (pid -1): o menu de um app em Flatpak também chega sem classe, fora do
+ * Alt+Tab e sem foco, e só o pid o separa de um overlay (Lição 51).
  */
 export function isInternalWindow(w: KWinWindow): boolean {
-  return !w.resourceClass && (w.skipSwitcher || w.wantsInput === false);
+  if (w.resourceClass || (typeof w.pid === "number" && w.pid > 0)) return false;
+  return w.skipSwitcher || w.wantsInput === false;
 }
 
 /** Título das janelas de overlay do Kubik (borda, prévia, fantasma, abas): Kubik.qml. */

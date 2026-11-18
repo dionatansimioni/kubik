@@ -4,7 +4,8 @@ O KWin põe toda janela interna (os overlays do Kubik) na camada mais alta,
 acima até dos menus (Lição 51). Um menu do app em foco cruzando a beira da
 janela era cortado pela linha da borda. Agora a borda ganha um buraco onde o
 menu passa, e a barra de abas (que recebe cliques) some enquanto um menu a
-cobre. Layout: Alpha (4,4 634×792) | Beta (642,4 634×792); a borda da Beta
+cobre. Também o menu de um app em Flatpak, que o KWin entrega sem classe e
+sem foco, como um overlay. Layout: Alpha (4,4 634×792) | Beta (642,4 634×792); a borda da Beta
 passa em x≈640, e o menu dela (fundo #202020) cobre 493..793 × 240..440.
 """
 import os
@@ -29,6 +30,7 @@ class PopupOverOverlaysTest(unittest.TestCase):
         )
         cls.log = (cls.out / "kwin.log").read_text(errors="replace")
         cls.popups = dict(re.findall(r"=== POPUP (\w+) (\S+ \S+)", cls.log))
+        cls.flatpak = re.search(r"=== POPUP flatpak .*", cls.log)
 
     @classmethod
     def tearDownClass(cls):
@@ -68,6 +70,17 @@ class PopupOverOverlaysTest(unittest.TestCase):
         self.assertGreater(self.accent_share("tabs", 990, 1250), 0.6, "sem a barra de abas")
         self.assertLess(self.accent_share("tabs_menu", 990, 1250), 0.1, "barra de abas por cima do menu")
         self.assertGreater(self.accent_share("tabs_closed", 990, 1250), 0.6, "a barra não voltou")
+
+    def test_flatpak_menu_looks_like_an_overlay_except_for_the_pid(self):
+        # O caso do relato: sem classe (o KWin não acha o executável), mas de um processo.
+        self.assertIsNotNone(self.flatpak)
+        self.assertIn('class="" pid=true', self.flatpak.group(0))
+
+    @needs_pixels
+    def test_border_does_not_cross_the_menu_of_a_flatpak_app(self):
+        # Sem a correção, o menu passava por overlay e a linha o atravessava.
+        self.assertEqual(self.accent_column("flatpak_menu", 640, 250, 430), [], "borda por cima do menu")
+        self.assertNotEqual(self.accent_column("flatpak_menu", 640, 460, 790), [], "borda sumiu abaixo do menu")
 
     def test_no_qml_errors(self):
         for bad in ("TypeError", "ReferenceError", "is not defined", "Cannot read", "Cannot assign", "Unable to assign"):

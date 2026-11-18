@@ -46,6 +46,8 @@ export interface KWinWindow {
   skipSwitcher: boolean;
   /** false nas janelas internas do KWin (overlays de scripts), em qualquer versão. */
   readonly wantsInput?: boolean;
+  /** Processo do app; -1 nas janelas internas do KWin (overlays de scripts). */
+  readonly pid?: number;
   /** Fora da barra de tarefas. Junto com skipSwitcher: janela auxiliar oculta. */
   skipTaskbar: boolean;
   /** Fora do pager (miniaturas das áreas de trabalho). */
