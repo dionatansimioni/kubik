@@ -231,15 +231,15 @@ describe("Controller", () => {
       expect(s.frameGeometry).toEqual(rect(642, 4, 634, 792));
     });
 
-    it("com a opção desligada, ficam flutuantes", () => {
+    it("numa tela sem tiling, ficam flutuantes como as outras", () => {
       const h = fakeHost(ws);
       ctl.stop();
-      const off = new Controller(h.host, { ...DEFAULT_CONFIG, allDesktopsOff: ["dp-1"] });
+      const off = new Controller(h.host, { ...DEFAULT_CONFIG, screensOff: ["dp-1"] });
       off.start();
-      const a = ws.open(win("a"));
+      ws.open(win("a"));
       ws.open(sticky("s"));
-      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
-      expect(h.logs).toContain("flutuante 's': em todos os desktops (desligado nesta tela)");
+      expect(h.logs).toContain("flutuante 'a': tiling desligado nesta tela");
+      expect(h.logs).toContain("flutuante 's': tiling desligado nesta tela");
     });
   });
 
@@ -749,16 +749,51 @@ describe("Controller", () => {
       expect(borders[borders.length - 1]).toEqual(rect(-2, -2, 1284, 804));
     });
 
-    it("todos os desktops por tela: desligado só no DP-1", () => {
-      const s1 = win("s1");
-      s1.desktops = [];
-      const s2 = win("s2", SCREEN_B);
-      s2.desktops = [];
-      ws.open(s1);
-      ws.open(s2);
-      ctl.applySettings(settings({ allDesktopsOff: ["dp-1"] }));
-      expect(logs).toContain("flutuante 's1': em todos os desktops (desligado nesta tela)");
-      expect(s2.frameGeometry).toEqual(rect(1284, 4, 992, 992));
+    it("tela sem tiling: desligar o DP-1 solta só as janelas dele, e religar as põe de volta", () => {
+      const a = win("a");
+      const b = win("b");
+      const d = win("d", SCREEN_B);
+      const start = { ...a.frameGeometry };
+      ws.open(a);
+      ws.open(b);
+      ws.open(d);
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      ctl.applySettings(settings({ screensOff: ["dp-1"] }));
+      expect(logs).toContain("flutuante 'a': tiling desligado nesta tela");
+      expect(logs).toContain("flutuante 'b': tiling desligado nesta tela");
+      expect(a.frameGeometry).toEqual(start); // volta para onde estava antes do tiling
+      expect(d.frameGeometry).toEqual(rect(1284, 4, 992, 992));
+      ctl.applySettings(settings({ screensOff: [] }));
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      expect(b.frameGeometry).toEqual(rect(642, 4, 634, 792));
+    });
+
+    it("tela sem tiling: o nome da saída vale sem maiúsculas", () => {
+      ctl.applySettings(settings({ screensOff: ["DP-1"] }));
+      ws.open(win("a"));
+      expect(logs).toContain("flutuante 'a': tiling desligado nesta tela");
+    });
+
+    it("tela sem tiling: janela levada para ela flutua, e trazida de volta entra no tiling", () => {
+      ctl.applySettings(settings({ screensOff: ["hdmi-1"] }));
+      const a = ws.open(win("a"));
+      const b = ws.open(win("b"));
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+      b.output = SCREEN_B;
+      expect(logs).toContain("flutuante 'b': tiling desligado nesta tela");
+      expect(a.frameGeometry).toEqual(rect(4, 4, 1272, 792));
+      b.output = SCREEN_A;
+      expect(a.frameGeometry).toEqual(rect(4, 4, 634, 792));
+    });
+
+    it("tela sem tiling: Meta+Shift+seta não manda a janela para ela", () => {
+      ctl.applySettings(settings({ screensOff: ["hdmi-1"] }));
+      ws.open(win("a"));
+      const b = ws.open(win("b"));
+      ws.activate(b);
+      ctl.moveDirection("right");
+      expect(b.output).toBe(SCREEN_A);
+      expect(b.frameGeometry).toEqual(rect(642, 4, 634, 792));
     });
 
     it("a borda espera a duração da animação configurada (+50 ms) para voltar", () => {

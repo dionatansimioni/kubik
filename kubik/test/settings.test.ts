@@ -17,7 +17,7 @@ describe("parseSettings", () => {
         GapsOuter: "0",
         BorderEnabled: "false",
         BorderWidth: "5",
-        AllDesktopsOff: "HDMI-A-1",
+        ScreensOff: "HDMI-A-1",
         Exceptions: "Steam,org.gimp.GIMP",
         AnimDuration: "0",
         AnimCurve: "OutBack",
@@ -27,7 +27,7 @@ describe("parseSettings", () => {
       enabled: false,
       gaps: { inner: 8, outer: 0 },
       border: { enabled: false, width: 5 },
-      allDesktopsOff: ["hdmi-a-1"],
+      screensOff: ["hdmi-a-1"],
       exceptions: ["steam", "org.gimp.gimp"],
       animation: { duration: 0, curve: "OutBack" },
     });
@@ -50,6 +50,14 @@ describe("parseSettings", () => {
   });
 });
 
+describe("migração da 0.13.4", () => {
+  it("a tela desmarcada na chave antiga (AllDesktopsOff) fica sem tiling", () => {
+    expect(parseSettings(reader({ AllDesktopsOff: "HDMI-A-1" })).screensOff).toEqual(["hdmi-a-1"]);
+    expect(parseSettings(reader({ ScreensOff: "DP-1", AllDesktopsOff: "dp-1,HDMI-A-1" })).screensOff)
+      .toEqual(["dp-1", "hdmi-a-1"]);
+  });
+});
+
 describe("list", () => {
   it("separa por vírgula, tira espaços, vazios e repetidos, sem maiúsculas", () => {
     expect(list(" a, B ,,b,c ")).toEqual(["a", "b", "c"]);
@@ -62,7 +70,7 @@ describe("list", () => {
 describe("describeSettings", () => {
   it("resume numa linha", () => {
     expect(describeSettings(DEFAULT_SETTINGS)).toBe(
-      "tiling ligado; gaps 4/4; borda 3px; fora em todos os desktops: nenhuma tela; exceções: nenhuma; animação 250ms OutCubic",
+      "tiling ligado; gaps 4/4; borda 3px; telas sem tiling: nenhuma; exceções: nenhuma; animação 250ms OutCubic",
     );
   });
 });

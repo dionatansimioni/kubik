@@ -18,12 +18,20 @@ describe("bandeja: ida e volta pelo kwinrc", () => {
       enabled: false,
       gaps: { inner: 12, outer: 2 },
       exceptions: ["steam", "org.gimp.gimp"],
-      allDesktopsOff: ["hdmi-a-1"],
+      screensOff: ["hdmi-a-1"],
       animation: { duration: 0, curve: "OutBack" as const },
     };
     const v = kwinrcValues(s);
     const stdout = KEYS.map((k) => `${k}=${v[k]}`).join("\n");
     expect(parseRead(stdout)).toEqual(s);
+  });
+
+  it("grava as telas na chave nova e esvazia a antiga (senão religar uma tela não valeria)", () => {
+    const v = kwinrcValues({ ...DEFAULT_SETTINGS, screensOff: [] });
+    expect(v.ScreensOff).toBe("");
+    expect(v.AllDesktopsOff).toBe("");
+    expect(parseRead("ScreensOff=\nAllDesktopsOff=HDMI-A-1").screensOff).toEqual(["hdmi-a-1"]);
+    expect(parseRead(KEYS.map((k) => `${k}=${v[k]}`).join("\n")).screensOff).toEqual([]);
   });
 
   it("kwinrc sem nada (primeira vez): padrões", () => {

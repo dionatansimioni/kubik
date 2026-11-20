@@ -18,8 +18,8 @@ export interface Settings {
   enabled: boolean;
   gaps: Gaps;
   border: { enabled: boolean; width: number };
-  /** Telas (nome da saída, ex.: "DP-3") onde janelas "em todos os desktops" ficam FORA do tiling. */
-  allDesktopsOff: readonly string[];
+  /** Telas (nome da saída, ex.: "DP-3") sem tiling: as janelas nelas flutuam. */
+  screensOff: readonly string[];
   /** Apps que sempre flutuam (classe da janela ou nome do .desktop, sem maiúsculas). */
   exceptions: readonly string[];
   /** Animação: duração base em ms (0 = sem animação) e curva. */
@@ -30,7 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
   enabled: true,
   gaps: { outer: 4, inner: 4 },
   border: { enabled: true, width: 3 },
-  allDesktopsOff: [],
+  screensOff: [],
   exceptions: [],
   animation: { duration: 250, curve: "OutCubic" },
 };
@@ -85,7 +85,10 @@ export function parseSettings(read: ConfigReader): Settings {
       width: toInt(read("BorderWidth", d.border.width), d.border.width, LIMITS.borderWidth),
     },
     // Nomes de saída mantêm maiúsculas ("DP-3"): compara-se sem elas mesmo assim.
-    allDesktopsOff: list(read("AllDesktopsOff", "")),
+    // AllDesktopsOff é a chave antiga (até a 0.13.4, valia só para as janelas
+    // em todos os desktops): quem desmarcou uma tela queria a tela sem tiling.
+    // A bandeja grava a chave nova e esvazia a antiga.
+    screensOff: list([...list(read("ScreensOff", "")), ...list(read("AllDesktopsOff", ""))]),
     exceptions: list(read("Exceptions", "")),
     animation: {
       duration: toInt(read("AnimDuration", d.animation.duration), d.animation.duration, LIMITS.duration),
@@ -100,7 +103,7 @@ export function describeSettings(s: Settings): string {
     `tiling ${s.enabled ? "ligado" : "desligado"}`,
     `gaps ${s.gaps.inner}/${s.gaps.outer}`,
     `borda ${s.border.enabled ? `${s.border.width}px` : "desligada"}`,
-    `fora em todos os desktops: ${s.allDesktopsOff.join(",") || "nenhuma tela"}`,
+    `telas sem tiling: ${s.screensOff.join(",") || "nenhuma"}`,
     `exceções: ${s.exceptions.join(",") || "nenhuma"}`,
     `animação ${s.animation.duration}ms ${s.animation.curve}`,
   ].join("; ");

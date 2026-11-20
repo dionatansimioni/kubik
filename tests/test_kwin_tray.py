@@ -102,9 +102,18 @@ class TrayInPlasmaTest(unittest.TestCase):
         self.assertIn("borda desligada", self.log)
 
     @needs_popup_clicks
-    def test_all_desktops_per_screen(self):
-        self.assertEqual(self.rc["screen"]["AllOff"], "virtual-0")
-        self.assertIn("fora em todos os desktops: virtual-0", self.log)
+    def test_screen_checkbox_turns_tiling_off_on_that_screen(self):
+        self.assertEqual(self.rc["screen"]["ScreensOff"], "virtual-0")
+        self.assertEqual(self.rc["screen"]["Legacy"], "")
+        self.assertIn("telas sem tiling: virtual-0", self.log)
+        off = self.log.split("=== MARK screen ===")[1].split("=== MARK screen_on ===")[0]
+        self.assertIn("flutuante 'Alpha': tiling desligado nesta tela", off)
+        self.assertIn("flutuante 'Beta': tiling desligado nesta tela", off)
+        self.assertNotEqual(self.w["screen_off"]["Alpha"], self.w["gaps"]["Alpha"])
+        # Marcada de novo: as janelas voltam para o mesmo arranjo.
+        self.assertEqual(self.rc["screen_on"]["ScreensOff"], "")
+        self.assertEqual(self.w["screen_on"]["Alpha"], self.w["gaps"]["Alpha"])
+        self.assertEqual(self.w["screen_on"]["Beta"], self.w["gaps"]["Beta"])
 
     @needs_popup_clicks
     def test_exceptions_page_marks_an_open_app(self):

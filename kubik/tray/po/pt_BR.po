@@ -46,8 +46,8 @@ msgstr "px"
 msgid "Border"
 msgstr "Borda"
 
-msgid "Tile windows that are on all desktops"
-msgstr "Janelas em todos os desktops entram no tiling"
+msgid "Tile windows on these screens"
+msgstr "Fazer tiling nestas telas"
 
 msgid "Configure…"
 msgstr "Configurar…"

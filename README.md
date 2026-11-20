@@ -42,7 +42,7 @@
 - **Highlight border** around the focused window, in the system accent color.
 - **Smooth animations** (a companion KWin effect) with configurable duration and curve.
 - **Tray icon:**
-  - on/off, gaps, border, and per-screen "tile windows on all desktops";
+  - on/off, gaps, border, and tiling on/off per screen;
   - exceptions (apps that always float), picked from the open apps;
   - animation settings;
   - update check against GitHub releases (can be turned off).

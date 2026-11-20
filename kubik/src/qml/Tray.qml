@@ -75,7 +75,7 @@ Item {
             gapsOuter: cfg.gapsOuter,
             borderEnabled: cfg.borderEnabled,
             borderWidth: cfg.borderWidth,
-            allDesktopsOff: cfg.allDesktopsOff,
+            screensOff: cfg.screensOff,
             exceptions: cfg.exceptions,
             animDuration: cfg.animDuration,
             animCurve: cfg.animCurve
@@ -432,7 +432,7 @@ Item {
                 Kirigami.Heading {
                     Layout.topMargin: Kirigami.Units.largeSpacing
                     level: 4
-                    text: i18n("Tile windows that are on all desktops")
+                    text: i18n("Tile windows on these screens")
                     wrapMode: Text.Wrap
                     Layout.fillWidth: true
                 }
@@ -446,8 +446,8 @@ Item {
                         objectName: "screen-" + modelData.name
                         Layout.fillWidth: true
                         text: modelData.model ? modelData.name + " — " + modelData.model : modelData.name
-                        checked: !root.logic.inList(root.cfg.allDesktopsOff, modelData.name)
-                        onToggled: root.cfg.allDesktopsOff = root.logic.toggleInList(root.cfg.allDesktopsOff, modelData.name, !checked)
+                        checked: !root.logic.inList(root.cfg.screensOff, modelData.name)
+                        onToggled: root.cfg.screensOff = root.logic.toggleInList(root.cfg.screensOff, modelData.name, !checked)
                     }
                 }
 

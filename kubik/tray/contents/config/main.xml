@@ -11,7 +11,7 @@
     <entry name="gapsOuter" type="Int"><default>4</default></entry>
     <entry name="borderEnabled" type="Bool"><default>true</default></entry>
     <entry name="borderWidth" type="Int"><default>3</default></entry>
-    <entry name="allDesktopsOff" type="StringList"><default></default></entry>
+    <entry name="screensOff" type="StringList"><default></default></entry>
     <entry name="exceptions" type="StringList"><default></default></entry>
     <entry name="animDuration" type="Int"><default>250</default></entry>
     <entry name="animCurve" type="String"><default>OutCubic</default></entry>

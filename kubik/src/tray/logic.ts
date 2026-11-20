@@ -28,7 +28,8 @@ export const KEYS = [
   "GapsOuter",
   "BorderEnabled",
   "BorderWidth",
-  "AllDesktopsOff",
+  "ScreensOff",
+  "AllDesktopsOff", // chave antiga: lida para migrar, gravada vazia
   "Exceptions",
   "AnimDuration",
   "AnimCurve",
@@ -52,7 +53,7 @@ export interface TrayConfig {
   gapsOuter: number;
   borderEnabled: boolean;
   borderWidth: number;
-  allDesktopsOff: string[];
+  screensOff: string[];
   exceptions: string[];
   animDuration: number;
   animCurve: string;
@@ -65,7 +66,7 @@ export function toTrayConfig(s: Settings): TrayConfig {
     gapsOuter: s.gaps.outer,
     borderEnabled: s.border.enabled,
     borderWidth: s.border.width,
-    allDesktopsOff: [...s.allDesktopsOff],
+    screensOff: [...s.screensOff],
     exceptions: [...s.exceptions],
     animDuration: s.animation.duration,
     animCurve: s.animation.curve,
@@ -84,7 +85,7 @@ export function toSettings(c: Partial<TrayConfig>): Settings {
     GapsOuter: c.gapsOuter,
     BorderEnabled: c.borderEnabled,
     BorderWidth: c.borderWidth,
-    AllDesktopsOff: c.allDesktopsOff ? Array.from(c.allDesktopsOff as ArrayLike<string>) : undefined,
+    ScreensOff: c.screensOff ? Array.from(c.screensOff as ArrayLike<string>) : undefined,
     Exceptions: c.exceptions ? Array.from(c.exceptions as ArrayLike<string>) : undefined,
     AnimDuration: c.animDuration,
     AnimCurve: c.animCurve,
@@ -131,7 +132,8 @@ export function kwinrcValues(s: Settings): Record<(typeof KEYS)[number], string>
     GapsOuter: String(s.gaps.outer),
     BorderEnabled: String(s.border.enabled),
     BorderWidth: String(s.border.width),
-    AllDesktopsOff: s.allDesktopsOff.filter(isValidName).join(","),
+    ScreensOff: s.screensOff.filter(isValidName).join(","),
+    AllDesktopsOff: "",
     Exceptions: s.exceptions.filter(isValidName).join(","),
     AnimDuration: String(s.animation.duration),
     AnimCurve: s.animation.curve,

@@ -46,10 +46,11 @@ A bandeja também avisa de versão nova (ao iniciar e a cada 6 h; desliga em *Co
 ## O que já funciona
 
 - Janelas novas são organizadas em árvore BSP: a janela nova divide ao meio, pelo lado mais longo, a **maior** janela (no empate, a focada). Assim, 1 janela fica cheia, 2 ficam lado a lado, 3 ficam com metade + 2 quadrantes e 4 ficam em quadrantes. Minimizadas liberam o espaço.
-- Janelas **em todos os desktops** entram no tiling do desktop visível e acompanham a troca de desktop. Com o plugin "Virtual desktops only on primary", isso inclui todas as janelas da tela secundária. Dá para desligar isso por tela, na bandeja.
+- Janelas **em todos os desktops** entram no tiling do desktop visível e acompanham a troca de desktop. Com o plugin "Virtual desktops only on primary", isso inclui todas as janelas da tela secundária.
 - Uma janela que abre maximizada (ex.: o Chrome restaurando a sessão) entra no tile desmaximizada.
 - Fechar ou minimizar uma janela devolve o espaço às vizinhas.
 - Há uma árvore por tela × desktop virtual. Mover uma janela de tela ou de desktop a reorganiza no destino.
+- Dá para desligar o tiling de uma tela, na bandeja: as janelas nela flutuam.
 - Gaps de 4 px (ajustáveis na bandeja).
 - Ficam flutuantes, fora do tiling: janelas internas do KWin (bordas e prévias de scripts), janelas auxiliares ocultas (fora da barra de tarefas e do Alt+Tab, ou com opacidade 0, como a ponte de vídeo do XWayland), diálogos, transientes, splash, janelas de tamanho fixo ou não redimensionáveis, janelas em alguns desktops (2 ou mais, mas não todos), tela cheia, algumas classes do Plasma (krunner, plasmashell, yakuake…) e as **exceções** escolhidas na bandeja.
 - **Mouse:**

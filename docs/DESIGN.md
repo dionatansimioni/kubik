@@ -18,7 +18,8 @@ Decisões fechadas em 2026-11-09.
 
 - **Divisão:** BSP. A janela nova divide sempre uma das **maiores** janelas, ao meio e pelo lado mais longo. No empate, divide a focada. Resultado: 1 janela fica cheia, 2 ficam lado a lado, 3 ficam com uma metade e dois quadrantes, 4 ficam em quadrantes, e assim por diante. Decisão do usuário em 2026-11-10; antes a regra era dividir sempre a focada.
 - **Janelas minimizadas** saem do tiling e liberam o espaço; ao restaurar, voltam.
-- **Janelas em todos os desktops** entram na árvore do desktop visível daquela tela. Ao trocar de desktop, uma tela que só tem janelas assim leva a árvore inteira junto, com o mesmo arranjo; nas outras, cada uma muda de árvore. O padrão é ligado, e a bandeja terá uma opção por monitor. Decisão do usuário em 2026-11-10.
+- **Janelas em todos os desktops** entram na árvore do desktop visível daquela tela. Ao trocar de desktop, uma tela que só tem janelas assim leva a árvore inteira junto, com o mesmo arranjo; nas outras, cada uma muda de árvore. O padrão é ligado. Decisão do usuário em 2026-11-10.
+- **Tiling por monitor:** na bandeja, cada tela tem uma caixa. Desmarcada, nenhuma janela daquela tela entra no tiling: as que estavam voltam para onde estavam antes, e uma janela levada para lá flutua (Meta+Shift+seta não a manda para uma tela assim). Até a 0.13.4, a caixa valia só para as janelas em todos os desktops; quem a desmarcava esperava a tela inteira sem tiling (relato com dois monitores), e a 0.13.5 mudou. A chave do kwinrc passou de `AllDesktopsOff` para `ScreensOff`; o script lê as duas, e a bandeja grava a nova e esvazia a antiga. Decisão do usuário em 2026-11-20.
 - **Escopo:** uma árvore por tela × desktop virtual. Activities são ignoradas.
 - **Liga/desliga:** toggle global (Super+Y), com exceções por desktop/tela nas configurações. Ao desligar, as janelas voltam à geometria que tinham antes do tiling.
 - **Mouse:**
@@ -51,7 +52,7 @@ Decisões fechadas em 2026-11-09.
 
 Um applet QML na bandeja do sistema (`kubik/tray`, id `io.github.dionatansimioni.kubik`), separado do KWin Script. Desenho aprovado pelo usuário:
 
-- **Popup** (clique): liga/desliga, gaps (um valor), borda (liga/desliga + espessura) e, por tela, se as janelas "em todos os desktops" entram no tiling. Clique do meio liga/desliga.
+- **Popup** (clique): liga/desliga, gaps (um valor), borda (liga/desliga + espessura) e, por tela, se ela tem tiling. Clique do meio liga/desliga.
 - **Configurar…** (páginas do plasmoide): *Geral* (gaps internos e externos separados, borda), *Exceções* (apps abertos para marcar + campo para classe de app fechado + as embutidas, só leitura) e *Animação* (duração 0–600 ms e curva nomeada, com prévia animada).
 
 Comunicação:

@@ -5,7 +5,7 @@
 source /work/testenv/lib.sh
 
 rc() { kreadconfig6 --file kwinrc --group Script-kubik --key "$1"; }
-show_rc() { echo "=== RC $1 Enabled=$(rc Enabled) Gaps=$(rc GapsInner)/$(rc GapsOuter) Border=$(rc BorderEnabled)/$(rc BorderWidth) AllOff=$(rc AllDesktopsOff) Exc=$(rc Exceptions)" >&2; }
+show_rc() { echo "=== RC $1 Enabled=$(rc Enabled) Gaps=$(rc GapsInner)/$(rc GapsOuter) Border=$(rc BorderEnabled)/$(rc BorderWidth) ScreensOff=$(rc ScreensOff) Legacy=$(rc AllDesktopsOff) Exc=$(rc Exceptions)" >&2; }
 
 open_window Alpha 400x300 "#8b2f2f"
 open_window Beta 400x300 "#2f6b2f"
@@ -44,10 +44,16 @@ mark border
 click 843 176
 show_rc border
 
+# Desmarcar a única tela: tudo nela sai do tiling; marcar de novo: volta.
 mark screen
 click 843 233
 show_rc screen
+dump_windows screen_off
 screenshot popup_after
+mark screen_on
+click 843 233
+show_rc screen_on
+dump_windows screen_on
 
 mark configure
 click 1105 268 5

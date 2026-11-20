@@ -241,7 +241,7 @@ export class Controller {
     for (const t of this.tracked.values()) {
       const wasTiled = t.key !== null;
       this.refresh(t);
-      // Virou exceção (ou a tela deixou de ladrilhar "todos os desktops"):
+      // Virou exceção (ou a tela saiu do tiling):
       // volta para onde estava antes do tiling, como ao desligar.
       if (wasTiled && t.key === null && t.saved) {
         t.window.frameGeometry = copy(t.saved);
@@ -389,7 +389,7 @@ export class Controller {
   /** A tela vizinha de `from` naquela direção (pela área útil), ou null. */
   private screenToward(from: Output, dir: Direction): Output | null {
     const desk = this.host.workspace.currentDesktop;
-    const screens = (this.host.workspace.screens ?? []).filter((o) => o.name !== from.name);
+    const screens = (this.host.workspace.screens ?? []).filter((o) => o.name !== from.name && !this.screenOff(o));
     const id = neighbor(
       this.host.clientArea(from, desk),
       screens.map((o) => ({ id: o.name, rect: this.host.clientArea(o, desk) })),
@@ -814,9 +814,14 @@ export class Controller {
     if (rule !== null) return rule;
     const exception = this.exceptionOf(t.window);
     if (exception !== null) return `exceção do usuário (${exception})`;
-    if (t.window.onAllDesktops && this.config.allDesktopsOff.includes(t.window.output.name.toLowerCase()))
-      return "em todos os desktops (desligado nesta tela)";
+    if (this.screenOff(t.window.output)) return "tiling desligado nesta tela";
     return null;
+  }
+
+  /** A tela foi desmarcada na bandeja: nada nela entra no tiling. */
+  private screenOff(o: Output): boolean {
+    const name = o.name.toLowerCase();
+    return this.config.screensOff.some((s) => s.toLowerCase() === name);
   }
 
   /** Tela × desktop da janela; "em todos os desktops" = o desktop atual. */
